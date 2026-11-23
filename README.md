@@ -1,4 +1,6 @@
-# Omareel
+# SigmaOS Omareel
+
+> Forked from omacom/omareel (MIT). See `SIGMAOS_FORK.md`.
 
 Omareel is a native screen recorder and editor for Omarchy and Hyprland. It captures the
 screen without the system cursor, records pointer and keyboard activity separately, and then
