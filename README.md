@@ -27,7 +27,7 @@ cursor-following zooms. Finished projects export to MP4 or GIF.
 On SigmaOS, install from the SigmaOS package repository:
 
 ```sh
-omarchy-pkg-add omareel
+sigmaos-pkg-add omareel
 ```
 
 Prebuilt `x86_64` and `aarch64` packages are also attached to every
@@ -42,7 +42,7 @@ makepkg -si
 ```
 
 On SigmaOS, `./install-omarchy` first adds any missing runtime/build packages with
-`omarchy-pkg-add` (falling back to `pacman`) and then installs the same PKGBUILD.
+`sigmaos-pkg-add` (falling back to `pacman`) and then installs the same PKGBUILD.
 
 `gifsicle` is optional and can be installed for additional GIF optimization.
 
