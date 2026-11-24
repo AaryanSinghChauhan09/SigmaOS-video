@@ -174,3 +174,8 @@ Interface icons are from Lucide, used under the ISC license. See
 The interface is set in Inter, bundled under the SIL Open Font License 1.1. See
 [`LICENSES/inter.txt`](LICENSES/inter.txt). Numbers, timecodes, and keys use your Omarchy
 monospace font.
+## Documentation
+
+Wiki documentation is available in the SigmaOS Wiki Staging repository:
+
+- [SigmaOS Wiki Staging](https://github.com/AaryanSinghChauhan09/sigmaos-wiki-staging#SigmaOS-video) - Full Wiki documentation for all SigmaOS components
