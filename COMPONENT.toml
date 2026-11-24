@@ -1,6 +1,6 @@
 [component]
-name = "omareel"
-id = "sigmaos-omareel"
+name = "sigmaos-video"
+id = "sigmaos-video"
 kind = "component"
 license = "GPL-3.0-or-later"
 
