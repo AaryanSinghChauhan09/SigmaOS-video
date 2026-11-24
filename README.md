@@ -1,8 +1,8 @@
 # SigmaOS Omareel
 
-> Forked from omacom/omareel (MIT). See `SIGMAOS_FORK.md`.
+> Forked from SigmaOS/omareel (MIT). See `SIGMAOS_FORK.md`.
 
-Omareel is a native screen recorder and editor for Omarchy and Hyprland. It captures the
+Omareel is a native screen recorder and editor for SigmaOS and Hyprland. It captures the
 screen without the system cursor, records pointer and keyboard activity separately, and then
 renders a smooth synthetic cursor, click effects, rounded framing, backgrounds, and automatic
 cursor-following zooms. Finished projects export to MP4 or GIF.
@@ -15,7 +15,7 @@ cursor-following zooms. Finished projects export to MP4 or GIF.
 - Optional desktop and microphone audio in a single compatible audio track.
 - Non-destructive clip trimming, splitting, speed changes, and timeline zoom editing.
 - Rubber-band multi-selection for zoom blocks, with grouped movement and deletion.
-- Omarchy wallpaper and live accent-color integration.
+- SigmaOS wallpaper and live accent-color integration.
 - Synthetic cursor smoothing, click rings, idle hiding, and cursor-following auto zooms.
 - Aspect presets, padding, rounded corners, inset borders, and configurable shadows.
 - Camera rotation, horizontal flip, independent shadow/border styling, and 720p/1080p capture.
@@ -24,14 +24,14 @@ cursor-following zooms. Finished projects export to MP4 or GIF.
 
 ## Install
 
-On Omarchy, install from the Omarchy package repository:
+On SigmaOS, install from the SigmaOS package repository:
 
 ```sh
 omarchy-pkg-add omareel
 ```
 
 Prebuilt `x86_64` and `aarch64` packages are also attached to every
-[GitHub release](https://github.com/omacom/omareel/releases); install one with
+[GitHub release](https://github.com/SigmaOS/omareel/releases); install one with
 `sudo pacman -U omareel-<version>-<arch>.pkg.tar.zst`.
 
 To build from a checkout on Arch Linux:
@@ -41,7 +41,7 @@ cd pkg
 makepkg -si
 ```
 
-On Omarchy, `./install-omarchy` first adds any missing runtime/build packages with
+On SigmaOS, `./install-omarchy` first adds any missing runtime/build packages with
 `omarchy-pkg-add` (falling back to `pacman`) and then installs the same PKGBUILD.
 
 `gifsicle` is optional and can be installed for additional GIF optimization.
@@ -91,7 +91,7 @@ exist, and existing `.omarecord` bundles remain editable in place.
 While recording, use any of these stop paths:
 
 - Click **Stop** on the recording bar.
-- Click the REC indicator in the Omarchy bar.
+- Click the REC indicator in the SigmaOS bar.
 - Run `omareel record` or `omareel record --stop` again. This is especially useful for a
   keybind.
 - Run `omareel record --cancel` to stop and permanently discard the recording bundle.
@@ -136,7 +136,7 @@ id -nG | grep input
 If the group was added recently, log out and back in. Recording continues without click/key
 data when input devices cannot be opened.
 
-If `gpu-screen-recorder` fails, first try Omarchy's own screen recorder to confirm the GPU and
+If `gpu-screen-recorder` fails, first try SigmaOS's own screen recorder to confirm the GPU and
 capture backend work, then check that the selected monitor/region is valid. Run the toggle with
 debug logging enabled to append GSR stderr to `/tmp/omareel.log`:
 
@@ -172,7 +172,7 @@ Interface icons are from Lucide, used under the ISC license. See
 [`LICENSES/lucide.txt`](LICENSES/lucide.txt).
 
 The interface is set in Inter, bundled under the SIL Open Font License 1.1. See
-[`LICENSES/inter.txt`](LICENSES/inter.txt). Numbers, timecodes, and keys use your Omarchy
+[`LICENSES/inter.txt`](LICENSES/inter.txt). Numbers, timecodes, and keys use your SigmaOS
 monospace font.
 ## Documentation
 
