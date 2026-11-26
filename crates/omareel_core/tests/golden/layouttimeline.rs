@@ -15,12 +15,26 @@ struct Variant {
 
 #[test]
 fn sample_txt() {
-    let timelines = read_json("layouttimeline/cases.json").get("timelines").to_object();
-    let mut variants = vec![Variant { camera: false, bubble: true, transition: None }];
+    let timelines = read_json("layouttimeline/cases.json")
+        .get("timelines")
+        .to_object();
+    let mut variants = vec![Variant {
+        camera: false,
+        bubble: true,
+        transition: None,
+    }];
     for bubble in [false, true] {
-        variants.push(Variant { camera: true, bubble, transition: None });
+        variants.push(Variant {
+            camera: true,
+            bubble,
+            transition: None,
+        });
         for transition in [0.0, 0.25, 1.5] {
-            variants.push(Variant { camera: true, bubble, transition: Some(transition) });
+            variants.push(Variant {
+                camera: true,
+                bubble,
+                transition: Some(transition),
+            });
         }
     }
     let mut out = Text::new();
@@ -30,7 +44,8 @@ fn sample_txt() {
         let mut starts = vec![0.0];
         for clip in &clips {
             let last = *starts.last().expect("a start");
-            starts.push(last + cpp::max(0.0, (clip.out - clip.in_) / cpp::max(0.000001, clip.speed)));
+            starts
+                .push(last + cpp::max(0.0, (clip.out - clip.in_) / cpp::max(0.000001, clip.speed)));
         }
         let end = *starts.last().expect("a start");
         for v in &variants {

@@ -9,13 +9,13 @@ use omareel_record::capture::CaptureRegion;
 use omareel_record::capture_exclusion::{self, HardwareCursorHold};
 use omareel_record::recorder::audio::{AudioCaptureStart, finish_audio_capture, first_sample_us};
 use omareel_record::recorder::{
-    DiscardActions, GsrExitClassification, camera_capture_block, classify_gsr_exit, discard_timeline,
-    even_capture_region, microphone_missing, microphone_peak_db,
+    DiscardActions, GsrExitClassification, camera_capture_block, classify_gsr_exit,
+    discard_timeline, even_capture_region, microphone_missing, microphone_peak_db,
 };
 use omareel_record::region_picker::{is_click_selection, parse_capture_options};
 use omareel_record::screen_capture::{
-    CaptureRingBookkeeping, EncoderProbeResults, Rect, Size, SlotState, capture_crop_rows, capture_frame_header,
-    capture_stream_header, encoder_arguments,
+    CaptureRingBookkeeping, EncoderProbeResults, Rect, Size, SlotState, capture_crop_rows,
+    capture_frame_header, capture_stream_header, encoder_arguments,
 };
 use std::cell::RefCell;
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -51,7 +51,8 @@ impl Drop for Scratch {
 }
 
 fn have_ffmpeg() -> bool {
-    !qstandardpaths::find_executable("ffmpeg").is_empty() && !qstandardpaths::find_executable("ffprobe").is_empty()
+    !qstandardpaths::find_executable("ffmpeg").is_empty()
+        && !qstandardpaths::find_executable("ffprobe").is_empty()
 }
 
 #[test]
@@ -66,7 +67,11 @@ fn classifies_gsr_exit() {
         ("invalid duration", 0, false, 1024, f64::NAN, Failure),
     ];
     for (name, exit_code, stop_requested, file_size, duration, expected) in rows {
-        assert_eq!(classify_gsr_exit(exit_code, stop_requested, file_size, duration), expected, "{name}");
+        assert_eq!(
+            classify_gsr_exit(exit_code, stop_requested, file_size, duration),
+            expected,
+            "{name}"
+        );
     }
 }
 
@@ -82,27 +87,76 @@ fn trims_capture_region_to_even_size() {
         ..CaptureRegion::default()
     };
     let trimmed = even_capture_region(region.clone());
-    assert_eq!((trimmed.physical_width, trimmed.physical_height), (1520, 834));
-    assert_eq!((trimmed.width, trimmed.height, trimmed.x, trimmed.y), (1520.0, 834.0, 10.0, 20.0));
+    assert_eq!(
+        (trimmed.physical_width, trimmed.physical_height),
+        (1520, 834)
+    );
+    assert_eq!(
+        (trimmed.width, trimmed.height, trimmed.x, trimmed.y),
+        (1520.0, 834.0, 10.0, 20.0)
+    );
 
-    let region = CaptureRegion { scale: 2.0, width: 760.5, height: 418.0, physical_width: 1521, physical_height: 836, ..region };
+    let region = CaptureRegion {
+        scale: 2.0,
+        width: 760.5,
+        height: 418.0,
+        physical_width: 1521,
+        physical_height: 836,
+        ..region
+    };
     let scaled = even_capture_region(region.clone());
     assert_eq!((scaled.physical_width, scaled.physical_height), (1520, 836));
     assert_eq!((scaled.width, scaled.height), (760.0, 418.0));
 
-    let region = CaptureRegion { scale: 1.0, width: 1520.0, height: 836.0, physical_width: 1520, physical_height: 836, ..region };
+    let region = CaptureRegion {
+        scale: 1.0,
+        width: 1520.0,
+        height: 836.0,
+        physical_width: 1520,
+        physical_height: 836,
+        ..region
+    };
     let even = even_capture_region(region);
-    assert_eq!((even.physical_width, even.physical_height, even.width, even.height), (1520, 836, 1520.0, 836.0));
+    assert_eq!(
+        (
+            even.physical_width,
+            even.physical_height,
+            even.width,
+            even.height
+        ),
+        (1520, 836, 1520.0, 836.0)
+    );
 }
 
 #[test]
 fn camera_capture_block_includes_settings() {
-    let camera = camera_capture_block("/dev/video2", 1080, 1920, 1080, 30.0, 1234567, "ffmpeg-pipe", 90, true, "round", 16.0);
+    let camera = camera_capture_block(
+        "/dev/video2",
+        1080,
+        1920,
+        1080,
+        30.0,
+        1234567,
+        "ffmpeg-pipe",
+        90,
+        true,
+        "round",
+        16.0,
+    );
     assert_eq!(camera.value("backend").to_string_or(""), "ffmpeg-pipe");
     assert_eq!(camera.value("requestedHeight").to_int(0), 1080);
-    assert_eq!((camera.value("width").to_int(0), camera.value("height").to_int(0)), (1920, 1080));
+    assert_eq!(
+        (
+            camera.value("width").to_int(0),
+            camera.value("height").to_int(0)
+        ),
+        (1920, 1080)
+    );
     assert_eq!(camera.value("fps").to_double(0.0), 30.0);
-    assert_eq!(camera.value("first_frame_us").to_variant_long_long(), 1234567);
+    assert_eq!(
+        camera.value("first_frame_us").to_variant_long_long(),
+        1234567
+    );
     assert_eq!(camera.value("rotation").to_int(0), 90);
     assert!(camera.value("flipHorizontal").to_bool(false));
     assert_eq!(camera.value("shape").to_string_or(""), "round");
@@ -131,7 +185,14 @@ fn discard_timeline_never_drains() {
     assert_eq!(*camera_wait_ms.borrow(), 1000);
     assert_eq!(
         *calls.borrow(),
-        ["abort-capture", "kill-audio", "request-camera-stop", "wait-camera", "remove-bundle", "remove-state"]
+        [
+            "abort-capture",
+            "kill-audio",
+            "request-camera-stop",
+            "wait-camera",
+            "remove-bundle",
+            "remove-state"
+        ]
     );
 }
 
@@ -156,7 +217,11 @@ fn capture_ring_tracks_slots_and_drops() {
 
 #[test]
 fn capture_region_row_crop_math() {
-    let rows = capture_crop_rows(Size::new(3840, 2160), 3840 * 4, Rect::new(320, 240, 1280, 960));
+    let rows = capture_crop_rows(
+        Size::new(3840, 2160),
+        3840 * 4,
+        Rect::new(320, 240, 1280, 960),
+    );
     assert_eq!(rows.len(), 960);
     assert_eq!(rows[0].source_offset, 240 * 3840 * 4 + 320 * 4);
     assert_eq!((rows[0].destination_offset, rows[0].bytes), (0, 1280 * 4));
@@ -183,49 +248,111 @@ fn capture_stream_keeps_frame_times_and_colours() {
     let times_us = [0, 16667, 100000, 116667, 500000];
     let mut stream = capture_stream_header(size, 60);
     for &time_us in &times_us {
-        let frame: Vec<u8> = (0..size.width * size.height).flat_map(|_| [0xc8, 0x32, 0x0a, 0xff]).collect(); // B, G, R, X
+        let frame: Vec<u8> = (0..size.width * size.height)
+            .flat_map(|_| [0xc8, 0x32, 0x0a, 0xff])
+            .collect(); // B, G, R, X
         stream.extend(capture_frame_header(time_us, frame.len() as i64));
         stream.extend(frame);
     }
     // The arguments a recording without NVENC runs ffmpeg with.
-    let arguments = encoder_arguments(size, 60, &EncoderProbeResults::default(), None, None, &video).arguments;
+    let arguments = encoder_arguments(
+        size,
+        60,
+        &EncoderProbeResults::default(),
+        None,
+        None,
+        &video,
+    )
+    .arguments;
     let mut encoder = Process::new();
     encoder.start("ffmpeg", &arguments);
     assert!(encoder.wait_for_started(5000));
     encoder.write(&stream);
     encoder.close_write_channel();
     assert!(encoder.wait_for_finished(30000));
-    assert_eq!(encoder.exit_code(), 0, "{}", String::from_utf8_lossy(&encoder.read_all_standard_error()));
+    assert_eq!(
+        encoder.exit_code(),
+        0,
+        "{}",
+        String::from_utf8_lossy(&encoder.read_all_standard_error())
+    );
 
     let mut probe = Process::new();
     probe.start(
         "ffprobe",
-        &["-v", "error", "-select_streams", "v", "-show_entries", "packet=pts_time:format=duration", "-of", "csv=p=0", &video],
+        &[
+            "-v",
+            "error",
+            "-select_streams",
+            "v",
+            "-show_entries",
+            "packet=pts_time:format=duration",
+            "-of",
+            "csv=p=0",
+            &video,
+        ],
     );
     assert!(probe.wait_for_finished(10000));
     let output = String::from_utf8_lossy(&probe.read_all_standard_output()).into_owned();
     let lines: Vec<&str> = output.split('\n').filter(|line| !line.is_empty()).collect();
     assert_eq!(lines.len(), times_us.len() + 1);
     for (line, &time_us) in lines.iter().zip(&times_us) {
-        assert!((line.parse::<f64>().unwrap() - time_us as f64 / 1e6).abs() < 0.001, "{line}");
+        assert!(
+            (line.parse::<f64>().unwrap() - time_us as f64 / 1e6).abs() < 0.001,
+            "{line}"
+        );
     }
     assert!((lines.last().unwrap().parse::<f64>().unwrap() - (0.5 + 1.0 / 60.0)).abs() < 0.001);
 
     let mut decoder = Process::new();
-    decoder.start("ffmpeg", &["-v", "error", "-i", &video, "-frames:v", "1", "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]);
+    decoder.start(
+        "ffmpeg",
+        &[
+            "-v",
+            "error",
+            "-i",
+            &video,
+            "-frames:v",
+            "1",
+            "-pix_fmt",
+            "rgb24",
+            "-f",
+            "rawvideo",
+            "-",
+        ],
+    );
     assert!(decoder.wait_for_finished(10000));
     let rgb = decoder.read_all_standard_output();
     assert!(rgb.len() >= 3);
     let near = |value: u8, expected: i32| (i32::from(value) - expected).abs() <= 4;
-    assert!(near(rgb[0], 10) && near(rgb[1], 50) && near(rgb[2], 200), "{},{},{}", rgb[0], rgb[1], rgb[2]);
+    assert!(
+        near(rgb[0], 10) && near(rgb[1], 50) && near(rgb[2], 200),
+        "{},{},{}",
+        rgb[0],
+        rgb[1],
+        rgb[2]
+    );
     // Converted with BT.709, and tagged so (players read untagged HD as BT.709 anyway).
     let mut tags = Process::new();
     tags.start(
         "ffprobe",
-        &["-v", "error", "-select_streams", "v", "-show_entries", "stream=color_space,color_range", "-of", "csv=p=0", &video],
+        &[
+            "-v",
+            "error",
+            "-select_streams",
+            "v",
+            "-show_entries",
+            "stream=color_space,color_range",
+            "-of",
+            "csv=p=0",
+            &video,
+        ],
     );
     assert!(tags.wait_for_finished(10000));
-    assert_eq!(String::from_utf8_lossy(&tags.read_all_standard_output()).trim(), "tv,bt709");
+    assert_eq!(
+        String::from_utf8_lossy(&tags.read_all_standard_output()).trim(),
+        "tv,bt709"
+    );
 }
 
 #[test]
@@ -241,11 +368,24 @@ fn killed_capture_encoder_leaves_a_playable_video() {
     // Two seconds of a still screen (small frames), then the encoder is killed without warning.
     let mut stream = capture_stream_header(size, 60);
     for index in 0..120i64 {
-        let frame: Vec<u8> = (0..size.width * size.height).flat_map(|_| [0x40, 0x80, 0xc0, 0xff]).collect();
-        stream.extend(capture_frame_header(index * 1_000_000 / 60, frame.len() as i64));
+        let frame: Vec<u8> = (0..size.width * size.height)
+            .flat_map(|_| [0x40, 0x80, 0xc0, 0xff])
+            .collect();
+        stream.extend(capture_frame_header(
+            index * 1_000_000 / 60,
+            frame.len() as i64,
+        ));
         stream.extend(frame);
     }
-    let arguments = encoder_arguments(size, 60, &EncoderProbeResults::default(), None, None, &video).arguments;
+    let arguments = encoder_arguments(
+        size,
+        60,
+        &EncoderProbeResults::default(),
+        None,
+        None,
+        &video,
+    )
+    .arguments;
     let mut encoder = Process::new();
     encoder.start("ffmpeg", &arguments);
     assert!(encoder.wait_for_started(5000));
@@ -255,10 +395,24 @@ fn killed_capture_encoder_leaves_a_playable_video() {
         let mut probe = Process::new();
         probe.start(
             "ffprobe",
-            &["-v", "error", "-count_packets", "-select_streams", "v", "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", &video],
+            &[
+                "-v",
+                "error",
+                "-count_packets",
+                "-select_streams",
+                "v",
+                "-show_entries",
+                "stream=nb_read_packets",
+                "-of",
+                "csv=p=0",
+                &video,
+            ],
         );
         probe.wait_for_finished(10000);
-        String::from_utf8_lossy(&probe.read_all_standard_output()).trim().parse::<i32>().unwrap_or(0)
+        String::from_utf8_lossy(&probe.read_all_standard_output())
+            .trim()
+            .parse::<i32>()
+            .unwrap_or(0)
     };
     // The first one-second fragment reaches the file once the second keyframe is encoded.
     let started = Instant::now();
@@ -282,9 +436,41 @@ fn stuck_audio_capture_stops_quickly_and_keeps_its_audio() {
     let screen = scratch.file("screen-video.mp4");
     let audio = scratch.file("audio.mka");
     let mut make = Process::new();
-    make.start("ffmpeg", &["-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30", "-t", "2", "-c:v", "libx264", &screen]);
+    make.start(
+        "ffmpeg",
+        &[
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=320x180:rate=30",
+            "-t",
+            "2",
+            "-c:v",
+            "libx264",
+            &screen,
+        ],
+    );
     assert!(make.wait_for_finished(30000) && make.exit_code() == 0);
-    make.start("ffmpeg", &["-y", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000", "-t", "2", "-c:a", "aac", &audio]);
+    make.start(
+        "ffmpeg",
+        &[
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=48000",
+            "-t",
+            "2",
+            "-c:a",
+            "aac",
+            &audio,
+        ],
+    );
     assert!(make.wait_for_finished(30000) && make.exit_code() == 0);
     // ffmpeg blocked on a PipeWire source that sends nothing never acts on SIGINT.
     let deaf_recorder = |process: &mut Process| {
@@ -295,22 +481,61 @@ fn stuck_audio_capture_stops_quickly_and_keeps_its_audio() {
     let mut stuck = Process::new();
     assert!(deaf_recorder(&mut stuck));
     let output = scratch.file("screen.mp4");
-    let start = AudioCaptureStart { started: true, started_us: Some(0), realtime_offset_us: 0 };
+    let start = AudioCaptureStart {
+        started: true,
+        started_us: Some(0),
+        realtime_offset_us: 0,
+    };
     let started = Instant::now();
     assert!(finish_audio_capture(&mut stuck, &screen, &audio, &output, 0, &start, 2000000).muxed);
-    assert!(started.elapsed().as_millis() < 5000, "{:?}", started.elapsed());
+    assert!(
+        started.elapsed().as_millis() < 5000,
+        "{:?}",
+        started.elapsed()
+    );
     assert_eq!(stuck.state(), ProcessState::NotRunning);
     let mut probe = Process::new();
-    probe.start("ffprobe", &["-v", "error", "-select_streams", "a", "-show_entries", "stream=codec_type", "-of", "csv=p=0", &output]);
+    probe.start(
+        "ffprobe",
+        &[
+            "-v",
+            "error",
+            "-select_streams",
+            "a",
+            "-show_entries",
+            "stream=codec_type",
+            "-of",
+            "csv=p=0",
+            &output,
+        ],
+    );
     assert!(probe.wait_for_finished(15000));
-    assert_eq!(String::from_utf8_lossy(&probe.read_all_standard_output()).trim(), "audio");
+    assert_eq!(
+        String::from_utf8_lossy(&probe.read_all_standard_output()).trim(),
+        "audio"
+    );
 
     // Nothing ever reached the file: no audio, and still no long wait.
     let mut silent = Process::new();
     assert!(deaf_recorder(&mut silent));
     let started = Instant::now();
-    assert!(!finish_audio_capture(&mut silent, &screen, &scratch.file("none.mka"), &scratch.file("silent.mp4"), 0, &start, 2000000).muxed);
-    assert!(started.elapsed().as_millis() < 5000, "{:?}", started.elapsed());
+    assert!(
+        !finish_audio_capture(
+            &mut silent,
+            &screen,
+            &scratch.file("none.mka"),
+            &scratch.file("silent.mp4"),
+            0,
+            &start,
+            2000000
+        )
+        .muxed
+    );
+    assert!(
+        started.elapsed().as_millis() < 5000,
+        "{:?}",
+        started.elapsed()
+    );
 }
 
 #[test]
@@ -322,7 +547,10 @@ fn audio_is_placed_by_its_first_sample() {
     let started_us = 345_600_000;
     assert_eq!(first_sample_us(log, started_us, offset), Some(345_678_900));
     // No start line, or one from a wall clock that jumped: none.
-    assert_eq!(first_sample_us("Input #0, pulse, from 'x':\n", started_us, offset), None);
+    assert_eq!(
+        first_sample_us("Input #0, pulse, from 'x':\n", started_us, offset),
+        None
+    );
     assert_eq!(first_sample_us(log, started_us, offset - 60_000_000), None);
 }
 
@@ -353,8 +581,11 @@ fn recording_holds_hardware_cursors() {
     environment.set("XDG_RUNTIME_DIR", &runtime);
     environment.set("HYPRLAND_INSTANCE_SIGNATURE", "test-instance");
     let calls = || {
-        let lines: Vec<String> =
-            std::fs::read_to_string(&log).unwrap_or_default().lines().map(str::to_owned).collect();
+        let lines: Vec<String> = std::fs::read_to_string(&log)
+            .unwrap_or_default()
+            .lines()
+            .map(str::to_owned)
+            .collect();
         let _ = std::fs::remove_file(&log);
         lines
     };
@@ -369,7 +600,10 @@ fn recording_holds_hardware_cursors() {
     let hold = HardwareCursorHold::new();
     let held = read_marker().expect("the hold's marker");
     assert_eq!(held.value("previous").to_int(-1), 2);
-    assert_eq!(held.value("pid").to_variant_long_long(), i64::from(std::process::id()));
+    assert_eq!(
+        held.value("pid").to_variant_long_long(),
+        i64::from(std::process::id())
+    );
     assert_eq!(held.value("instance").to_string_or(""), "test-instance");
     // This process's own marker is not abandoned.
     assert!(!capture_exclusion::restore_abandoned_hardware_cursor());
@@ -404,7 +638,10 @@ fn recording_holds_hardware_cursors() {
     );
     // Hyprland 0.56 refuses eval under a hyprlang config with hyprctl's exit status still 0.
     environment.set("OMAREEL_TEST_EVAL_EXIT", "0");
-    environment.set("OMAREEL_TEST_EVAL_REPLY", "eval is only supported with the lua config manager");
+    environment.set(
+        "OMAREEL_TEST_EVAL_REPLY",
+        "eval is only supported with the lua config manager",
+    );
     drop(HardwareCursorHold::new());
     assert_eq!(
         calls(),
@@ -422,7 +659,13 @@ fn recording_holds_hardware_cursors() {
     let hold = HardwareCursorHold::new();
     environment.set("OMAREEL_TEST_KEYWORD_EXIT", "1");
     drop(hold);
-    assert_eq!(read_marker().expect("kept for a retry").value("previous").to_int(-1), 1);
+    assert_eq!(
+        read_marker()
+            .expect("kept for a retry")
+            .value("previous")
+            .to_int(-1),
+        1
+    );
     std::fs::remove_file(&marker).unwrap();
     drop(HardwareCursorHold::new());
     assert!(read_marker().is_none());
@@ -431,13 +674,20 @@ fn recording_holds_hardware_cursors() {
     calls();
 
     // A recorder that died holding the setting: the next start puts it back.
-    let mut exited = std::process::Command::new("/bin/sh").args(["-c", "exit 0"]).spawn().unwrap();
+    let mut exited = std::process::Command::new("/bin/sh")
+        .args(["-c", "exit 0"])
+        .spawn()
+        .unwrap();
     exited.wait().unwrap();
-    let marker_of = |instance: &str| runtime.join(format!("omareel/hardware-cursor-hold-{instance}.json"));
+    let marker_of =
+        |instance: &str| runtime.join(format!("omareel/hardware-cursor-hold-{instance}.json"));
     let abandoned = |previous: i32, instance: &str| {
         std::fs::write(
             marker_of(instance),
-            format!("{{\"previous\": {previous}, \"pid\": {}, \"instance\": \"{instance}\"}}", exited.id()),
+            format!(
+                "{{\"previous\": {previous}, \"pid\": {}, \"instance\": \"{instance}\"}}",
+                exited.id()
+            ),
         )
         .unwrap();
     };
@@ -447,7 +697,10 @@ fn recording_holds_hardware_cursors() {
     assert!(read_marker().is_none());
     assert_eq!(
         calls(),
-        ["-j getoption cursor:no_hardware_cursors", "eval hl.config({ cursor = { no_hardware_cursors = 2 } })"]
+        [
+            "-j getoption cursor:no_hardware_cursors",
+            "eval hl.config({ cursor = { no_hardware_cursors = 2 } })"
+        ]
     );
     // Nothing abandoned: no calls.
     assert!(!capture_exclusion::restore_abandoned_hardware_cursor());
@@ -472,8 +725,15 @@ fn recording_holds_hardware_cursors() {
     assert!(calls().is_empty());
     environment.set("OMAREEL_TEST_CURSOR", "2");
     let hold = HardwareCursorHold::new();
-    assert_eq!(read_marker().expect("this instance's marker").value("previous").to_int(-1), 2);
-    let other = std::fs::read_to_string(marker_of("other-instance")).expect("the other instance's marker");
+    assert_eq!(
+        read_marker()
+            .expect("this instance's marker")
+            .value("previous")
+            .to_int(-1),
+        2
+    );
+    let other =
+        std::fs::read_to_string(marker_of("other-instance")).expect("the other instance's marker");
     assert!(other.contains("\"previous\": 3"), "{other}");
     drop(hold);
     assert!(read_marker().is_none());
@@ -500,18 +760,29 @@ fn recording_holds_hardware_cursors() {
         let ready = scratch.file("locked");
         let mut holder = std::process::Command::new("/usr/bin/flock")
             .arg(&lock)
-            .args(["/bin/sh", "-c", &format!(": > '{ready}'; exec /usr/bin/sleep 0.6")])
+            .args([
+                "/bin/sh",
+                "-c",
+                &format!(": > '{ready}'; exec /usr/bin/sleep 0.6"),
+            ])
             .spawn()
             .unwrap();
         while !std::path::Path::new(&ready).exists() {
             std::thread::sleep(std::time::Duration::from_millis(5));
         }
         // Meanwhile the "recorder" replaced the dead one's marker with its own live one.
-        let live = format!("{{\"previous\": 2, \"pid\": {}, \"instance\": \"test-instance\"}}", std::process::id());
+        let live = format!(
+            "{{\"previous\": 2, \"pid\": {}, \"instance\": \"test-instance\"}}",
+            std::process::id()
+        );
         std::fs::write(&marker, live).unwrap();
         let started = Instant::now();
         assert!(!capture_exclusion::restore_abandoned_hardware_cursor());
-        assert!(started.elapsed().as_millis() >= 400, "{:?}", started.elapsed());
+        assert!(
+            started.elapsed().as_millis() >= 400,
+            "{:?}",
+            started.elapsed()
+        );
         holder.wait().unwrap();
         assert!(read_marker().is_some());
         assert!(calls().is_empty());
@@ -588,15 +859,31 @@ fn capture_exclusion_checks_hash_before_loading() {
     std::fs::write(&sidecar, "b".repeat(40)).unwrap();
     let mismatch = capture_exclusion::ensure_loaded("");
     assert!(!mismatch.loaded);
-    assert!(mismatch.reason.contains("rebuilding"), "{}", mismatch.reason);
-    assert!(!std::fs::read_to_string(&log).unwrap().contains("plugin load"));
+    assert!(
+        mismatch.reason.contains("rebuilding"),
+        "{}",
+        mismatch.reason
+    );
+    assert!(
+        !std::fs::read_to_string(&log)
+            .unwrap()
+            .contains("plugin load")
+    );
     std::fs::write(&sidecar, "a".repeat(40)).unwrap();
     let refused = capture_exclusion::ensure_loaded("");
     assert!(!refused.loaded);
     assert!(refused.reason.contains("refused"), "{}", refused.reason);
-    assert!(std::fs::read_to_string(&log).unwrap().contains("plugin load"));
+    assert!(
+        std::fs::read_to_string(&log)
+            .unwrap()
+            .contains("plugin load")
+    );
     environment.set("OMAREEL_PLUGIN_PATH", scratch.file("absent.so"));
-    assert!(capture_exclusion::ensure_loaded("").reason.contains("does not exist"));
+    assert!(
+        capture_exclusion::ensure_loaded("")
+            .reason
+            .contains("does not exist")
+    );
 }
 
 // A package holds a plugin build per Hyprland version (one beside the program's plugin/, others
@@ -633,7 +920,8 @@ fn capture_exclusion_loads_the_build_for_the_running_hyprland() {
             ),
         )
         .unwrap();
-        std::fs::set_permissions(&mock, std::os::unix::fs::PermissionsExt::from_mode(0o700)).unwrap();
+        std::fs::set_permissions(&mock, std::os::unix::fs::PermissionsExt::from_mode(0o700))
+            .unwrap();
     };
     let mut environment = ScopedEnvironment::new();
     environment.set("PATH", &scratch.0);
@@ -643,14 +931,25 @@ fn capture_exclusion_loads_the_build_for_the_running_hyprland() {
     capture_exclusion::ensure_loaded(&application);
     let calls = std::fs::read_to_string(&log).unwrap();
     assert!(calls.contains(&format!("plugin load {older}")), "{calls}");
-    assert!(!calls.contains(&format!("plugin load {current}")), "{calls}");
+    assert!(
+        !calls.contains(&format!("plugin load {current}")),
+        "{calls}"
+    );
 
     std::fs::remove_file(&log).unwrap();
     write_mock(&"c".repeat(40));
     let mismatch = capture_exclusion::ensure_loaded(&application);
-    assert!(mismatch.reason.contains("rebuilding"), "{}", mismatch.reason);
+    assert!(
+        mismatch.reason.contains("rebuilding"),
+        "{}",
+        mismatch.reason
+    );
     assert_eq!(mismatch.built_hash, "b".repeat(40));
-    assert!(!std::fs::read_to_string(&log).unwrap().contains("plugin load"));
+    assert!(
+        !std::fs::read_to_string(&log)
+            .unwrap()
+            .contains("plugin load")
+    );
 }
 
 #[test]
@@ -659,10 +958,19 @@ fn missing_microphone_falls_back_to_default() {
         "alsa_input.platform-mtk_sdw_mc.HiFi__Mic__source",
         "alsa_input.usb-Insta360_Insta360_Link_2-02.mono-fallback",
     ];
-    assert!(!microphone_missing("alsa_input.usb-Insta360_Insta360_Link_2-02.mono-fallback", &sources));
-    assert!(microphone_missing("alsa_input.usb-Elgato_Cam_Link_4K-02.analog-stereo", &sources));
+    assert!(!microphone_missing(
+        "alsa_input.usb-Insta360_Insta360_Link_2-02.mono-fallback",
+        &sources
+    ));
+    assert!(microphone_missing(
+        "alsa_input.usb-Elgato_Cam_Link_4K-02.analog-stereo",
+        &sources
+    ));
     assert!(!microphone_missing("default_input", &sources));
-    assert!(!microphone_missing("alsa_input.usb-Elgato_Cam_Link_4K-02.analog-stereo", &[] as &[&str]));
+    assert!(!microphone_missing(
+        "alsa_input.usb-Elgato_Cam_Link_4K-02.analog-stereo",
+        &[] as &[&str]
+    ));
 }
 
 #[test]

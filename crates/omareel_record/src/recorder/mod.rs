@@ -45,7 +45,11 @@ pub fn classify_gsr_exit(
     if exit_code != 0 || file_size <= 0 || !probed_duration.is_finite() || probed_duration <= 0.0 {
         return GsrExitClassification::Failure;
     }
-    if stop_requested { GsrExitClassification::UserStop } else { GsrExitClassification::ExternalStop }
+    if stop_requested {
+        GsrExitClassification::UserStop
+    } else {
+        GsrExitClassification::ExternalStop
+    }
 }
 
 /// `Recorder::evenCaptureRegion`: yuv420p encoders refuse odd frame sizes, so the physical size
@@ -89,10 +93,17 @@ pub fn camera_capture_block(
     shape: &str,
     radius: f64,
 ) -> Object {
-    let camera_shape = if shape == "square" || shape == "rectangle" { shape } else { "round" };
+    let camera_shape = if shape == "square" || shape == "rectangle" {
+        shape
+    } else {
+        "round"
+    };
     let mut block = Object::new();
     block.insert("device", device);
-    block.insert("requestedHeight", if requested_height == 720 { 720 } else { 1080 });
+    block.insert(
+        "requestedHeight",
+        if requested_height == 720 { 720 } else { 1080 },
+    );
     block.insert("width", width);
     block.insert("height", height);
     block.insert("fps", fps);
@@ -145,7 +156,9 @@ pub fn discard_timeline(actions: &mut DiscardActions) -> bool {
 /// sources, so the default one has to stand in. `default_input` is never missing, and an empty
 /// list (pactl failed) says nothing either way.
 pub fn microphone_missing<S: AsRef<str>>(device: &str, sources: &[S]) -> bool {
-    device != "default_input" && !sources.is_empty() && !sources.iter().any(|source| source.as_ref() == device)
+    device != "default_input"
+        && !sources.is_empty()
+        && !sources.iter().any(|source| source.as_ref() == device)
 }
 
 /// `QString::section(sep, start, end)` with the default flags and non-negative bounds: the
@@ -174,7 +187,11 @@ pub fn microphone_peak_db(ffmpeg_log: &str) -> f64 {
         let value = section(line, "] ", 1, None);
         if value.starts_with("n_samples:") {
             let samples = qnumber::to_long_long(&section(&value, " ", 1, Some(1))).unwrap_or(0);
-            peak = if samples == 0 { f64::NEG_INFINITY } else { f64::NAN };
+            peak = if samples == 0 {
+                f64::NEG_INFINITY
+            } else {
+                f64::NAN
+            };
         } else if value.starts_with("max_volume:") {
             if let Some(decibels) = qnumber::to_double(&section(&value, " ", 1, Some(1))) {
                 peak = decibels;
@@ -199,7 +216,11 @@ pub fn command_output<S: AsRef<str>>(program: &str, arguments: &[S]) -> String {
 /// `daemonMain` gets it from [`command_output`]): the second TAB-separated field of every
 /// non-empty line, empty when a line has none.
 pub fn pactl_source_names(output: &str) -> Vec<String> {
-    output.split('\n').filter(|line| !line.is_empty()).map(|line| section(line, "\t", 1, Some(1))).collect()
+    output
+        .split('\n')
+        .filter(|line| !line.is_empty())
+        .map(|line| section(line, "\t", 1, Some(1)))
+        .collect()
 }
 
 /// `daemonMain`'s list of the audio server's sources (lines 803–807): `pactl list short sources`
@@ -211,7 +232,10 @@ pub fn pactl_sources() -> Vec<String> {
 /// The file-static `valueAfter`: the argument after the first `name`, or empty when there is
 /// none (or `name` is last).
 pub fn value_after<S: AsRef<str>>(arguments: &[S], name: &str) -> String {
-    match arguments.iter().position(|argument| argument.as_ref() == name) {
+    match arguments
+        .iter()
+        .position(|argument| argument.as_ref() == name)
+    {
         Some(index) if index + 1 < arguments.len() => arguments[index + 1].as_ref().to_owned(),
         _ => String::new(),
     }
@@ -237,7 +261,10 @@ pub fn realtime_us() -> i64 {
 }
 
 fn clock_us(clock: libc::clockid_t) -> i64 {
-    let mut now = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+    let mut now = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
     // SAFETY: clock_gettime writes one timespec.
     unsafe { libc::clock_gettime(clock, &mut now) };
     now.tv_sec * 1_000_000 + now.tv_nsec / 1000
@@ -246,7 +273,9 @@ fn clock_us(clock: libc::clockid_t) -> i64 {
 /// `qEnvironmentVariable(name)`: the variable as UTF-8 text, empty when unset.
 pub(crate) fn environment_variable(name: &str) -> String {
     use std::os::unix::ffi::OsStrExt;
-    std::env::var_os(name).map(|value| qstring::from_utf8(value.as_bytes())).unwrap_or_default()
+    std::env::var_os(name)
+        .map(|value| qstring::from_utf8(value.as_bytes()))
+        .unwrap_or_default()
 }
 
 /// The file-static `debugStartStage` of `Recorder.cpp` and `ScreenCapture.cpp`: with
@@ -257,7 +286,11 @@ pub fn debug_start_stage(stage: &str, start_us: i64, detail: &str) {
     if environment_variable("OMAREEL_DEBUG") != "1" {
         return;
     }
-    let Ok(mut file) = std::fs::OpenOptions::new().append(true).create(true).open("/tmp/omareel.log") else {
+    let Ok(mut file) = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open("/tmp/omareel.log")
+    else {
         return;
     };
     let now = monotonic_us();

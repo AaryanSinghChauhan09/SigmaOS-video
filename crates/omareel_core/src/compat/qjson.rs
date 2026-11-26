@@ -51,7 +51,12 @@ impl Value {
     /// A `QJsonArray` of the values. Qt stores an `Undefined` element as null, so build
     /// arrays through this (or `From<Vec<Value>>`) rather than `Value::Array` directly.
     pub fn array(items: Vec<Value>) -> Value {
-        Value::Array(items.into_iter().map(|v| if v.is_undefined() { Value::Null } else { v }).collect())
+        Value::Array(
+            items
+                .into_iter()
+                .map(|v| if v.is_undefined() { Value::Null } else { v })
+                .collect(),
+        )
     }
 
     /// `QJsonValue(double)`: a whole number within ±2^53 becomes an integer, anything else
@@ -108,7 +113,9 @@ impl Value {
     pub fn to_int(&self, default: i32) -> i32 {
         match self {
             Value::Int(n) => i32::try_from(*n).unwrap_or(default),
-            Value::Double(d) => whole_i64(*d).and_then(|n| i32::try_from(n).ok()).unwrap_or(default),
+            Value::Double(d) => whole_i64(*d)
+                .and_then(|n| i32::try_from(n).ok())
+                .unwrap_or(default),
             _ => default,
         }
     }
@@ -395,7 +402,11 @@ fn write_value(value: &Value, out: &mut String, level: usize, format: Format) {
         Value::Int(n) => out.push_str(&n.to_string()),
         Value::Double(d) => {
             if d.is_finite() {
-                out.push_str(&qnumber::byte_array_number(*d, 'g', qnumber::FLOATING_POINT_SHORTEST));
+                out.push_str(&qnumber::byte_array_number(
+                    *d,
+                    'g',
+                    qnumber::FLOATING_POINT_SHORTEST,
+                ));
             } else {
                 out.push_str("null");
             }
@@ -524,10 +535,18 @@ impl std::error::Error for ParseError {}
 /// `QJsonDocument::fromJson`: an object or array. A lone scalar parses but is rejected as
 /// `IllegalValue` at offset 0, as Qt does.
 pub fn from_json(json: &[u8]) -> Result<Value, ParseError> {
-    let value = Parser { json, pos: 0, nesting: 0 }.parse()?;
+    let value = Parser {
+        json,
+        pos: 0,
+        nesting: 0,
+    }
+    .parse()?;
     match value {
         Value::Object(_) | Value::Array(_) => Ok(value),
-        _ => Err(ParseError { kind: ParseErrorKind::IllegalValue, offset: 0 }),
+        _ => Err(ParseError {
+            kind: ParseErrorKind::IllegalValue,
+            offset: 0,
+        }),
     }
 }
 
@@ -585,7 +604,10 @@ impl Parser<'_> {
             self.pos = 3;
         }
         let result = self.parse_document();
-        result.map_err(|kind| ParseError { kind, offset: self.pos })
+        result.map_err(|kind| ParseError {
+            kind,
+            offset: self.pos,
+        })
     }
 
     fn parse_document(&mut self) -> Parsed<Value> {
@@ -798,7 +820,9 @@ impl Parser<'_> {
                 break;
             }
             if c == b'\\' {
-                let ch = self.scan_escape().ok_or(ParseErrorKind::IllegalEscapeSequence)?;
+                let ch = self
+                    .scan_escape()
+                    .ok_or(ParseErrorKind::IllegalEscapeSequence)?;
                 if ch < 0x1_0000 {
                     units.push(ch as u16);
                 } else {
@@ -865,7 +889,11 @@ impl Parser<'_> {
 /// the same decimal forms and rounds the same way; Qt also fails a value that overflows to
 /// infinity or a non-zero one that underflows to zero.
 fn parse_double(text: &str) -> Option<f64> {
-    if text.is_empty() || text.bytes().any(|c| !matches!(c, b'0'..=b'9' | b'-' | b'+' | b'.' | b'e' | b'E')) {
+    if text.is_empty()
+        || text
+            .bytes()
+            .any(|c| !matches!(c, b'0'..=b'9' | b'-' | b'+' | b'.' | b'e' | b'E'))
+    {
         return None;
     }
     let d: f64 = text.parse().ok()?;
@@ -884,12 +912,17 @@ mod tests {
 
     #[test]
     fn writes_like_qjsondocument() {
-        let doc = obj(r#"{"b": [1, 2.5, {"z": null, "a": true}], "a": {}, "c": [], "d": "x\"\n\u0001é"}"#);
+        let doc = obj(
+            r#"{"b": [1, 2.5, {"z": null, "a": true}], "a": {}, "c": [], "d": "x\"\n\u0001é"}"#,
+        );
         assert_eq!(
             doc.to_json(Format::Indented),
             "{\n    \"a\": {\n    },\n    \"b\": [\n        1,\n        2.5,\n        {\n            \"a\": true,\n            \"z\": null\n        }\n    ],\n    \"c\": [\n    ],\n    \"d\": \"x\\\"\\n\\u0001é\"\n}\n"
         );
-        assert_eq!(doc.to_json(Format::Compact), r#"{"a":{},"b":[1,2.5,{"a":true,"z":null}],"c":[],"d":"x\"\n\u0001é"}"#);
+        assert_eq!(
+            doc.to_json(Format::Compact),
+            r#"{"a":{},"b":[1,2.5,{"a":true,"z":null}],"c":[],"d":"x\"\n\u0001é"}"#
+        );
         assert_eq!(Object::new().to_json(Format::Indented), "{\n}\n");
         assert_eq!(Value::Array(vec![]).to_json(Format::Compact), "[]");
     }
@@ -924,9 +957,15 @@ mod tests {
             assert_eq!(text, format!("[{expected}]"), "{d:e}");
         }
         // QJsonValue(double) keeps 2^53 an integer, but a parsed literal stays one up to 2^63.
-        assert!(matches!(Value::from_f64(9_007_199_254_740_992.0), Value::Int(_)));
+        assert!(matches!(
+            Value::from_f64(9_007_199_254_740_992.0),
+            Value::Int(_)
+        ));
         assert!(matches!(Value::from_f64(1e17), Value::Double(_)));
-        assert!(matches!(obj("[1e17]").as_array().unwrap()[0], Value::Int(100_000_000_000_000_000)));
+        assert!(matches!(
+            obj("[1e17]").as_array().unwrap()[0],
+            Value::Int(100_000_000_000_000_000)
+        ));
     }
 
     #[test]
@@ -961,17 +1000,32 @@ mod tests {
     fn errors_match_qt() {
         let error = |json: &str| from_json(json.as_bytes()).unwrap_err();
         assert_eq!(error("").kind, ParseErrorKind::IllegalValue);
-        assert_eq!(error("{\"a\" 1}").kind, ParseErrorKind::MissingNameSeparator);
+        assert_eq!(
+            error("{\"a\" 1}").kind,
+            ParseErrorKind::MissingNameSeparator
+        );
         assert_eq!(error("{\"a\": 1,}").kind, ParseErrorKind::MissingObject);
         assert_eq!(error("[1 2]").kind, ParseErrorKind::MissingValueSeparator);
         assert_eq!(error("[1,").kind, ParseErrorKind::UnterminatedArray);
         assert_eq!(error("{} x").kind, ParseErrorKind::GarbageAtEnd);
         assert_eq!(error("{} x").offset, 3);
-        assert_eq!(error("\"just a string\""), ParseError { kind: ParseErrorKind::IllegalValue, offset: 0 });
+        assert_eq!(
+            error("\"just a string\""),
+            ParseError {
+                kind: ParseErrorKind::IllegalValue,
+                offset: 0
+            }
+        );
         assert_eq!(error("{\"a\": tru}").kind, ParseErrorKind::IllegalValue);
         assert_eq!(error("{\"a\": +1}").kind, ParseErrorKind::IllegalNumber);
-        assert_eq!(error("{\"a\": \"x}").kind, ParseErrorKind::UnterminatedString);
-        assert_eq!(error("[\"\\u12\"]").kind, ParseErrorKind::IllegalEscapeSequence);
+        assert_eq!(
+            error("{\"a\": \"x}").kind,
+            ParseErrorKind::UnterminatedString
+        );
+        assert_eq!(
+            error("[\"\\u12\"]").kind,
+            ParseErrorKind::IllegalEscapeSequence
+        );
         assert_eq!(error("{\"a\" 1}").error_string(), "missing name separator");
         // Offsets and kinds as Qt 6.11 reports them.
         let cases: &[(&str, ParseErrorKind, usize)] = &[
@@ -992,15 +1046,29 @@ mod tests {
             assert_eq!(error(json), ParseError { kind, offset }, "{json}");
         }
         assert!(from_json(b"[2e-324, 0e-400]").is_err());
-        assert_eq!(obj("[3e-324, 0e-400]").as_array().unwrap()[1], Value::Int(0));
+        assert_eq!(
+            obj("[3e-324, 0e-400]").as_array().unwrap()[1],
+            Value::Int(0)
+        );
     }
 
     #[test]
     fn strings_decode_escapes_leniently() {
         let doc = obj(r#"["\ud83d\ude00", "\q", "a\/b", "tab	in"]"#);
-        let items: Vec<_> = doc.as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_owned()).collect();
+        let items: Vec<_> = doc
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect();
         assert_eq!(items, ["😀", "q", "a/b", "tab\tin"]);
-        assert!(from_json(b"\xef\xbb\xbf{}").is_ok(), "a UTF-8 BOM is skipped");
-        assert!(obj("[.5, 1., -0]").as_array().unwrap() == [Value::Double(0.5), Value::Int(1), Value::Int(0)]);
+        assert!(
+            from_json(b"\xef\xbb\xbf{}").is_ok(),
+            "a UTF-8 BOM is skipped"
+        );
+        assert!(
+            obj("[.5, 1., -0]").as_array().unwrap()
+                == [Value::Double(0.5), Value::Int(1), Value::Int(0)]
+        );
     }
 }

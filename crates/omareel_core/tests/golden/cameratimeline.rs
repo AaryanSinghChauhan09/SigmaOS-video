@@ -9,7 +9,11 @@ fn map_txt() {
     let mut out = Text::new();
     for offset in [-2.0, -0.5, 0.0, 0.25, 1.5, 3.0, f64::NAN] {
         for duration in [-1.0, 0.0, 0.5, 4.0, 8.0, f64::INFINITY, f64::NAN] {
-            out.section(&format!("offset={} duration={}", num(offset), num(duration)));
+            out.section(&format!(
+                "offset={} duration={}",
+                num(offset),
+                num(duration)
+            ));
             let mut times = uniform(4, -12, 48);
             for edge in [offset, offset + duration] {
                 if edge.is_finite() {

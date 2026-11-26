@@ -13,14 +13,16 @@
 use omareel_core::compat::qdir::{self, FileInfo};
 use omareel_core::compat::qjson::{self, Format, Object, Value};
 use omareel_core::compat::qlockfile::{LockError, LockFile};
-use omareel_core::compat::qsavefile::SaveFile;
 use omareel_core::compat::qprocess::{self, DetachedChannels};
+use omareel_core::compat::qsavefile::SaveFile;
 use omareel_core::compat::{qfile, qstandardpaths, qstring};
 use std::os::unix::ffi::OsStrExt;
 
 /// `qEnvironmentVariable(name)`: the variable as UTF-8 text, empty when unset.
 fn environment_variable(name: &str) -> String {
-    std::env::var_os(name).map(|value| qstring::from_utf8(value.as_bytes())).unwrap_or_default()
+    std::env::var_os(name)
+        .map(|value| qstring::from_utf8(value.as_bytes()))
+        .unwrap_or_default()
 }
 
 /// `Recorder::stateFilePath()`: `$XDG_RUNTIME_DIR/omareel/recording.json`, with `/tmp` for an
@@ -57,9 +59,19 @@ pub fn self_view_host_path() -> String {
 pub fn hardware_cursor_hold_path(instance: &str) -> String {
     let name: String = instance
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.') { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.') {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
-    let name = if name.is_empty() || name.chars().all(|c| c == '.') { "none".to_owned() } else { name };
+    let name = if name.is_empty() || name.chars().all(|c| c == '.') {
+        "none".to_owned()
+    } else {
+        name
+    };
     format!("{}/hardware-cursor-hold-{name}.json", state_directory())
 }
 
@@ -80,7 +92,9 @@ fn object_or_empty(bytes: &[u8]) -> Object {
 /// `Recorder::readStateFile(path)`: the file's JSON object, empty when it can't be read or holds
 /// anything else.
 pub fn read_state_file(path: &str) -> Object {
-    qfile::read_all(path).map(|bytes| object_or_empty(&bytes)).unwrap_or_default()
+    qfile::read_all(path)
+        .map(|bytes| object_or_empty(&bytes))
+        .unwrap_or_default()
 }
 
 /// `readState()`: the recording's state file.
@@ -106,7 +120,10 @@ pub fn update_state_file(path: &str, values: &Object) -> Result<(), String> {
     let mut state = read_state_file(path);
     if values.contains("command") && !values.contains("command_sequence") {
         // qint64 + 1; the C++ overflow at INT64_MAX is undefined, so this wraps.
-        let sequence = state.value("command_sequence").to_variant_long_long().wrapping_add(1);
+        let sequence = state
+            .value("command_sequence")
+            .to_variant_long_long()
+            .wrapping_add(1);
         state.insert("command_sequence", sequence);
     }
     for (key, value) in values.iter() {
@@ -117,7 +134,11 @@ pub fn update_state_file(path: &str, values: &Object) -> Result<(), String> {
         return Err(file.error_string());
     }
     file.write(Value::Object(state).to_json(Format::Indented).as_bytes());
-    if file.commit() { Ok(()) } else { Err(file.error_string()) }
+    if file.commit() {
+        Ok(())
+    } else {
+        Err(file.error_string())
+    }
 }
 
 /// `Recorder::sendHostCommand(command)`: `{"command": command}` into the self-view host's file.
@@ -181,8 +202,14 @@ pub fn process_alive(pid: i64) -> bool {
     if pid <= 1 || (kill(pid, 0) != 0 && errno() != libc::EPERM) {
         return false;
     }
-    let Ok(fields) = qfile::read_all(format!("/proc/{pid}/stat")) else { return false };
-    let state_offset = fields.iter().rposition(|&b| b == b')').map_or(-1, |i| i as isize) + 2;
+    let Ok(fields) = qfile::read_all(format!("/proc/{pid}/stat")) else {
+        return false;
+    };
+    let state_offset = fields
+        .iter()
+        .rposition(|&b| b == b')')
+        .map_or(-1, |i| i as isize)
+        + 2;
     state_offset > 1
         && (state_offset as usize) < fields.len()
         && fields[state_offset as usize] != b'Z'
@@ -194,14 +221,22 @@ pub fn recorder_daemon_alive(pid: i64) -> bool {
     if !process_alive(pid) {
         return false;
     }
-    let Ok(command_line) = qfile::read_all(format!("/proc/{pid}/cmdline")) else { return false };
-    command_line.windows(b"__record-daemon".len()).any(|window| window == b"__record-daemon")
+    let Ok(command_line) = qfile::read_all(format!("/proc/{pid}/cmdline")) else {
+        return false;
+    };
+    command_line
+        .windows(b"__record-daemon".len())
+        .any(|window| window == b"__record-daemon")
 }
 
 /// `QByteArray::simplified()`: ASCII whitespace trimmed and runs of it made one space.
 fn simplified(bytes: &[u8]) -> Vec<u8> {
     let space = |b: &u8| matches!(b, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r');
-    bytes.split(space).filter(|part| !part.is_empty()).collect::<Vec<_>>().join(&b' ')
+    bytes
+        .split(space)
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(&b' ')
 }
 
 /// `QByteArray::toLongLong(&ok)`: base 10, surrounding whitespace allowed.
@@ -220,9 +255,13 @@ pub fn process_descendants(parent_pid: i64) -> Vec<i64> {
     let mut result = Vec::new();
     let mut pending = vec![parent_pid];
     while let Some(parent) = pending.pop() {
-        let Ok(children) = qfile::read_all(format!("/proc/{parent}/task/{parent}/children")) else { continue };
+        let Ok(children) = qfile::read_all(format!("/proc/{parent}/task/{parent}/children")) else {
+            continue;
+        };
         for id in simplified(&children).split(|&b| b == b' ') {
-            let Some(child) = to_long_long(id) else { continue };
+            let Some(child) = to_long_long(id) else {
+                continue;
+            };
             if child <= 1 || result.contains(&child) {
                 continue;
             }
@@ -261,7 +300,14 @@ pub fn run_optional_detached<S: AsRef<str>>(program: &str, arguments: &[S]) {
 pub fn notify_stop_failure(detail: &str) {
     run_optional_detached(
         "omarchy-notification-send",
-        &["-u", "critical", "-t", "5000", "Screen recording error", detail],
+        &[
+            "-u",
+            "critical",
+            "-t",
+            "5000",
+            "Screen recording error",
+            detail,
+        ],
     );
 }
 
@@ -278,7 +324,9 @@ pub fn signal_existing(cancel: bool) -> Result<(), String> {
     }
     if kill(pid, if cancel { libc::SIGUSR2 } else { libc::SIGUSR1 }) != 0 {
         let error = strerror(errno());
-        notify_stop_failure("Could not ask the recording process to stop. The video may be incomplete.");
+        notify_stop_failure(
+            "Could not ask the recording process to stop. The video may be incomplete.",
+        );
         return Err(error);
     }
     Ok(())
@@ -303,7 +351,13 @@ fn file_size(path: &str) -> i64 {
 /// How much the bundle's files hold together, which grows while a stopping recorder saves.
 fn bundle_bytes(bundle: &str) -> u64 {
     std::fs::read_dir(bundle)
-        .map(|entries| entries.flatten().filter_map(|entry| entry.metadata().ok()).map(|data| data.len()).sum())
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter_map(|entry| entry.metadata().ok())
+                .map(|data| data.len())
+                .sum()
+        })
         .unwrap_or(0)
 }
 
@@ -325,24 +379,40 @@ pub fn stop_existing(cancel: bool) -> StopOutcome {
     let pid = state.value("pid").to_variant_long_long();
     if !recorder_daemon_alive(pid) {
         qfile::remove(&state_file_path());
-        return StopOutcome { code: 1, bundle_path: None, error: "No recording is active".into() };
+        return StopOutcome {
+            code: 1,
+            bundle_path: None,
+            error: "No recording is active".into(),
+        };
     }
     let bundle = state.value("bundle").to_string_or("");
     if let Err(error) = signal_existing(cancel) {
-        return StopOutcome { code: 2, bundle_path: None, error };
+        return StopOutcome {
+            code: 2,
+            bundle_path: None,
+            error,
+        };
     }
     let started = std::time::Instant::now();
     let mut saved = bundle_bytes(&bundle);
     let mut last_progress = started;
     while last_progress.elapsed() < STOP_STALL && started.elapsed() < STOP_LIMIT {
         if !recorder_daemon_alive(pid) || !qdir::file_exists(&state_file_path()) {
-            let bundle_path = Some(if cancel { String::new() } else { bundle.clone() });
+            let bundle_path = Some(if cancel {
+                String::new()
+            } else {
+                bundle.clone()
+            });
             if cancel {
                 let discarded = !qdir::file_exists(&bundle);
                 return StopOutcome {
                     code: if discarded { 0 } else { 2 },
                     bundle_path,
-                    error: if discarded { String::new() } else { "Recording bundle could not be discarded".into() },
+                    error: if discarded {
+                        String::new()
+                    } else {
+                        "Recording bundle could not be discarded".into()
+                    },
                 };
             }
             let complete = file_size(&format!("{bundle}/screen.mp4")) > 0
@@ -351,7 +421,11 @@ pub fn stop_existing(cancel: bool) -> StopOutcome {
             return StopOutcome {
                 code: if complete { 0 } else { 2 },
                 bundle_path,
-                error: if complete { String::new() } else { "Recording could not be finalized".into() },
+                error: if complete {
+                    String::new()
+                } else {
+                    "Recording could not be finalized".into()
+                },
             };
         }
         std::thread::sleep(std::time::Duration::from_millis(25));
@@ -362,7 +436,9 @@ pub fn stop_existing(cancel: bool) -> StopOutcome {
         }
     }
     for child in process_descendants(pid) {
-        let Ok(command) = qfile::read_all(format!("/proc/{child}/cmdline")) else { continue };
+        let Ok(command) = qfile::read_all(format!("/proc/{child}/cmdline")) else {
+            continue;
+        };
         let contains = |needle: &[u8]| command.windows(needle.len()).any(|window| window == needle);
         if contains(b"ffmpeg") || contains(b"__record-gsr") {
             kill(child, libc::SIGKILL);
@@ -381,7 +457,11 @@ pub fn stop_existing(cancel: bool) -> StopOutcome {
     let timeout_message =
         "Recorder stopped saving for 20 seconds; force-killed the recorder and capture processes";
     notify_stop_failure(&format!("{timeout_message}. The video may be incomplete."));
-    StopOutcome { code: 2, bundle_path: None, error: timeout_message.into() }
+    StopOutcome {
+        code: 2,
+        bundle_path: None,
+        error: timeout_message.into(),
+    }
 }
 
 /// `writeLastError(detail)`: the detail and a newline into `last-error.txt`, replaced whole.
@@ -399,7 +479,9 @@ pub fn write_last_error(detail: &str) {
 /// `readLastError()`: `last-error.txt` as text (a `QFile` in text mode drops every `\r`),
 /// trimmed; empty when it can't be read.
 pub fn read_last_error() -> String {
-    let Ok(mut bytes) = qfile::read_all(last_error_file_path()) else { return String::new() };
+    let Ok(mut bytes) = qfile::read_all(last_error_file_path()) else {
+        return String::new();
+    };
     bytes.retain(|&b| b != b'\r');
     qstring::trimmed(&qstring::from_utf8(&bytes)).to_owned()
 }

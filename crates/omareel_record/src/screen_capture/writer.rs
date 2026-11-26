@@ -15,7 +15,10 @@
 //! [`SlotMemory`], so the writer can be driven without a compositor; or the VA-API encoder, which
 //! takes the slots' dmabufs by index ([`run_writer`]).
 
-use super::{CaptureRingBookkeeping, CaptureRowCopy, Size, SlotState, capture_frame_header, capture_stream_header};
+use super::{
+    CaptureRingBookkeeping, CaptureRowCopy, Size, SlotState, capture_frame_header,
+    capture_stream_header,
+};
 use omareel_core::compat::qsavefile::SaveFile;
 use std::os::fd::RawFd;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, Ordering};
@@ -32,7 +35,9 @@ pub(crate) fn strerror(code: i32) -> String {
         return format!("Unknown error {code}");
     }
     // SAFETY: the buffer holds a NUL-terminated string.
-    unsafe { std::ffi::CStr::from_ptr(buffer.as_ptr()) }.to_string_lossy().into_owned()
+    unsafe { std::ffi::CStr::from_ptr(buffer.as_ptr()) }
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// The encoder's standard input as the writer uses it: single writes and a wait until it takes
@@ -57,11 +62,19 @@ impl EncoderSink for FdSink {
     fn write(&mut self, bytes: &[u8]) -> Result<usize, i32> {
         // SAFETY: `bytes` is valid for its length; a bad descriptor only makes write fail.
         let count = unsafe { libc::write(self.0, bytes.as_ptr().cast(), bytes.len()) };
-        if count < 0 { Err(errno()) } else { Ok(count as usize) }
+        if count < 0 {
+            Err(errno())
+        } else {
+            Ok(count as usize)
+        }
     }
 
     fn wait_writable(&mut self, timeout_ms: i32) -> Result<i32, i32> {
-        let mut descriptor = libc::pollfd { fd: self.0, events: libc::POLLOUT, revents: 0 };
+        let mut descriptor = libc::pollfd {
+            fd: self.0,
+            events: libc::POLLOUT,
+            revents: 0,
+        };
         // SAFETY: one pollfd.
         let result = unsafe { libc::poll(&mut descriptor, 1, timeout_ms) };
         if result < 0 { Err(errno()) } else { Ok(result) }
@@ -70,7 +83,11 @@ impl EncoderSink for FdSink {
 
 /// `writeAll`: every byte, retrying after EINTR and waiting (100 ms at a time) while the pipe is
 /// full, until `abort` is set or ten seconds pass without progress. `Err` holds the message.
-pub fn write_all<S: EncoderSink + ?Sized>(sink: &mut S, bytes: &[u8], abort: &AtomicBool) -> Result<(), String> {
+pub fn write_all<S: EncoderSink + ?Sized>(
+    sink: &mut S,
+    bytes: &[u8],
+    abort: &AtomicBool,
+) -> Result<(), String> {
     let mut written = 0;
     let mut stall = Instant::now();
     while written < bytes.len() && !abort.load(Ordering::Relaxed) {
@@ -128,7 +145,11 @@ impl RawSlotMemory {
     /// `base` must point at `slot_bytes * slots` readable bytes that stay mapped for as long as
     /// this value is used.
     pub unsafe fn new(base: *const u8, slot_bytes: usize, slots: usize) -> RawSlotMemory {
-        RawSlotMemory { base, slot_bytes, slots }
+        RawSlotMemory {
+            base,
+            slot_bytes,
+            slots,
+        }
     }
 }
 
@@ -138,7 +159,9 @@ impl SlotMemory for RawSlotMemory {
             return false;
         }
         // SAFETY: `new`'s contract covers every slot below `slots`.
-        read(unsafe { std::slice::from_raw_parts(self.base.add(index * self.slot_bytes), self.slot_bytes) });
+        read(unsafe {
+            std::slice::from_raw_parts(self.base.add(index * self.slot_bytes), self.slot_bytes)
+        });
         true
     }
 }
@@ -213,7 +236,10 @@ impl FrameQueue {
     pub fn mark_queued(&self, slot: i32, presentation_us: i64) -> bool {
         let queued = {
             let mut shared = self.lock();
-            if let Some(time) = usize::try_from(slot).ok().and_then(|index| shared.presentation_us.get_mut(index)) {
+            if let Some(time) = usize::try_from(slot)
+                .ok()
+                .and_then(|index| shared.presentation_us.get_mut(index))
+            {
                 *time = presentation_us;
             }
             shared.ring.mark_queued(slot)
@@ -316,7 +342,10 @@ pub fn write_timestamp(path: &str, monotonic: i64) -> Result<(), String> {
     if !file.open() {
         return Err(file.error_string());
     }
-    let text = format!("monotonic_microsec\trealtime_microsec\n{monotonic}\t{}\n", realtime_us());
+    let text = format!(
+        "monotonic_microsec\trealtime_microsec\n{monotonic}\t{}\n",
+        realtime_us()
+    );
     file.write(text.as_bytes());
     if !file.commit() {
         return Err(file.error_string());
@@ -326,7 +355,10 @@ pub fn write_timestamp(path: &str, monotonic: i64) -> Result<(), String> {
 
 /// `CLOCK_REALTIME` in microseconds.
 fn realtime_us() -> i64 {
-    let mut value = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+    let mut value = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
     // SAFETY: clock_gettime writes a timespec.
     unsafe { libc::clock_gettime(libc::CLOCK_REALTIME, &mut value) };
     value.tv_sec * 1_000_000 + value.tv_nsec / 1000
@@ -364,22 +396,37 @@ impl<S: EncoderSink + ?Sized, M: SlotMemory + ?Sized> FrameOutput for MatroskaOu
     }
 
     fn write(&mut self, index: usize, frame_index: i64) -> Result<(), String> {
-        let MatroskaOutput { fps, rows, cropped, memory, sink, abort, .. } = self;
+        let MatroskaOutput {
+            fps,
+            rows,
+            cropped,
+            memory,
+            sink,
+            abort,
+            ..
+        } = self;
         let mut result = Ok(());
         let read = memory.with_slot(index, &mut |bytes: &[u8]| {
             let Some(first) = rows.first() else { return };
             let output: &[u8] = if rows.len() > 1 {
                 for row in rows.iter() {
-                    let (from, to, count) =
-                        (row.source_offset as usize, row.destination_offset as usize, row.bytes as usize);
+                    let (from, to, count) = (
+                        row.source_offset as usize,
+                        row.destination_offset as usize,
+                        row.bytes as usize,
+                    );
                     cropped[to..to + count].copy_from_slice(&bytes[from..from + count]);
                 }
                 cropped
             } else {
                 &bytes[first.source_offset as usize..(first.source_offset + first.bytes) as usize]
             };
-            let frame_header = capture_frame_header((frame_index as f64 * 1e6 / *fps).round() as i64, output.len() as i64);
-            result = write_all(*sink, &frame_header, abort).and_then(|()| write_all(*sink, output, abort));
+            let frame_header = capture_frame_header(
+                (frame_index as f64 * 1e6 / *fps).round() as i64,
+                output.len() as i64,
+            );
+            result = write_all(*sink, &frame_header, abort)
+                .and_then(|()| write_all(*sink, output, abort));
         });
         if !read {
             return Err("A captured frame could not be read".into());
@@ -400,7 +447,12 @@ pub fn writer_loop<S: EncoderSink + ?Sized, M: SlotMemory + ?Sized>(
     let mut cropped = Vec::new();
     if rows.len() > 1 {
         cropped.resize(
-            config.encoded_size.width.wrapping_mul(config.encoded_size.height).wrapping_mul(4).max(0) as usize,
+            config
+                .encoded_size
+                .width
+                .wrapping_mul(config.encoded_size.height)
+                .wrapping_mul(4)
+                .max(0) as usize,
             0u8,
         );
     }
@@ -420,7 +472,11 @@ pub fn writer_loop<S: EncoderSink + ?Sized, M: SlotMemory + ?Sized>(
 /// 1/fps grid, skipping a frame that lands on the tick before it, the last frame written kept in
 /// its slot so it can be written again at the stop time, the first frame's presentation time
 /// in the timestamp file. A failure is kept for `capture_frame` to report.
-pub fn run_writer<O: FrameOutput + ?Sized>(queue: &FrameQueue, config: &WriterConfig, output: &mut O) {
+pub fn run_writer<O: FrameOutput + ?Sized>(
+    queue: &FrameQueue,
+    config: &WriterConfig,
+    output: &mut O,
+) {
     let fps = f64::from(config.fps);
     if let Err(error) = output.begin() {
         queue.fail(None, error, true);
@@ -436,13 +492,19 @@ pub fn run_writer<O: FrameOutput + ?Sized>(queue: &FrameQueue, config: &WriterCo
             let shared = queue.lock();
             let mut shared = queue
                 .queued_frame
-                .wait_while(shared, |s| !(s.writer_stopping || s.ring.count(SlotState::Queued) > 0))
+                .wait_while(shared, |s| {
+                    !(s.writer_stopping || s.ring.count(SlotState::Queued) > 0)
+                })
                 .unwrap_or_else(PoisonError::into_inner);
             let index = shared.ring.take_queued();
             if index < 0 && shared.writer_stopping {
                 break;
             }
-            let presentation = if index >= 0 { shared.presentation_us[index as usize] } else { 0 };
+            let presentation = if index >= 0 {
+                shared.presentation_us[index as usize]
+            } else {
+                0
+            };
             (index, presentation)
         };
         if index < 0 {
@@ -486,7 +548,11 @@ pub fn run_writer<O: FrameOutput + ?Sized>(queue: &FrameQueue, config: &WriterCo
     if held_index >= 0 {
         let stop_us = queue.lock().stop_us;
         let first_us = queue.first_us.load(Ordering::Relaxed);
-        let stop_index = if stop_us > 0 { ((stop_us - first_us) as f64 * fps / 1e6).round() as i64 } else { -1 };
+        let stop_index = if stop_us > 0 {
+            ((stop_us - first_us) as f64 * fps / 1e6).round() as i64
+        } else {
+            -1
+        };
         let mut padded = Ok(());
         if stop_index > queue.last_frame_index.load(Ordering::Relaxed)
             && !queue.writer_abort.load(Ordering::Relaxed)

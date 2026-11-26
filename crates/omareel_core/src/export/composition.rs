@@ -94,9 +94,23 @@ impl CompositionState {
             camera_source_width: 0,
             camera_source_height: 0,
             time: 0.0,
-            zoom: Zoom { scale: 1.0, cx: 0.5, cy: 0.5, velocity: 0.0 },
-            layout: Layout { camera_full: 0.0, bubble: 1.0 },
-            media: Media { active: false, ready: true, fit: "fit".into(), width: 16, height: 9 },
+            zoom: Zoom {
+                scale: 1.0,
+                cx: 0.5,
+                cy: 0.5,
+                velocity: 0.0,
+            },
+            layout: Layout {
+                camera_full: 0.0,
+                bubble: 1.0,
+            },
+            media: Media {
+                active: false,
+                ready: true,
+                fit: "fit".into(),
+                width: 16,
+                height: 9,
+            },
             cursor: Cursor {
                 x: 0.5,
                 y: 0.5,
@@ -117,10 +131,18 @@ impl CompositionState {
         let project = sources.project;
         // An inserted clip shows none of the recording's motion, cursor, keys, or camera.
         let source_time = sources.timeline.recording_source_time(output_time);
-        let sample = if insert { MotionSample::default() } else { sources.motion.sample(source_time) };
+        let sample = if insert {
+            MotionSample::default()
+        } else {
+            sources.motion.sample(source_time)
+        };
         self.time = source_time;
-        self.zoom =
-            Zoom { scale: sample.zoom_scale, cx: sample.zoom_cx, cy: sample.zoom_cy, velocity: sample.zoom_center_velocity };
+        self.zoom = Zoom {
+            scale: sample.zoom_scale,
+            cx: sample.zoom_cx,
+            cy: sample.zoom_cy,
+            velocity: sample.zoom_center_velocity,
+        };
         self.cursor = Cursor {
             x: sample.cursor_x,
             y: sample.cursor_y,
@@ -130,10 +152,16 @@ impl CompositionState {
             rotation: sample.cursor_rotation,
         };
         self.ripples.clear();
-        if !insert && (project.cursor.click_effect == "ripple" || project.cursor.click_effect == "circle") {
+        if !insert
+            && (project.cursor.click_effect == "ripple" || project.cursor.click_effect == "circle")
+        {
             self.ripples.extend(sources.motion.ripples(source_time));
         }
-        self.keystroke_pills = if insert { Vec::new() } else { sources.keystrokes.sample(source_time) };
+        self.keystroke_pills = if insert {
+            Vec::new()
+        } else {
+            sources.keystrokes.sample(source_time)
+        };
         let layout = sample_layout(
             &project.clips,
             output_time,
@@ -141,13 +169,26 @@ impl CompositionState {
             project.camera.enabled,
             layout_timeline::DEFAULT_TRANSITION,
         );
-        self.layout = Layout { camera_full: layout.camera_full, bubble: layout.bubble };
-        let camera_time = map_camera_time(source_time, sources.camera_offset, sources.camera_duration);
+        self.layout = Layout {
+            camera_full: layout.camera_full,
+            bubble: layout.bubble,
+        };
+        let camera_time =
+            map_camera_time(source_time, sources.camera_offset, sources.camera_duration);
         self.camera_visible = !insert && (!camera_time.before_start || layout.camera_full > 0.0);
         if insert {
-            let info = sources.inserts.get(&clip.media).copied().unwrap_or_default();
-            self.media =
-                Media { active: true, ready: true, fit: clip.fit.clone(), width: info.width, height: info.height };
+            let info = sources
+                .inserts
+                .get(&clip.media)
+                .copied()
+                .unwrap_or_default();
+            self.media = Media {
+                active: true,
+                ready: true,
+                fit: clip.fit.clone(),
+                width: info.width,
+                height: info.height,
+            };
         } else {
             self.media.active = false;
         }

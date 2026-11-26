@@ -5,13 +5,13 @@
 //! wait for the probes every time. The runtime directory is a tmpfs, so the probes run again once
 //! per login, beside the capture setup, and nothing is written to disk for them.
 
+use crate::recorder::state::state_directory;
 use omareel_core::compat::qdir::{self, FileInfo};
 use omareel_core::compat::qjson::{self, Format, Object, Value};
 use omareel_core::compat::qprocess::Process;
 use omareel_core::compat::qsavefile::SaveFile;
 use omareel_core::compat::qstandardpaths;
 use omareel_core::compat::{qfile, qstring};
-use crate::recorder::state::state_directory;
 
 /// `EncoderProbeResults`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -135,9 +135,16 @@ pub fn encoder_probe_results() -> EncoderProbeResults {
     let (preferred, gpu_conversion) = std::thread::scope(|scope| {
         let preferred = scope.spawn(preferred_encoder_available);
         let conversion = scope.spawn(gpu_conversion_available);
-        (preferred.join().unwrap_or(false), conversion.join().unwrap_or(false))
+        (
+            preferred.join().unwrap_or(false),
+            conversion.join().unwrap_or(false),
+        )
     });
-    let results = EncoderProbeResults { preferred, gpu_conversion, cached: false };
+    let results = EncoderProbeResults {
+        preferred,
+        gpu_conversion,
+        cached: false,
+    };
     let cache_path = encoder_probe_cache_path();
     qdir::mkpath(&FileInfo::new(cache_path.clone()).absolute_path());
     let mut output = SaveFile::new(cache_path);
@@ -155,6 +162,9 @@ pub fn encoder_probe_results() -> EncoderProbeResults {
 /// `cachedPreferredEncoderAvailable`: what the cache says about NVENC, without probing; false
 /// without a cache or with a stale one.
 pub fn cached_preferred_encoder_available() -> bool {
-    let Some(cached) = read_cache() else { return false };
-    cached.value("key").to_object() == encoder_probe_key() && cached.value("preferred").to_bool(false)
+    let Some(cached) = read_cache() else {
+        return false;
+    };
+    cached.value("key").to_object() == encoder_probe_key()
+        && cached.value("preferred").to_bool(false)
 }

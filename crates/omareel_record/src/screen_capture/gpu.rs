@@ -50,7 +50,12 @@ struct RawEncoder {
 }
 
 unsafe extern "C" {
-    fn oc_device_open(device: u64, out: *mut *mut RawDevice, error: *mut c_char, size: usize) -> c_int;
+    fn oc_device_open(
+        device: u64,
+        out: *mut *mut RawDevice,
+        error: *mut c_char,
+        size: usize,
+    ) -> c_int;
     fn oc_device_close(device: *mut RawDevice);
     fn oc_device_driver(device: *const RawDevice) -> *const c_char;
     fn oc_device_path(device: *const RawDevice) -> *const c_char;
@@ -66,7 +71,12 @@ unsafe extern "C" {
         size: usize,
     ) -> c_int;
     fn oc_buffer_destroy(buffer: *mut RawBuffer);
-    fn oc_buffer_map(buffer: *mut RawBuffer, data: *mut *const u8, stride: *mut u32, mapping: *mut *mut c_void) -> c_int;
+    fn oc_buffer_map(
+        buffer: *mut RawBuffer,
+        data: *mut *const u8,
+        stride: *mut u32,
+        mapping: *mut *mut c_void,
+    ) -> c_int;
     fn oc_buffer_unmap(buffer: *mut RawBuffer, mapping: *mut c_void);
     fn oc_encoder_open(
         device: *mut RawDevice,
@@ -77,7 +87,13 @@ unsafe extern "C" {
         error: *mut c_char,
         size: usize,
     ) -> c_int;
-    fn oc_encoder_submit(encoder: *mut RawEncoder, index: usize, pts: i64, error: *mut c_char, size: usize) -> c_int;
+    fn oc_encoder_submit(
+        encoder: *mut RawEncoder,
+        index: usize,
+        pts: i64,
+        error: *mut c_char,
+        size: usize,
+    ) -> c_int;
     fn oc_encoder_finish(encoder: *mut RawEncoder, error: *mut c_char, size: usize) -> c_int;
     fn oc_encoder_destroy(encoder: *mut RawEncoder);
 }
@@ -89,8 +105,14 @@ fn checked(call: impl FnOnce(*mut c_char, usize) -> c_int) -> Result<(), String>
         return Ok(());
     }
     // SAFETY: the shim leaves a NUL-terminated message in the buffer (or nothing, all zeros).
-    let message = unsafe { CStr::from_ptr(error.as_ptr()) }.to_string_lossy().into_owned();
-    Err(if message.is_empty() { "The GPU capture failed".into() } else { message })
+    let message = unsafe { CStr::from_ptr(error.as_ptr()) }
+        .to_string_lossy()
+        .into_owned();
+    Err(if message.is_empty() {
+        "The GPU capture failed".into()
+    } else {
+        message
+    })
 }
 
 /// `DRM_FORMAT_XRGB8888` and `DRM_FORMAT_ARGB8888`, the formats a capture asks for (in that
@@ -138,13 +160,17 @@ impl Device {
     /// The kernel driver's name.
     pub fn driver(&self) -> String {
         // SAFETY: a NUL-terminated string the device owns.
-        unsafe { CStr::from_ptr(oc_device_driver(self.0)) }.to_string_lossy().into_owned()
+        unsafe { CStr::from_ptr(oc_device_driver(self.0)) }
+            .to_string_lossy()
+            .into_owned()
     }
 
     /// The render node's path.
     pub fn path(&self) -> String {
         // SAFETY: as for `driver`.
-        unsafe { CStr::from_ptr(oc_device_path(self.0)) }.to_string_lossy().into_owned()
+        unsafe { CStr::from_ptr(oc_device_path(self.0)) }
+            .to_string_lossy()
+            .into_owned()
     }
 
     /// NVIDIA's driver, whose VA-API (nvidia-vaapi-driver) can't encode and crashes reading
@@ -174,12 +200,28 @@ unsafe impl Sync for Buffer {}
 impl Buffer {
     /// A `width` by `height` buffer in `format`, with one of `modifiers` (the driver's choice
     /// when empty).
-    pub fn new(device: &Device, width: u32, height: u32, format: u32, modifiers: &[u64]) -> Result<Buffer, String> {
+    pub fn new(
+        device: &Device,
+        width: u32,
+        height: u32,
+        format: u32,
+        modifiers: &[u64],
+    ) -> Result<Buffer, String> {
         // SAFETY: an all-zero oc_buffer is what the shim starts from.
         let mut raw: RawBuffer = unsafe { std::mem::zeroed() };
         // SAFETY: the modifiers outlive the call; the shim fills `raw`.
         checked(|error, size| unsafe {
-            oc_buffer_create(device.0, width, height, format, modifiers.as_ptr(), modifiers.len(), &mut raw, error, size)
+            oc_buffer_create(
+                device.0,
+                width,
+                height,
+                format,
+                modifiers.as_ptr(),
+                modifiers.len(),
+                &mut raw,
+                error,
+                size,
+            )
         })?;
         Ok(Buffer(raw))
     }
@@ -239,9 +281,14 @@ impl MappedSlots {
     /// The slots, when every buffer has one plane and maps with the first one's row stride, which
     /// covers at least a row of 4-byte pixels.
     pub fn new(buffers: Vec<Buffer>) -> Result<MappedSlots, String> {
-        let stride = buffers.first().and_then(|buffer| buffer.planes().next()).map_or(0, |(_, _, stride)| stride as usize);
+        let stride = buffers
+            .first()
+            .and_then(|buffer| buffer.planes().next())
+            .map_or(0, |(_, _, stride)| stride as usize);
         let width = buffers.first().map_or(0, |buffer| buffer.0.width as usize);
-        let readable = buffers.iter().all(|buffer| buffer.planes().count() == 1 && buffer.readable_with_stride(stride));
+        let readable = buffers
+            .iter()
+            .all(|buffer| buffer.planes().count() == 1 && buffer.readable_with_stride(stride));
         if buffers.is_empty() || !readable || stride < width * 4 {
             return Err("the dmabufs can't be read back".into());
         }
@@ -261,7 +308,9 @@ impl MappedSlots {
 
 impl SlotMemory for MappedSlots {
     fn with_slot(&self, index: usize, read: &mut dyn FnMut(&[u8])) -> bool {
-        let Some(buffer) = self.buffers.get(index) else { return false };
+        let Some(buffer) = self.buffers.get(index) else {
+            return false;
+        };
         let mut called = false;
         let mapped = buffer.read(&mut |data, stride| {
             // A mapping with other rows than the slots were made for would be misread.
@@ -297,8 +346,13 @@ unsafe impl Send for Encoder {}
 
 impl Encoder {
     /// Opens the encoder with `buffers` imported, slot `i` being `buffers[i]`.
-    pub fn open(device: &Device, config: &EncoderConfig, buffers: &[Buffer]) -> Result<Encoder, String> {
-        let path = CString::new(config.path).map_err(|_| "The screen video's path holds a NUL".to_owned())?;
+    pub fn open(
+        device: &Device,
+        config: &EncoderConfig,
+        buffers: &[Buffer],
+    ) -> Result<Encoder, String> {
+        let path = CString::new(config.path)
+            .map_err(|_| "The screen video's path holds a NUL".to_owned())?;
         let raw_config = RawEncoderConfig {
             width: config.width,
             height: config.height,
@@ -315,7 +369,15 @@ impl Encoder {
         // SAFETY: `Buffer` is a transparent `oc_buffer`; everything passed outlives the call, and
         // the shim imports the buffers without keeping a pointer to them.
         checked(|error, size| unsafe {
-            oc_encoder_open(device.0, &raw_config, buffers.as_ptr().cast(), buffers.len(), &mut raw, error, size)
+            oc_encoder_open(
+                device.0,
+                &raw_config,
+                buffers.as_ptr().cast(),
+                buffers.len(),
+                &mut raw,
+                error,
+                size,
+            )
         })?;
         Ok(Encoder(raw))
     }
@@ -348,11 +410,18 @@ mod tests {
     fn only_uncompressed_modifiers_are_plain() {
         assert!(plain_modifier(MOD_LINEAR));
         // I915_FORMAT_MOD_X_TILED, Y_TILED, 4_TILED.
-        assert!(plain_modifier((1 << 56) | 1) && plain_modifier((1 << 56) | 2) && plain_modifier((1 << 56) | 9));
+        assert!(
+            plain_modifier((1 << 56) | 1)
+                && plain_modifier((1 << 56) | 2)
+                && plain_modifier((1 << 56) | 9)
+        );
         // I915_FORMAT_MOD_Y_TILED_CCS, 4_TILED_DG2_RC_CCS.
         assert!(!plain_modifier((1 << 56) | 4) && !plain_modifier((1 << 56) | 10));
         // An AMD modifier with and without DCC.
-        assert!(plain_modifier((2 << 56) | 0x6_0000_0f04) && !plain_modifier((2 << 56) | (1 << 13) | 0x6_0000_0f04));
+        assert!(
+            plain_modifier((2 << 56) | 0x6_0000_0f04)
+                && !plain_modifier((2 << 56) | (1 << 13) | 0x6_0000_0f04)
+        );
         assert!(!plain_modifier(MOD_INVALID));
     }
 }

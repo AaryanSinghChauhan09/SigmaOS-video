@@ -66,6 +66,11 @@ pub struct RectF {
 
 impl RectF {
     pub const fn new(x: f64, y: f64, width: f64, height: f64) -> RectF {
-        RectF { x, y, width, height }
+        RectF {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 }

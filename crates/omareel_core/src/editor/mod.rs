@@ -47,9 +47,9 @@ mod history;
 mod ids;
 pub mod playback;
 mod presets;
+mod project_map;
 #[cfg(test)]
 mod tests;
-mod project_map;
 mod thumbnails;
 mod zooms;
 
@@ -59,7 +59,9 @@ pub use composition::*;
 pub use document::*;
 pub use exporting::*;
 pub use ids::random_uuid;
-pub use playback::{CameraSync, MediaSeek, NextClip, NextClipKind, Player, PlayerPosition, Transport};
+pub use playback::{
+    CameraSync, MediaSeek, NextClip, NextClipKind, Player, PlayerPosition, Transport,
+};
 pub use presets::clean_preset_name;
 pub use thumbnails::*;
 pub use zooms::ZoomTarget;
@@ -70,7 +72,10 @@ pub use zooms::ZoomTarget;
 pub enum Effect {
     // Editor::changed(), in its order.
     /// `m_playback.setAudio(PlaybackDriver::Screen, volume, muted)`.
-    SetScreenAudio { volume: f64, muted: bool },
+    SetScreenAudio {
+        volume: f64,
+        muted: bool,
+    },
     /// `updateInsertAudio()`: [`Document::insert_audio`] for the active clip and the media
     /// player's warm-up.
     UpdateInsertAudio,
@@ -116,7 +121,10 @@ pub enum Effect {
     /// [`Document::start_import`]) and pauses in between, where the C++ did.
     Pause,
     /// `syncCamera(screenSourceTime, force)` with [`Document::camera_sync`].
-    SyncCamera { screen_source_time: f64, force: bool },
+    SyncCamera {
+        screen_source_time: f64,
+        force: bool,
+    },
     /// `startNextVideoThumbnail()`: [`Document::next_video_thumbnail_job`] unless playing or
     /// scrubbing.
     StartNextVideoThumbnail,
@@ -125,5 +133,8 @@ pub enum Effect {
     StartImport(String),
     /// `OmarchyPaths::generateWallpaperThumbnail(path, thumbnail)` off the GUI thread, then
     /// [`Document::wallpaper_thumbnail_ready`].
-    GenerateWallpaperThumbnail { path: String, thumbnail: String },
+    GenerateWallpaperThumbnail {
+        path: String,
+        thumbnail: String,
+    },
 }

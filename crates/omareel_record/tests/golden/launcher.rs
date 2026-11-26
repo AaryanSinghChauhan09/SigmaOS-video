@@ -15,7 +15,13 @@ use omareel_record::launcher::*;
 fn audio_list(devices: &[AudioDevice]) -> String {
     let items: Vec<String> = devices
         .iter()
-        .map(|device| format!("{{text={},value={}}}", quote(&device.text), quote(&device.value)))
+        .map(|device| {
+            format!(
+                "{{text={},value={}}}",
+                quote(&device.text),
+                quote(&device.value)
+            )
+        })
         .collect();
     format!("[{}]", items.join(","))
 }
@@ -25,9 +31,18 @@ fn webcam_list(devices: &[WebcamDevice]) -> String {
         .iter()
         .map(|device| match &device.node {
             Some(node) => {
-                format!("{{node={},text={},value={}}}", quote(node), quote(&device.text), quote(&device.value))
+                format!(
+                    "{{node={},text={},value={}}}",
+                    quote(node),
+                    quote(&device.text),
+                    quote(&device.value)
+                )
             }
-            None => format!("{{text={},value={}}}", quote(&device.text), quote(&device.value)),
+            None => format!(
+                "{{text={},value={}}}",
+                quote(&device.text),
+                quote(&device.value)
+            ),
         })
         .collect();
     format!("[{}]", items.join(","))
@@ -41,7 +56,11 @@ fn helpers_txt() {
     let mut out = Text::new();
     for name in cases.get("cameraNames").to_array() {
         let name = name.to_string_or("");
-        out.row(["cameraName".to_owned(), quote(&name), quote(&camera_name(&name))]);
+        out.row([
+            "cameraName".to_owned(),
+            quote(&name),
+            quote(&camera_name(&name)),
+        ]);
     }
     let inf = f64::INFINITY;
     let seconds = [
@@ -72,22 +91,59 @@ fn helpers_txt() {
     ];
     for value in seconds {
         // qRound of NaN, infinities and values past int are undefined; the oracle skips them.
-        let text =
-            if value.is_finite() && value.abs() < 2147483647.0 { quote(&format_duration(value)) } else { "-".into() };
+        let text = if value.is_finite() && value.abs() < 2147483647.0 {
+            quote(&format_duration(value))
+        } else {
+            "-".into()
+        };
         out.row(["formatDuration".to_owned(), num(value), text]);
     }
     for value in [720, 1080, 0, 480, 721, -720, 2160] {
-        out.row(["setWebcamHeight".to_owned(), value.to_string(), normalized_webcam_height(value).to_string()]);
+        out.row([
+            "setWebcamHeight".to_owned(),
+            value.to_string(),
+            normalized_webcam_height(value).to_string(),
+        ]);
     }
-    for value in [0, 90, 180, 270, 360, 450, -90, -180, -270, -360, 45, 89, 1, -1, 720, i32::MAX, i32::MIN] {
-        out.row(["setWebcamRotation".to_owned(), value.to_string(), normalized_webcam_rotation(value).to_string()]);
+    for value in [
+        0,
+        90,
+        180,
+        270,
+        360,
+        450,
+        -90,
+        -180,
+        -270,
+        -360,
+        45,
+        89,
+        1,
+        -1,
+        720,
+        i32::MAX,
+        i32::MIN,
+    ] {
+        out.row([
+            "setWebcamRotation".to_owned(),
+            value.to_string(),
+            normalized_webcam_rotation(value).to_string(),
+        ]);
     }
     for value in ["S", "m", "l", "XL", "", " M", "ß", "ſ"] {
         let normalized = normalized_self_view_size(value).unwrap_or_else(|| "<ignored>".into());
-        out.row(["setSelfViewSize".to_owned(), quote(value), quote(&normalized)]);
+        out.row([
+            "setSelfViewSize".to_owned(),
+            quote(value),
+            quote(&normalized),
+        ]);
     }
     for screens in 0..4 {
-        out.row(["captureExclusionNote".to_owned(), screens.to_string(), quote(capture_exclusion_note(screens))]);
+        out.row([
+            "captureExclusionNote".to_owned(),
+            screens.to_string(),
+            quote(capture_exclusion_note(screens)),
+        ]);
     }
     assert_golden("launcher/helpers.txt", &out.into_string());
 }
@@ -107,7 +163,10 @@ fn audio_devices_txt() {
             Some(file) => replay.answer(
                 "gpu-screen-recorder",
                 &["--list-audio-devices"],
-                &Answer { status, ..Answer::stdout(read_corpus(file)) },
+                &Answer {
+                    status,
+                    ..Answer::stdout(read_corpus(file))
+                },
                 0,
             ),
             None => environment.set("PATH", shim_directory(&h.scratch(), "empty", &[])),
@@ -137,7 +196,12 @@ fn webcam_devices_txt() {
     let mut out = Text::new();
     for (name, input) in cases.get("webcams").to_object().iter() {
         let input = input.to_object();
-        let existing: Vec<String> = input.value("exists").to_array().iter().map(|path| path.to_string_or("")).collect();
+        let existing: Vec<String> = input
+            .value("exists")
+            .to_array()
+            .iter()
+            .map(|path| path.to_string_or(""))
+            .collect();
         let cameras: Vec<_> = input
             .value("cameras")
             .to_array()
@@ -160,7 +224,11 @@ fn webcam_devices_txt() {
         );
         out.section(name);
         out.row(["devices".to_owned(), webcam_list(&selection.devices)]);
-        out.row(["selected".to_owned(), quote(&selection.device), boolean(selection.changed).into()]);
+        out.row([
+            "selected".to_owned(),
+            quote(&selection.device),
+            boolean(selection.changed).into(),
+        ]);
     }
     assert_golden("launcher/webcam-devices.txt", &out.into_string());
 }
@@ -179,8 +247,10 @@ fn status_txt() {
         r#"{"camera_status": "READY", "visible": true}"#,
         r#"{"camera_status": "ready", "visible": true, "monitor": "Écran %1 ☃"}"#,
     ];
-    let hosts: Vec<Object> =
-        hosts.iter().map(|json| qjson::object_from_json(json.as_bytes()).expect("an object")).collect();
+    let hosts: Vec<Object> = hosts
+        .iter()
+        .map(|json| qjson::object_from_json(json.as_bytes()).expect("an object"))
+        .collect();
     let mut out = Text::new();
     for pid in [0i64, 4242] {
         for alive in [true, false] {

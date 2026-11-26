@@ -10,8 +10,8 @@
 //! a new bar only when none is waiting. A bar nobody adopts quits a little after whatever started
 //! it has gone. `OMAREEL_BAR_WAIT=0` turns this off.
 
-use super::state::state_directory;
 use super::environment_variable;
+use super::state::state_directory;
 use omareel_core::compat::qcoreapplication::application_pid;
 use omareel_core::compat::qprocess::{self, DetachedChannels};
 
@@ -32,10 +32,13 @@ pub fn waiting(application: &str) -> Option<i64> {
     let pid: i64 = std::fs::read_to_string(path()).ok()?.trim().parse().ok()?;
     let command = std::fs::read(format!("/proc/{pid}/cmdline")).ok()?;
     let arguments: Vec<&[u8]> = command.split(|byte| *byte == 0).collect();
-    let same_program = std::fs::canonicalize(String::from_utf8_lossy(arguments.first()?).as_ref()).ok()
+    let same_program = std::fs::canonicalize(String::from_utf8_lossy(arguments.first()?).as_ref())
+        .ok()
         == std::fs::canonicalize(application).ok();
-    (same_program && arguments.get(1) == Some(&&b"__record-bar"[..]) && arguments.get(2) == Some(&&b"--wait"[..]))
-        .then_some(pid)
+    (same_program
+        && arguments.get(1) == Some(&&b"__record-bar"[..])
+        && arguments.get(2) == Some(&&b"--wait"[..]))
+    .then_some(pid)
 }
 
 /// Starts a waiting bar for this process, unless one is already waiting.
@@ -46,8 +49,15 @@ pub fn start(application: &str) {
     let pid = application_pid().to_string();
     // Its output goes nowhere, as a bar the recorder starts (whose own goes to /dev/null): one
     // that kept `omareel record`'s would hold the caller's pipes open for the whole recording.
-    let channels = DetachedChannels { standard_output_file: Some("/dev/null"), standard_error_file: Some("/dev/null") };
-    qprocess::start_detached(application, &["__record-bar", "--wait", pid.as_str()], channels);
+    let channels = DetachedChannels {
+        standard_output_file: Some("/dev/null"),
+        standard_error_file: Some("/dev/null"),
+    };
+    qprocess::start_detached(
+        application,
+        &["__record-bar", "--wait", pid.as_str()],
+        channels,
+    );
 }
 
 /// For the bar: it can take the signal now.
@@ -73,9 +83,13 @@ pub fn adopt(application: &str, flags: i32) -> bool {
     if !enabled() {
         return false;
     }
-    let Some(pid) = waiting(application) else { return false };
+    let Some(pid) = waiting(application) else {
+        return false;
+    };
     let _ = std::fs::remove_file(path());
-    let value = libc::sigval { sival_ptr: flags as usize as *mut libc::c_void };
+    let value = libc::sigval {
+        sival_ptr: flags as usize as *mut libc::c_void,
+    };
     // SAFETY: sigqueue takes a pid, a signal and a value; the pid is the waiting bar's.
     unsafe { libc::sigqueue(pid as libc::pid_t, libc::SIGUSR1, value) == 0 }
 }

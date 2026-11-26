@@ -20,14 +20,19 @@ struct Config {
 impl Config {
     fn new(name: &str) -> Config {
         let lock = ENVIRONMENT.lock().unwrap_or_else(PoisonError::into_inner);
-        let path = std::env::temp_dir().join(format!("omareel-preferences-{name}-{}", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("omareel-preferences-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&path);
         std::fs::create_dir_all(&path).unwrap();
         let previous = std::env::var_os("XDG_CONFIG_HOME");
         // SAFETY: the lock keeps this binary's other test out; nothing else here reads the
         // environment meanwhile.
         unsafe { std::env::set_var("XDG_CONFIG_HOME", &path) };
-        Config { path, previous, _lock: lock }
+        Config {
+            path,
+            previous,
+            _lock: lock,
+        }
     }
 }
 
@@ -62,7 +67,8 @@ fn recording_preferences_round_trip() {
     preferences.microphone_device = "test_input".into();
     preferences.webcam_enabled = true;
     preferences.webcam_device = "/dev/video8".into();
-    preferences.webcam_chosen_device = "/dev/v4l/by-id/usb-Insta360_Insta360_Link_2-video-index0".into();
+    preferences.webcam_chosen_device =
+        "/dev/v4l/by-id/usb-Insta360_Insta360_Link_2-video-index0".into();
     preferences.webcam_height = 720;
     preferences.webcam_rotation = 270;
     preferences.webcam_flip_horizontal = true;
@@ -74,7 +80,10 @@ fn recording_preferences_round_trip() {
     assert_eq!(loaded.webcam.value("shape").to_string_or(""), "round");
     assert!(loaded.webcam_enabled);
     assert_eq!(loaded.webcam_device, "/dev/video8");
-    assert_eq!(loaded.webcam_chosen_device, "/dev/v4l/by-id/usb-Insta360_Insta360_Link_2-video-index0");
+    assert_eq!(
+        loaded.webcam_chosen_device,
+        "/dev/v4l/by-id/usb-Insta360_Insta360_Link_2-video-index0"
+    );
     assert_eq!(loaded.webcam_height, 720);
     assert_eq!(loaded.webcam_rotation, 270);
     assert!(loaded.webcam_flip_horizontal);

@@ -56,7 +56,13 @@ impl Default for QColor {
 impl QColor {
     /// `QColor()`: an invalid colour (alpha 65535, other channels 0).
     pub const fn invalid() -> QColor {
-        QColor { spec: Spec::Invalid, alpha: 0xffff, red: 0, green: 0, blue: 0 }
+        QColor {
+            spec: Spec::Invalid,
+            alpha: 0xffff,
+            red: 0,
+            green: 0,
+            blue: 0,
+        }
     }
 
     /// `QColor(int r, int g, int b)`: opaque; see [`QColor::from_rgba`].
@@ -73,14 +79,32 @@ impl QColor {
         let in_range =
             (r as u32) <= 255 && (g as u32) <= 255 && (b as u32) <= 255 && (a as u32) <= 255;
         if !in_range {
-            return QColor { spec: Spec::Invalid, alpha: 0, red: 0, green: 0, blue: 0 };
+            return QColor {
+                spec: Spec::Invalid,
+                alpha: 0,
+                red: 0,
+                green: 0,
+                blue: 0,
+            };
         }
-        QColor { spec: Spec::Rgb, alpha: wide(a), red: wide(r), green: wide(g), blue: wide(b) }
+        QColor {
+            spec: Spec::Rgb,
+            alpha: wide(a),
+            red: wide(r),
+            green: wide(g),
+            blue: wide(b),
+        }
     }
 
     /// `QColor::fromRgba64(r, g, b, a)`: 16-bit components, always valid.
     pub const fn from_rgba64(r: u16, g: u16, b: u16, a: u16) -> QColor {
-        QColor { spec: Spec::Rgb, alpha: a, red: r, green: g, blue: b }
+        QColor {
+            spec: Spec::Rgb,
+            alpha: a,
+            red: r,
+            green: g,
+            blue: b,
+        }
     }
 
     /// `QColor::fromRgbF(float r, float g, float b, float a)`.
@@ -145,7 +169,12 @@ impl QColor {
     /// colours name their stored channels (`#000000` for [`QColor::invalid`]).
     pub fn name(&self) -> String {
         let rgb = self.to_rgb();
-        format!("#{:02x}{:02x}{:02x}", div_257(rgb.red), div_257(rgb.green), div_257(rgb.blue))
+        format!(
+            "#{:02x}{:02x}{:02x}",
+            div_257(rgb.red),
+            div_257(rgb.green),
+            div_257(rgb.blue)
+        )
     }
 
     /// `QColor::name(QColor::HexArgb)`: `#aarrggbb`, lower case.
@@ -210,7 +239,11 @@ impl QColor {
     /// stored as `qRound(alpha * 65535.f)` (a half float for `ExtendedRgb`). This applies to
     /// invalid colours too, which stay invalid.
     pub fn set_alpha_f(&mut self, alpha: f32) {
-        let alpha = if alpha.is_nan() { 0.0 } else { q_bound(0.0, alpha, 1.0) };
+        let alpha = if alpha.is_nan() {
+            0.0
+        } else {
+            q_bound(0.0, alpha, 1.0)
+        };
         self.alpha = match self.spec {
             Spec::ExtendedRgb => f16_from_f32(alpha),
             _ => q_round_f32(alpha * MAX) as u16,
@@ -232,7 +265,10 @@ impl QColor {
         let mut hsv = self.to_hsv();
         let mut saturation = i64::from(hsv.saturation);
         // C++ multiplies as `unsigned int`, wrapping on overflow.
-        let mut value = u32::try_from(factor).unwrap_or(0).wrapping_mul(u32::from(hsv.value)) / 100;
+        let mut value = u32::try_from(factor)
+            .unwrap_or(0)
+            .wrapping_mul(u32::from(hsv.value))
+            / 100;
         if value > u32::from(u16::MAX) {
             saturation = (saturation - (i64::from(value) - 65535)).max(0);
             value = u32::from(u16::MAX);
@@ -294,12 +330,22 @@ impl QColor {
         let rgb = self.to_rgb();
         let (r, g, b) = (rgb.red, rgb.green, rgb.blue);
         if rgb.spec == Spec::Invalid {
-            return Hsv { alpha: rgb.alpha, hue: r, saturation: g, value: b };
+            return Hsv {
+                alpha: rgb.alpha,
+                hue: r,
+                saturation: g,
+                value: b,
+            };
         }
         let (min, max) = (r.min(g).min(b), r.max(g).max(b));
         if min == max {
             // Achromatic: hue is undefined.
-            return Hsv { alpha: rgb.alpha, hue: u16::MAX, saturation: 0, value: max };
+            return Hsv {
+                alpha: rgb.alpha,
+                hue: u16::MAX,
+                saturation: 0,
+                value: max,
+            };
         }
         let chroma = f32::from(max - min);
         let saturation = q_round_f32((chroma / f32::from(max)) * MAX) as u16;
@@ -312,7 +358,12 @@ impl QColor {
         } else {
             4.0 + delta(r, g) / chroma
         };
-        Hsv { alpha: rgb.alpha, hue: q_round_f32(hue * 6000.0) as u16, saturation, value: max }
+        Hsv {
+            alpha: rgb.alpha,
+            hue: q_round_f32(hue * 6000.0) as u16,
+            saturation,
+            value: max,
+        }
     }
 
     /// `hsv.convertTo(cspec)` for this colour's spec: back to `Rgb`, on to `ExtendedRgb`
@@ -376,7 +427,11 @@ fn hsv_to_rgb(hsv: Hsv) -> QColor {
         // Achromatic.
         return rgb(hsv.value, hsv.value, hsv.value);
     }
-    let h = if hsv.hue == 36000 { 0.0 } else { f32::from(hsv.hue) / 6000.0 };
+    let h = if hsv.hue == 36000 {
+        0.0
+    } else {
+        f32::from(hsv.hue) / 6000.0
+    };
     let s = f32::from(hsv.saturation) / MAX;
     let v = f32::from(hsv.value) / MAX;
     let sector = h as i32;
@@ -406,7 +461,11 @@ fn hsv_to_rgb(hsv: Hsv) -> QColor {
 /// rounding the product; x86-64 builds have no FMA and round twice. The two disagree on about
 /// one `lighter`/`darker` result in 2500.
 fn one_minus_product(a: f32, b: f32) -> f32 {
-    if cfg!(target_arch = "aarch64") { (-a).mul_add(b, 1.0) } else { 1.0 - a * b }
+    if cfg!(target_arch = "aarch64") {
+        (-a).mul_add(b, 1.0)
+    } else {
+        1.0 - a * b
+    }
 }
 
 /// `qt_div_257`: a 16-bit channel to 8 bits, rounding to nearest.
@@ -424,18 +483,40 @@ fn parse_hex(digits: &str) -> Option<QColor> {
     }
     // The `index`th group of `width` digits.
     let group = |index: usize, width: usize| {
-        digits[index * width..(index + 1) * width].iter().fold(0u16, |value, &digit| {
-            value << 4 | (char::from(digit).to_digit(16).unwrap_or(0) as u16)
-        })
+        digits[index * width..(index + 1) * width]
+            .iter()
+            .fold(0u16, |value, &digit| {
+                value << 4 | (char::from(digit).to_digit(16).unwrap_or(0) as u16)
+            })
     };
     let (red, green, blue, alpha) = match digits.len() {
-        3 => (group(0, 1) * 0x1111, group(1, 1) * 0x1111, group(2, 1) * 0x1111, u16::MAX),
-        6 => (group(0, 2) * 0x101, group(1, 2) * 0x101, group(2, 2) * 0x101, u16::MAX),
-        8 => (group(1, 2) * 0x101, group(2, 2) * 0x101, group(3, 2) * 0x101, group(0, 2) * 0x101),
+        3 => (
+            group(0, 1) * 0x1111,
+            group(1, 1) * 0x1111,
+            group(2, 1) * 0x1111,
+            u16::MAX,
+        ),
+        6 => (
+            group(0, 2) * 0x101,
+            group(1, 2) * 0x101,
+            group(2, 2) * 0x101,
+            u16::MAX,
+        ),
+        8 => (
+            group(1, 2) * 0x101,
+            group(2, 2) * 0x101,
+            group(3, 2) * 0x101,
+            group(0, 2) * 0x101,
+        ),
         9 => {
             // 12 bits per channel, widened by repeating the top nibble.
             let widen = |x: u16| x << 4 | x >> 8;
-            (widen(group(0, 3)), widen(group(1, 3)), widen(group(2, 3)), u16::MAX)
+            (
+                widen(group(0, 3)),
+                widen(group(1, 3)),
+                widen(group(2, 3)),
+                u16::MAX,
+            )
         }
         12 => (group(0, 4), group(1, 4), group(2, 4), u16::MAX),
         _ => return None,
@@ -458,7 +539,9 @@ fn named_rgba(name: &str) -> Option<u32> {
             c => key.push(c.to_ascii_lowercase()),
         }
     }
-    let index = NAMED_COLORS.binary_search_by(|(entry, _)| entry.cmp(&key.as_str())).ok()?;
+    let index = NAMED_COLORS
+        .binary_search_by(|(entry, _)| entry.cmp(&key.as_str()))
+        .ok()?;
     Some(NAMED_COLORS[index].1)
 }
 
@@ -470,7 +553,11 @@ fn f16_from_f32(value: f32) -> u16 {
     let mantissa = bits & 0x7f_ffff;
     if exponent == 0xff {
         // Infinity stays infinity; NaN stays a (quiet) NaN.
-        let nan = if mantissa != 0 { 0x200 | (mantissa >> 13) as u16 } else { 0 };
+        let nan = if mantissa != 0 {
+            0x200 | (mantissa >> 13) as u16
+        } else {
+            0
+        };
         return sign | 0x7c00 | nan;
     }
     let unbiased = exponent - 127;
@@ -672,13 +759,26 @@ mod tests {
     #[test]
     fn parses_hex_forms() {
         let c = QColor::parse("#abc");
-        assert_eq!((c.name(), c.name_argb()), ("#aabbcc".into(), "#ffaabbcc".into()));
+        assert_eq!(
+            (c.name(), c.name_argb()),
+            ("#aabbcc".into(), "#ffaabbcc".into())
+        );
         assert_eq!(QColor::parse("#80ff0000").alpha(), 128);
         assert_eq!(QColor::parse("#80ff0000").name_argb(), "#80ff0000");
         assert_eq!(rgba64("#123456789"), (4657, 17764, 30871, 65535));
         assert_eq!(rgba64("#0123456789ab"), (291, 17767, 35243, 65535));
         assert_eq!(QColor::parse("#7AA2F7"), QColor::from_rgb(0x7a, 0xa2, 0xf7));
-        for bad in ["", "#", "#12", "#1234", "#1234567", "#12345678901", " #abc", "#abc ", "#ggg"] {
+        for bad in [
+            "",
+            "#",
+            "#12",
+            "#1234",
+            "#1234567",
+            "#12345678901",
+            " #abc",
+            "#abc ",
+            "#ggg",
+        ] {
             assert!(!QColor::parse(bad).is_valid(), "{bad:?}");
         }
     }
@@ -710,7 +810,10 @@ mod tests {
         let mut faded = QColor::invalid();
         faded.set_alpha_f(0.5);
         assert!(!faded.is_valid());
-        assert_eq!((faded.alpha(), faded.name_argb()), (128, "#80000000".into()));
+        assert_eq!(
+            (faded.alpha(), faded.name_argb()),
+            (128, "#80000000".into())
+        );
         assert_eq!(faded.lighter(150), faded);
     }
 
@@ -721,14 +824,19 @@ mod tests {
         assert_eq!(accent.lighter(112).rgba64(), (37931, 46764, 65535, 65535));
         assert_eq!(accent.darker(108).name(), "#7196e5");
         assert_eq!(accent.darker(118).name(), "#6789d1");
-        assert_eq!(QColor::parse("#1a1b26").lighter(106).rgba64(), (7082, 7355, 10351, 65535));
+        assert_eq!(
+            QColor::parse("#1a1b26").lighter(106).rgba64(),
+            (7082, 7355, 10351, 65535)
+        );
         let orange = QColor::parse("#ff8a00");
         assert_eq!(orange.lighter(300).name(), "#ffffff");
         assert_eq!(orange.lighter(50).rgba64(), (32767, 17732, 0, 65535));
         assert_eq!(orange.darker(0), orange);
         // The float HSV round trip moves 16-bit channels even at factor 100.
         assert_eq!(
-            QColor::from_rgba64(0, 1009, 10130, 65535).lighter(100).rgba64(),
+            QColor::from_rgba64(0, 1009, 10130, 65535)
+                .lighter(100)
+                .rgba64(),
             (0, 1010, 10130, 65535)
         );
     }
@@ -754,7 +862,10 @@ mod tests {
         assert_eq!(c.red_f(), 0.100_007_63);
         let mut c = QColor::from_rgb(169, 177, 214);
         c.set_alpha_f(0.07);
-        assert_eq!((c.rgba64().3, c.alpha(), c.name_argb()), (4587, 18, "#12a9b1d6".into()));
+        assert_eq!(
+            (c.rgba64().3, c.alpha(), c.name_argb()),
+            (4587, 18, "#12a9b1d6".into())
+        );
         c.set_alpha_f(f32::NAN);
         assert_eq!(c.alpha(), 0);
         assert!(!QColor::from_rgb_f(0.5, 0.5, 0.5, 1.5).is_valid());
@@ -766,10 +877,16 @@ mod tests {
         let c = QColor::from_rgb_f(1.5, -0.25, 0.5, 1.0);
         assert_eq!(c.spec(), Spec::ExtendedRgb);
         assert_eq!((c.red_f(), c.green_f(), c.blue_f()), (1.5, -0.25, 0.5));
-        assert_eq!((c.name(), c.rgba64()), ("#ff0080".into(), (65535, 0, 32768, 65535)));
+        assert_eq!(
+            (c.name(), c.rgba64()),
+            ("#ff0080".into(), (65535, 0, 32768, 65535))
+        );
         let lighter = c.lighter(150);
         assert_eq!(lighter.spec(), Spec::ExtendedRgb);
-        assert_eq!((lighter.red_f(), lighter.green_f(), lighter.blue_f()), (1.0, 0.5, 0.75));
+        assert_eq!(
+            (lighter.red_f(), lighter.green_f(), lighter.blue_f()),
+            (1.0, 0.5, 0.75)
+        );
         // Fuzzy comparison: Rgb's 16-bit 0.5 is not within float fuzz of the half float 0.5,
         // and infinite channels never compare equal.
         assert_ne!(

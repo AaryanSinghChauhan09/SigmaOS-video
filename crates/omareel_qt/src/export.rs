@@ -6,7 +6,9 @@
 //! here calls back into C++ or runs the event loop, so no Rust frame is on the stack while Qt
 //! processes events; `CancelFlag::cancel` only sets an atomic and may be called from anywhere.
 
-use cxx_qt_lib::{QByteArray, QList, QMap, QMapPair_QString_QVariant, QString, QStringList, QVariant};
+use cxx_qt_lib::{
+    QByteArray, QList, QMap, QMapPair_QString_QVariant, QString, QStringList, QVariant,
+};
 use omareel_core::compat::qjson::Value;
 use omareel_core::export::plan::YuvMatrix;
 use omareel_core::export::{self, FrameImages, Image};
@@ -135,7 +137,12 @@ pub mod ffi {
         fn new_export_job() -> Box<ExportJob>;
         /// Loads the bundle and works out the output; false with `error` set when it can't be
         /// exported. Cancelling `cancel` stops the job.
-        fn prepare(self: &mut ExportJob, options: &ExportOptions, cancel: &CancelFlag, error: &mut QString) -> bool;
+        fn prepare(
+            self: &mut ExportJob,
+            options: &ExportOptions,
+            cancel: &CancelFlag,
+            error: &mut QString,
+        ) -> bool;
         #[cxx_name = "totalFrames"]
         fn total_frames(self: &ExportJob) -> i32;
         fn composition(self: &ExportJob) -> Composition;
@@ -190,14 +197,25 @@ pub mod ffi {
         /// Writes the output file once the encoder is done; false with `error` set.
         fn finish(self: &mut ExportJob, error: &mut QString) -> bool;
         #[cxx_name = "timingReport"]
-        fn timing_report(self: &ExportJob, upload_ns: i64, render_ns: i64, readback_ns: i64) -> QString;
+        fn timing_report(
+            self: &ExportJob,
+            upload_ns: i64,
+            render_ns: i64,
+            readback_ns: i64,
+        ) -> QString;
     }
 }
 
 use ffi::{Composition, EvenSize, ExportOptions, VideoInfo};
 
 fn video_info(info: &media_probe::VideoInfo) -> VideoInfo {
-    VideoInfo { width: info.width, height: info.height, duration: info.duration, fps: info.fps, audio: info.audio }
+    VideoInfo {
+        width: info.width,
+        height: info.height,
+        duration: info.duration,
+        fps: info.fps,
+        audio: info.audio,
+    }
 }
 
 impl VideoInfo {
@@ -224,7 +242,9 @@ fn probe_video_with_error(path: &QString, error: &mut QString) -> VideoInfo {
 }
 
 fn probe_frame_times(path: &QString) -> QList<f64> {
-    media_probe::probe_frame_times(&path.to_string()).into_iter().collect()
+    media_probe::probe_frame_times(&path.to_string())
+        .into_iter()
+        .collect()
 }
 
 fn padded_even_size(width: i32, height: i32) -> EvenSize {
@@ -272,11 +292,17 @@ impl DecodedImage {
     }
 
     fn yuv_bt709(&self) -> bool {
-        self.0.as_ref().and_then(|image| image.yuv).is_some_and(|yuv| yuv.matrix == YuvMatrix::Bt709)
+        self.0
+            .as_ref()
+            .and_then(|image| image.yuv)
+            .is_some_and(|yuv| yuv.matrix == YuvMatrix::Bt709)
     }
 
     fn yuv_full_range(&self) -> bool {
-        self.0.as_ref().and_then(|image| image.yuv).is_some_and(|yuv| yuv.full_range)
+        self.0
+            .as_ref()
+            .and_then(|image| image.yuv)
+            .is_some_and(|yuv| yuv.full_range)
     }
 }
 
@@ -301,7 +327,10 @@ pub struct ExportJob {
 }
 
 fn new_export_job() -> Box<ExportJob> {
-    Box::new(ExportJob { job: None, frame: FrameImages::default() })
+    Box::new(ExportJob {
+        job: None,
+        frame: FrameImages::default(),
+    })
 }
 
 fn qstring(text: &str) -> QString {
@@ -318,17 +347,29 @@ pub(crate) fn json_variant(value: &Value) -> QVariant {
         Value::Int(n) => QVariant::from(n),
         Value::Double(d) => QVariant::from(d),
         Value::String(s) => QVariant::from(&qstring(s)),
-        Value::Array(items) => QVariant::from(&items.iter().map(json_variant).collect::<QList<QVariant>>()),
+        Value::Array(items) => {
+            QVariant::from(&items.iter().map(json_variant).collect::<QList<QVariant>>())
+        }
         Value::Object(object) => QVariant::from(&json_map(object)),
     }
 }
 
-pub(crate) fn json_map(object: &omareel_core::compat::qjson::Object) -> QMap<QMapPair_QString_QVariant> {
-    object.iter().map(|(key, value)| (qstring(key), json_variant(value))).collect()
+pub(crate) fn json_map(
+    object: &omareel_core::compat::qjson::Object,
+) -> QMap<QMapPair_QString_QVariant> {
+    object
+        .iter()
+        .map(|(key, value)| (qstring(key), json_variant(value)))
+        .collect()
 }
 
-pub(crate) fn map<const N: usize>(entries: [(&str, QVariant); N]) -> QMap<QMapPair_QString_QVariant> {
-    entries.into_iter().map(|(key, value)| (qstring(key), value)).collect()
+pub(crate) fn map<const N: usize>(
+    entries: [(&str, QVariant); N],
+) -> QMap<QMapPair_QString_QVariant> {
+    entries
+        .into_iter()
+        .map(|(key, value)| (qstring(key), value))
+        .collect()
 }
 
 impl ExportJob {
@@ -336,7 +377,12 @@ impl ExportJob {
         self.job.as_ref().map(export::ExportJob::state)
     }
 
-    fn prepare(&mut self, options: &ExportOptions, cancel: &CancelFlag, error: &mut QString) -> bool {
+    fn prepare(
+        &mut self,
+        options: &ExportOptions,
+        cancel: &CancelFlag,
+        error: &mut QString,
+    ) -> bool {
         let options = export::ExportOptions {
             bundle_path: options.bundle_path.to_string(),
             output_path: options.output_path.to_string(),
@@ -393,15 +439,23 @@ impl ExportJob {
     }
 
     fn project_map(&self) -> QMap<QMapPair_QString_QVariant> {
-        self.job.as_ref().map(|job| json_map(&job.project().to_json())).unwrap_or_default()
+        self.job
+            .as_ref()
+            .map(|job| json_map(&job.project().to_json()))
+            .unwrap_or_default()
     }
 
     fn background_image(&self) -> QString {
-        self.job.as_ref().map(|job| qstring(&job.background_image())).unwrap_or_default()
+        self.job
+            .as_ref()
+            .map(|job| qstring(&job.background_image()))
+            .unwrap_or_default()
     }
 
     fn zoom_map(&self) -> QMap<QMapPair_QString_QVariant> {
-        let Some(s) = self.state() else { return QMap::default() };
+        let Some(s) = self.state() else {
+            return QMap::default();
+        };
         let z = &s.zoom;
         map([
             ("scale", QVariant::from(&z.scale)),
@@ -412,12 +466,19 @@ impl ExportJob {
     }
 
     fn layout_map(&self) -> QMap<QMapPair_QString_QVariant> {
-        let Some(s) = self.state() else { return QMap::default() };
-        map([("cameraFull", QVariant::from(&s.layout.camera_full)), ("bubble", QVariant::from(&s.layout.bubble))])
+        let Some(s) = self.state() else {
+            return QMap::default();
+        };
+        map([
+            ("cameraFull", QVariant::from(&s.layout.camera_full)),
+            ("bubble", QVariant::from(&s.layout.bubble)),
+        ])
     }
 
     fn media_map(&self) -> QMap<QMapPair_QString_QVariant> {
-        let Some(s) = self.state() else { return QMap::default() };
+        let Some(s) = self.state() else {
+            return QMap::default();
+        };
         let m = &s.media;
         map([
             ("active", QVariant::from(&m.active)),
@@ -429,7 +490,9 @@ impl ExportJob {
     }
 
     fn cursor_map(&self) -> QMap<QMapPair_QString_QVariant> {
-        let Some(s) = self.state() else { return QMap::default() };
+        let Some(s) = self.state() else {
+            return QMap::default();
+        };
         let c = &s.cursor;
         map([
             ("x", QVariant::from(&c.x)),
@@ -442,7 +505,9 @@ impl ExportJob {
     }
 
     fn ripples(&self) -> QList<QVariant> {
-        let Some(s) = self.state() else { return QList::default() };
+        let Some(s) = self.state() else {
+            return QList::default();
+        };
         s.ripples
             .iter()
             .map(|r| {
@@ -456,7 +521,9 @@ impl ExportJob {
     }
 
     fn keystroke_pills(&self) -> QList<QVariant> {
-        let Some(s) = self.state() else { return QList::default() };
+        let Some(s) = self.state() else {
+            return QList::default();
+        };
         s.keystroke_pills
             .iter()
             .map(|pill| {
@@ -477,7 +544,9 @@ impl ExportJob {
     }
 
     fn start(&mut self, software_rendering: bool, error: &mut QString) -> bool {
-        let Some(job) = self.job.as_mut() else { return false };
+        let Some(job) = self.job.as_mut() else {
+            return false;
+        };
         match job.start(software_rendering) {
             Ok(()) => true,
             Err(message) => {
@@ -488,7 +557,9 @@ impl ExportJob {
     }
 
     fn next_frame(&mut self, frame: i32, error: &mut QString) -> bool {
-        let Some(job) = self.job.as_mut() else { return false };
+        let Some(job) = self.job.as_mut() else {
+            return false;
+        };
         match job.next_frame(frame) {
             Ok(images) => {
                 self.frame = images;
@@ -515,11 +586,15 @@ impl ExportJob {
     }
 
     fn wait_encode_space(&self, timeout_ms: u64) -> bool {
-        self.job.as_ref().is_none_or(|job| job.wait_encode_space(timeout_ms))
+        self.job
+            .as_ref()
+            .is_none_or(|job| job.wait_encode_space(timeout_ms))
     }
 
     fn encode(&mut self, bytes: QByteArray) -> QString {
-        let Some(job) = self.job.as_mut() else { return QString::default() };
+        let Some(job) = self.job.as_mut() else {
+            return QString::default();
+        };
         match job.encode(Box::new(SendBytes(bytes))) {
             Ok(()) => QString::default(),
             Err(message) => qstring(&message),
@@ -539,7 +614,9 @@ impl ExportJob {
     }
 
     fn encoder_done(&self) -> bool {
-        self.job.as_ref().is_none_or(export::ExportJob::encoder_done)
+        self.job
+            .as_ref()
+            .is_none_or(export::ExportJob::encoder_done)
     }
 
     fn wait_encoder_done(&self, timeout_ms: u64) {
@@ -555,7 +632,9 @@ impl ExportJob {
     }
 
     fn finish(&mut self, error: &mut QString) -> bool {
-        let Some(job) = self.job.as_mut() else { return false };
+        let Some(job) = self.job.as_mut() else {
+            return false;
+        };
         match job.finish() {
             Ok(()) => true,
             Err(message) => {
@@ -566,6 +645,9 @@ impl ExportJob {
     }
 
     fn timing_report(&self, upload_ns: i64, render_ns: i64, readback_ns: i64) -> QString {
-        self.job.as_ref().map(|job| qstring(&job.timing_report(upload_ns, render_ns, readback_ns))).unwrap_or_default()
+        self.job
+            .as_ref()
+            .map(|job| qstring(&job.timing_report(upload_ns, render_ns, readback_ns)))
+            .unwrap_or_default()
     }
 }

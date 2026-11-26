@@ -40,13 +40,19 @@ pub struct CameraDevice {
 pub fn selected_format(device: &CameraDevice, requested_height: i32) -> Option<&CameraFormat> {
     let mut best = None;
     let mut best_score = f64::MAX;
-    let (requested_width, requested_height) = if requested_height == 720 { (1280, 720) } else { (1920, 1080) };
+    let (requested_width, requested_height) = if requested_height == 720 {
+        (1280, 720)
+    } else {
+        (1920, 1080)
+    };
     for format in &device.formats {
         // float + double, compared as double.
         if f64::from(format.max_frame_rate) + 0.01 < 30.0 {
             continue;
         }
-        let size_penalty = f64::from((format.width - requested_width).abs() + (format.height - requested_height).abs());
+        let size_penalty = f64::from(
+            (format.width - requested_width).abs() + (format.height - requested_height).abs(),
+        );
         // std::abs of the float difference, then widened.
         let frame_rate_penalty = f64::from((format.max_frame_rate - 30.0f32).abs()) * 100.0;
         let score = size_penalty + frame_rate_penalty;
@@ -66,7 +72,9 @@ pub fn camera_can_record(device: &CameraDevice) -> bool {
 
 /// `QFile(path).readAll()` decoded and trimmed, or "" when it can't be read.
 fn read_trimmed(path: &str) -> String {
-    qfile::read_all(path).map(|bytes| qstring::trimmed(&qstring::from_utf8(&bytes)).to_owned()).unwrap_or_default()
+    qfile::read_all(path)
+        .map(|bytes| qstring::trimmed(&qstring::from_utf8(&bytes)).to_owned())
+        .unwrap_or_default()
 }
 
 /// `stableCameraPath(devicePath)` with the system's `/dev` and `/sys`.
@@ -129,8 +137,12 @@ pub fn stable_camera_path_in(device_path: &str, dev_root: &str, sys_root: &str) 
     let name = FileInfo::new(node.clone()).file_name();
     let own = identity(&name);
     let mut shared = false;
-    let others =
-        qdir::entry_list(&class_directory, &[], Filters::ALL_ENTRIES | Filters::NO_DOT_AND_DOT_DOT, SortFlags::NAME);
+    let others = qdir::entry_list(
+        &class_directory,
+        &[],
+        Filters::ALL_ENTRIES | Filters::NO_DOT_AND_DOT_DOT,
+        SortFlags::NAME,
+    );
     for other in &others {
         shared = shared || (*other != name && !own.is_empty() && identity(other) == own);
     }
@@ -159,18 +171,27 @@ pub fn camera_id_node(id: &[u8]) -> String {
     let text = qstring::from_utf8(id);
     match text.find("/dev/video") {
         None => String::new(),
-        Some(marker) => text[marker..].split(' ').next().unwrap_or_default().to_owned(),
+        Some(marker) => text[marker..]
+            .split(' ')
+            .next()
+            .unwrap_or_default()
+            .to_owned(),
     }
 }
 
 /// `cameraDeviceForPath`: the camera whose id names the node `path` resolves to now, or `None`
 /// (the null `QCameraDevice`).
-pub fn camera_device_for_path<'a>(devices: &'a [CameraDevice], path: &str) -> Option<&'a CameraDevice> {
+pub fn camera_device_for_path<'a>(
+    devices: &'a [CameraDevice],
+    path: &str,
+) -> Option<&'a CameraDevice> {
     let node = camera_node_path(path);
     if node.is_empty() {
         return None;
     }
-    devices.iter().find(|device| camera_id_node(&device.id) == node)
+    devices
+        .iter()
+        .find(|device| camera_id_node(&device.id) == node)
 }
 
 /// `FirstFrameTimestamp`: writes the camera's first frame time, once, to the `.ts` file beside
@@ -184,7 +205,10 @@ pub struct FirstFrameTimestamp {
 impl FirstFrameTimestamp {
     /// `FirstFrameTimestamp(path)`.
     pub fn new(path: impl Into<String>) -> FirstFrameTimestamp {
-        FirstFrameTimestamp { path: path.into(), first_frame_us: 0 }
+        FirstFrameTimestamp {
+            path: path.into(),
+            first_frame_us: 0,
+        }
     }
 
     /// `setPath`: a new file, waiting for its own first frame.
@@ -256,9 +280,11 @@ mod tests {
     fn camera_paths_survive_renumbering() {
         // A laptop webcam whose IR sensor shares its USB serial, so both index-0 nodes claim one
         // by-id name and udev left it on the IR node, and an Insta360 on a dock.
-        let root = ScratchDirectory(
-            std::env::temp_dir().join(format!("omareel-camera-paths-{}-{:?}", std::process::id(), std::thread::current().id())),
-        );
+        let root = ScratchDirectory(std::env::temp_dir().join(format!(
+            "omareel-camera-paths-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        )));
         let root_path = root.0.to_string_lossy().into_owned();
         let dev = format!("{root_path}/dev");
         let sys = format!("{root_path}/sys");
@@ -266,8 +292,14 @@ mod tests {
             write(&format!("{dev}/{name}"), b"");
             std::fs::create_dir_all(format!("{sys}/devices/{interface}")).unwrap();
             let class_directory = format!("{sys}/class/video4linux/{name}");
-            write(&format!("{class_directory}/index"), format!("{index}\n").as_bytes());
-            link(&format!("{sys}/devices/{interface}"), &format!("{class_directory}/device"));
+            write(
+                &format!("{class_directory}/index"),
+                format!("{index}\n").as_bytes(),
+            );
+            link(
+                &format!("{sys}/devices/{interface}"),
+                &format!("{class_directory}/device"),
+            );
         };
         write(&format!("{sys}/devices/usb7/7-1/idVendor"), b"636e\n");
         write(&format!("{sys}/devices/usb7/7-1/idProduct"), b"0bdb\n");
@@ -280,16 +312,40 @@ mod tests {
         node("video4", "usb1/1-1.1/1-1.1:1.0", 0);
         let by_id = format!("{dev}/v4l/by-id/");
         let by_path = format!("{dev}/v4l/by-path/");
-        link(&format!("{dev}/video2"), &format!("{by_id}usb-ASUS_FHD_webcam_200901010001-video-index0"));
-        link(&format!("{dev}/video1"), &format!("{by_id}usb-ASUS_FHD_webcam_200901010001-video-index1"));
-        link(&format!("{dev}/video4"), &format!("{by_id}usb-Insta360_Insta360_Link_2-video-index0"));
-        link(&format!("{dev}/video0"), &format!("{by_path}platform-x-usbv2-0:1:1.0-video-index0"));
-        link(&format!("{dev}/video0"), &format!("{by_path}platform-x-usb-0:1:1.0-video-index0"));
-        link(&format!("{dev}/video2"), &format!("{by_path}platform-x-usb-0:1:1.2-video-index0"));
-        link(&format!("{dev}/video4"), &format!("{by_path}platform-y-usb-0:1.1:1.0-video-index0"));
+        link(
+            &format!("{dev}/video2"),
+            &format!("{by_id}usb-ASUS_FHD_webcam_200901010001-video-index0"),
+        );
+        link(
+            &format!("{dev}/video1"),
+            &format!("{by_id}usb-ASUS_FHD_webcam_200901010001-video-index1"),
+        );
+        link(
+            &format!("{dev}/video4"),
+            &format!("{by_id}usb-Insta360_Insta360_Link_2-video-index0"),
+        );
+        link(
+            &format!("{dev}/video0"),
+            &format!("{by_path}platform-x-usbv2-0:1:1.0-video-index0"),
+        );
+        link(
+            &format!("{dev}/video0"),
+            &format!("{by_path}platform-x-usb-0:1:1.0-video-index0"),
+        );
+        link(
+            &format!("{dev}/video2"),
+            &format!("{by_path}platform-x-usb-0:1:1.2-video-index0"),
+        );
+        link(
+            &format!("{dev}/video4"),
+            &format!("{by_path}platform-y-usb-0:1.1:1.0-video-index0"),
+        );
 
         let insta360 = stable_camera_path_in(&format!("{dev}/video4"), &dev, &sys);
-        assert_eq!(insta360, format!("{by_id}usb-Insta360_Insta360_Link_2-video-index0"));
+        assert_eq!(
+            insta360,
+            format!("{by_id}usb-Insta360_Insta360_Link_2-video-index0")
+        );
         assert_eq!(
             stable_camera_path_in(&format!("{dev}/video0"), &dev, &sys),
             format!("{by_path}platform-x-usb-0:1:1.0-video-index0")
@@ -299,13 +355,22 @@ mod tests {
             format!("{by_path}platform-x-usb-0:1:1.2-video-index0")
         );
         assert_eq!(stable_camera_path_in(&insta360, &dev, &sys), insta360);
-        assert_eq!(camera_node_path(&insta360), canonical(&format!("{dev}/video4")));
+        assert_eq!(
+            camera_node_path(&insta360),
+            canonical(&format!("{dev}/video4"))
+        );
 
         // The dock comes back with a capture card ahead of the camera.
         std::fs::remove_file(format!("{dev}/video4")).unwrap();
         node("video6", "usb1/1-1.1/1-1.1:1.0", 0);
-        link(&format!("{dev}/video6"), &format!("{by_id}usb-Insta360_Insta360_Link_2-video-index0"));
-        assert_eq!(camera_node_path(&insta360), canonical(&format!("{dev}/video6")));
+        link(
+            &format!("{dev}/video6"),
+            &format!("{by_id}usb-Insta360_Insta360_Link_2-video-index0"),
+        );
+        assert_eq!(
+            camera_node_path(&insta360),
+            canonical(&format!("{dev}/video6"))
+        );
 
         // Unplugged: the saved path stays, and there is no node.
         std::fs::remove_file(format!("{dev}/video6")).unwrap();

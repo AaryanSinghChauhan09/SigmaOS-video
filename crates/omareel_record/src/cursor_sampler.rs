@@ -83,7 +83,9 @@ const RECHECK_US: i64 = 100_000;
 
 /// `qEnvironmentVariable(name)`: the value decoded as UTF-8, empty when unset.
 fn environment_variable(name: &str) -> String {
-    std::env::var_os(name).map(|value| omareel_core::compat::qstring::from_utf8(value.as_bytes())).unwrap_or_default()
+    std::env::var_os(name)
+        .map(|value| omareel_core::compat::qstring::from_utf8(value.as_bytes()))
+        .unwrap_or_default()
 }
 
 /// Hyprland's request socket: `$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock`.
@@ -98,7 +100,11 @@ fn socket_path() -> String {
 /// `QtPrivate::fuzzyCompare`, which `QPointF`'s `==` applies to each coordinate: an exact zero
 /// on either side compares the difference with `qFuzzyIsNull`, anything else `qFuzzyCompare`s.
 fn fuzzy_compare(lhs: f64, rhs: f64) -> bool {
-    if lhs == 0.0 || rhs == 0.0 { q_fuzzy_is_null(lhs - rhs) } else { q_fuzzy_compare(lhs, rhs) }
+    if lhs == 0.0 || rhs == 0.0 {
+        q_fuzzy_is_null(lhs - rhs)
+    } else {
+        q_fuzzy_compare(lhs, rhs)
+    }
 }
 
 /// `QPointF::operator==`.
@@ -127,7 +133,10 @@ fn ipc_request(path: &[u8], request: &[u8]) -> Option<Vec<u8>> {
     }
     // SAFETY: the descriptor was just made and is owned here, closed when this drops.
     let fd = unsafe { OwnedFd::from_raw_fd(fd) };
-    let timeout = libc::timeval { tv_sec: 0, tv_usec: 20000 };
+    let timeout = libc::timeval {
+        tv_sec: 0,
+        tv_usec: 20000,
+    };
     for option in [libc::SO_RCVTIMEO, libc::SO_SNDTIMEO] {
         // SAFETY: a timeval of its size.
         unsafe {
@@ -161,7 +170,9 @@ fn ipc_request(path: &[u8], request: &[u8]) -> Option<Vec<u8>> {
         return None;
     }
     // SAFETY: writes the request's bytes.
-    if unsafe { libc::write(fd.as_raw_fd(), request.as_ptr().cast(), request.len()) } != request.len() as isize {
+    if unsafe { libc::write(fd.as_raw_fd(), request.as_ptr().cast(), request.len()) }
+        != request.len() as isize
+    {
         return None;
     }
     let mut reply = Vec::new();
@@ -186,7 +197,10 @@ pub fn query_cursor(path: &[u8]) -> Option<PointF> {
     if !object.contains("x") || !object.contains("y") {
         return None;
     }
-    Some(PointF::new(object.value("x").to_double(0.0), object.value("y").to_double(0.0)))
+    Some(PointF::new(
+        object.value("x").to_double(0.0),
+        object.value("y").to_double(0.0),
+    ))
 }
 
 /// Whether `j/getoption ecosystem:enforce_permissions` says Hyprland enforces permissions
@@ -252,15 +266,27 @@ impl CursorSampler {
         if runtime.is_empty() || signature.is_empty() || !qdir::file_exists(&socket_path) {
             return Err(format!("Hyprland IPC socket is unavailable: {socket_path}"));
         }
-        let stop = Arc::new(StopSignal::new().map_err(|error| format!("Cursor sampling could not start: {error}"))?);
+        let stop = Arc::new(
+            StopSignal::new()
+                .map_err(|error| format!("Cursor sampling could not start: {error}"))?,
+        );
         self.stop = Some(Arc::clone(&stop));
-        self.source.store(CursorSource::None as u8, Ordering::SeqCst);
+        self.source
+            .store(CursorSource::None as u8, Ordering::SeqCst);
         let source = Arc::clone(&self.source);
         let keeper = Keeper::new(Arc::clone(&self.samples));
         let monitor = monitor.to_owned();
         let interval = polling_interval(fps);
-        self.thread =
-            Some(std::thread::spawn(move || run(socket_path.as_bytes(), &monitor, interval, &stop, &source, keeper)));
+        self.thread = Some(std::thread::spawn(move || {
+            run(
+                socket_path.as_bytes(),
+                &monitor,
+                interval,
+                &stop,
+                &source,
+                keeper,
+            )
+        }));
         Ok(())
     }
 
@@ -283,7 +309,10 @@ impl CursorSampler {
 
     /// `samples()`: a copy of what was kept, in time order.
     pub fn samples(&self) -> Vec<RawCursorSample> {
-        self.samples.lock().unwrap_or_else(PoisonError::into_inner).clone()
+        self.samples
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 }
 
@@ -308,20 +337,29 @@ struct Keeper {
 
 impl Keeper {
     fn new(samples: Arc<Mutex<Vec<RawCursorSample>>>) -> Keeper {
-        Keeper { samples, previous: None, last_stored: 0 }
+        Keeper {
+            samples,
+            previous: None,
+            last_stored: 0,
+        }
     }
 
     /// Keeps `current` at `timestamp` when the condition holds.
     fn offer(&mut self, timestamp: i64, current: PointF) {
         let keep = match self.previous {
             None => true,
-            Some(previous) => !same_point(current, previous) || timestamp - self.last_stored >= STILL_INTERVAL_US,
+            Some(previous) => {
+                !same_point(current, previous) || timestamp - self.last_stored >= STILL_INTERVAL_US
+            }
         };
         if keep {
             self.samples
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
-                .push(RawCursorSample { monotonic_us: timestamp, logical_position: current });
+                .push(RawCursorSample {
+                    monotonic_us: timestamp,
+                    logical_position: current,
+                });
             self.previous = Some(current);
             self.last_stored = timestamp;
         }
@@ -367,12 +405,23 @@ impl StopSignal {
 /// readable. Says whether to stop and whether `fd` is readable; an interrupted wait is neither.
 fn wait(stop: &StopSignal, fd: Option<RawFd>, timeout_us: Option<i64>) -> (bool, bool) {
     let mut descriptors = [
-        libc::pollfd { fd: stop.0.as_raw_fd(), events: libc::POLLIN, revents: 0 },
-        libc::pollfd { fd: fd.unwrap_or(-1), events: libc::POLLIN, revents: 0 },
+        libc::pollfd {
+            fd: stop.0.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        },
+        libc::pollfd {
+            fd: fd.unwrap_or(-1),
+            events: libc::POLLIN,
+            revents: 0,
+        },
     ];
     let timeout = timeout_us.map(|us| {
         let us = us.max(0);
-        libc::timespec { tv_sec: us / 1_000_000, tv_nsec: (us % 1_000_000) * 1000 }
+        libc::timespec {
+            tv_sec: us / 1_000_000,
+            tv_nsec: (us % 1_000_000) * 1000,
+        }
     });
     let count = if fd.is_some() { 2 } else { 1 };
     // SAFETY: `count` pollfds and an optional timespec, no signal mask.
@@ -380,7 +429,9 @@ fn wait(stop: &StopSignal, fd: Option<RawFd>, timeout_us: Option<i64>) -> (bool,
         libc::ppoll(
             descriptors.as_mut_ptr(),
             count,
-            timeout.as_ref().map_or(std::ptr::null(), |timeout| timeout as *const libc::timespec),
+            timeout
+                .as_ref()
+                .map_or(std::ptr::null(), |timeout| timeout as *const libc::timespec),
             std::ptr::null(),
         )
     };
@@ -430,7 +481,9 @@ fn poll(ipc: &[u8], interval: Duration, stop: &StopSignal, keeper: &mut Keeper) 
         }
         deadline += interval;
         // Nothing to wait for when the deadline has passed, as std::this_thread::sleep_until.
-        let remaining = deadline.saturating_duration_since(Instant::now()).as_micros() as i64;
+        let remaining = deadline
+            .saturating_duration_since(Instant::now())
+            .as_micros() as i64;
         if wait(stop, None, Some(remaining)).0 {
             return;
         }
@@ -466,13 +519,24 @@ impl Dispatch<wl_registry::WlRegistry, ()> for SessionState {
         _: &Connection,
         queue: &QueueHandle<SessionState>,
     ) {
-        let wl_registry::Event::Global { name, interface, version } = event else { return };
+        let wl_registry::Event::Global {
+            name,
+            interface,
+            version,
+        } = event
+        else {
+            return;
+        };
         match interface.as_str() {
-            "ext_image_copy_capture_manager_v1" => state.capture_manager = Some(registry.bind(name, 1, queue, ())),
+            "ext_image_copy_capture_manager_v1" => {
+                state.capture_manager = Some(registry.bind(name, 1, queue, ()))
+            }
             "ext_output_image_capture_source_manager_v1" => {
                 state.source_manager = Some(registry.bind(name, 1, queue, ()));
             }
-            "wl_seat" if state.seat.is_none() => state.seat = Some(registry.bind(name, 1, queue, ())),
+            "wl_seat" if state.seat.is_none() => {
+                state.seat = Some(registry.bind(name, 1, queue, ()))
+            }
             "wl_output" => {
                 let object = registry.bind(name, version.min(4), queue, ());
                 state.outputs.push((object, String::new()));
@@ -508,7 +572,10 @@ impl Dispatch<wl_seat::WlSeat, ()> for SessionState {
         _: &Connection,
         _: &QueueHandle<SessionState>,
     ) {
-        if let wl_seat::Event::Capabilities { capabilities: WEnum::Value(capabilities) } = event {
+        if let wl_seat::Event::Capabilities {
+            capabilities: WEnum::Value(capabilities),
+        } = event
+        {
             state.pointer_capability = capabilities.contains(wl_seat::Capability::Pointer);
         }
     }
@@ -543,7 +610,9 @@ delegate_noop!(SessionState: ExtImageCaptureSourceV1);
 /// unset), inside `XDG_RUNTIME_DIR` unless it is absolute. Unlike `screen_capture`'s, it never
 /// takes a `WAYLAND_SOCKET` descriptor: that is single-use, and the capture's.
 fn connect_display() -> Option<Connection> {
-    let name = std::env::var_os("WAYLAND_DISPLAY").map(|value| value.as_bytes().to_vec()).unwrap_or(b"wayland-0".into());
+    let name = std::env::var_os("WAYLAND_DISPLAY")
+        .map(|value| value.as_bytes().to_vec())
+        .unwrap_or(b"wayland-0".into());
     let path = if name.first() == Some(&b'/') {
         name
     } else {
@@ -561,7 +630,9 @@ fn connect_display() -> Option<Connection> {
 /// entered the output, or IPC puts the pointer off the output, where the session is rightly
 /// silent. A session that says nothing with the pointer on the output lacks the permission.
 fn session_answered(entered: bool, pointer: Option<PointF>, output: RectF) -> bool {
-    let Some(pointer) = pointer else { return entered };
+    let Some(pointer) = pointer else {
+        return entered;
+    };
     let inside = pointer.x >= output.x
         && pointer.y >= output.y
         && pointer.x < output.x + output.width
@@ -581,12 +652,19 @@ struct Tracker {
 
 impl Tracker {
     fn new(output: RectF) -> Tracker {
-        Tracker { output, relative: (0, 0), entered: false }
+        Tracker {
+            output,
+            relative: (0, 0),
+            entered: false,
+        }
     }
 
     /// Where the session last put the pointer, globally.
     fn position(&self) -> PointF {
-        PointF::new(self.output.x + f64::from(self.relative.0), self.output.y + f64::from(self.relative.1))
+        PointF::new(
+            self.output.x + f64::from(self.relative.0),
+            self.output.y + f64::from(self.relative.1),
+        )
     }
 
     /// Whether `pointer` (from IPC, floored) agrees with what the session said: within a pixel
@@ -640,7 +718,10 @@ struct SilenceCheck {
 
 impl SilenceCheck {
     fn new(now: i64) -> SilenceCheck {
-        SilenceCheck { due: now + SILENCE_CHECK_US, suspect: false }
+        SilenceCheck {
+            due: now + SILENCE_CHECK_US,
+            suspect: false,
+        }
     }
 
     /// The session spoke at `now`: it is not silent.
@@ -682,7 +763,10 @@ fn open_session(ipc: &[u8], monitor: &str) -> Result<Session, String> {
     if permissions_enforced(ipc) {
         return Err("Hyprland enforces permissions".into());
     }
-    let Some(layout) = monitor_layouts().into_iter().find(|layout| layout.name == monitor) else {
+    let Some(layout) = monitor_layouts()
+        .into_iter()
+        .find(|layout| layout.name == monitor)
+    else {
         return Err(format!("monitor {monitor} is not in hyprctl monitors"));
     };
     let connection = connect_display().ok_or("no Wayland display")?;
@@ -692,24 +776,35 @@ fn open_session(ipc: &[u8], monitor: &str) -> Result<Session, String> {
     let mut state = SessionState::default();
     // The second roundtrip brings the outputs' names and the seat's capabilities.
     for _ in 0..2 {
-        queue.roundtrip(&mut state).map_err(|error| format!("registry roundtrip failed: {error}"))?;
+        queue
+            .roundtrip(&mut state)
+            .map_err(|error| format!("registry roundtrip failed: {error}"))?;
     }
-    let (Some(capture_manager), Some(source_manager), Some(seat)) =
-        (state.capture_manager.clone(), state.source_manager.clone(), state.seat.clone())
-    else {
+    let (Some(capture_manager), Some(source_manager), Some(seat)) = (
+        state.capture_manager.clone(),
+        state.source_manager.clone(),
+        state.seat.clone(),
+    ) else {
         return Err("ext-image-copy-capture cursor sessions are unavailable".into());
     };
     if !state.pointer_capability {
         return Err("the seat has no pointer".into());
     }
-    let Some(output) = state.outputs.iter().find(|output| output.1 == monitor).map(|output| output.0.clone()) else {
+    let Some(output) = state
+        .outputs
+        .iter()
+        .find(|output| output.1 == monitor)
+        .map(|output| output.0.clone())
+    else {
         return Err(format!("output {monitor} is not on the display"));
     };
     let pointer = seat.get_pointer(&handle, ());
     let source = source_manager.create_source(&output, &handle, ());
     let session = capture_manager.create_pointer_cursor_session(&source, &pointer, &handle, ());
     // Hyprland answers a new session at once when the pointer is over the output.
-    queue.roundtrip(&mut state).map_err(|error| format!("session roundtrip failed: {error}"))?;
+    queue
+        .roundtrip(&mut state)
+        .map_err(|error| format!("session roundtrip failed: {error}"))?;
     let entered = state.events.contains(&SessionEvent::Enter);
     let initial = if entered { None } else { query_cursor(ipc) };
     let mut opened = Session {
@@ -748,7 +843,10 @@ impl Session {
             self.tracker.take(&events, ipc, now, keeper);
             if silence.due <= now {
                 let pointer = query_cursor(ipc);
-                if silence.answer(now, pointer.map(|pointer| self.tracker.agrees(pointer))).is_err() {
+                if silence
+                    .answer(now, pointer.map(|pointer| self.tracker.agrees(pointer)))
+                    .is_err()
+                {
                     if let Some(pointer) = pointer {
                         keeper.offer(now, pointer);
                     }
@@ -769,7 +867,9 @@ impl Session {
                 }
                 continue;
             };
-            let due = keeper.repeat_due().map_or(silence.due, |repeat| repeat.min(silence.due));
+            let due = keeper
+                .repeat_due()
+                .map_or(silence.due, |repeat| repeat.min(silence.due));
             let timeout = Some(due - monotonic_us());
             let (stopped, readable) = wait(stop, Some(guard.connection_fd().as_raw_fd()), timeout);
             if stopped {
@@ -778,7 +878,8 @@ impl Session {
             if readable {
                 match guard.read() {
                     Ok(_) => {}
-                    Err(WaylandError::Io(error)) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+                    Err(WaylandError::Io(error))
+                        if error.kind() == std::io::ErrorKind::WouldBlock => {}
                     Err(error) => break Err(format!("cursor session connection failed: {error}")),
                 }
             }
@@ -811,9 +912,15 @@ mod tests {
 
     #[test]
     fn points_compare_as_qpointf_does() {
-        assert!(same_point(PointF::new(0.0, 1.0), PointF::new(1e-13, 1.0 + 1e-13)));
+        assert!(same_point(
+            PointF::new(0.0, 1.0),
+            PointF::new(1e-13, 1.0 + 1e-13)
+        ));
         assert!(!same_point(PointF::new(0.0, 1.0), PointF::new(1e-11, 1.0)));
-        assert!(!same_point(PointF::new(100.0, 1.0), PointF::new(100.5, 1.0)));
+        assert!(!same_point(
+            PointF::new(100.0, 1.0),
+            PointF::new(100.5, 1.0)
+        ));
         assert!(same_point(PointF::new(-0.0, 5.0), PointF::new(0.0, 5.0)));
     }
 
@@ -826,7 +933,12 @@ mod tests {
         let server = std::thread::spawn(move || {
             use std::io::{Read, Write};
             let mut requests = Vec::new();
-            for reply in [&b"{\"x\": 12.5, \"y\": 7}"[..], b"{\"x\": 3}", b"[1, 2]", b"not json"] {
+            for reply in [
+                &b"{\"x\": 12.5, \"y\": 7}"[..],
+                b"{\"x\": 3}",
+                b"[1, 2]",
+                b"not json",
+            ] {
                 let (mut stream, _) = listener.accept().unwrap();
                 let mut request = [0u8; 11];
                 stream.read_exact(&mut request).unwrap();
@@ -840,15 +952,33 @@ mod tests {
         assert_eq!(query_cursor(path), None);
         assert_eq!(query_cursor(path), None);
         assert_eq!(query_cursor(path), None);
-        assert!(server.join().unwrap().iter().all(|request| request == b"j/cursorpos"));
-        assert_eq!(query_cursor(dir.join("missing").as_os_str().as_bytes()), None);
+        assert!(
+            server
+                .join()
+                .unwrap()
+                .iter()
+                .all(|request| request == b"j/cursorpos")
+        );
+        assert_eq!(
+            query_cursor(dir.join("missing").as_os_str().as_bytes()),
+            None
+        );
         assert_eq!(query_cursor(&[b'a'; 108]), None);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
     fn kept(keeper: &Keeper) -> Vec<(i64, f64, f64)> {
         let samples = keeper.samples.lock().unwrap();
-        samples.iter().map(|sample| (sample.monotonic_us, sample.logical_position.x, sample.logical_position.y)).collect()
+        samples
+            .iter()
+            .map(|sample| {
+                (
+                    sample.monotonic_us,
+                    sample.logical_position.x,
+                    sample.logical_position.y,
+                )
+            })
+            .collect()
     }
 
     #[test]
@@ -864,7 +994,10 @@ mod tests {
         keeper.repeat(252_999);
         keeper.repeat(253_000);
         keeper.offer(253_001, PointF::new(7.0, 6.0));
-        assert_eq!(kept(&keeper), [(1000, 5.0, 6.0), (3000, 7.0, 6.0), (253_000, 7.0, 6.0)]);
+        assert_eq!(
+            kept(&keeper),
+            [(1000, 5.0, 6.0), (3000, 7.0, 6.0), (253_000, 7.0, 6.0)]
+        );
     }
 
     #[test]
@@ -874,13 +1007,33 @@ mod tests {
         let mut tracker = Tracker::new(RectF::new(1920.0, 0.0, 1280.0, 720.0));
         // An enter without a position: Hyprland's starting 0,0.
         tracker.take(&[SessionEvent::Enter], ipc, 10, &mut keeper);
-        tracker.take(&[SessionEvent::Position(100, 50), SessionEvent::Position(101, 52)], ipc, 20, &mut keeper);
+        tracker.take(
+            &[
+                SessionEvent::Position(100, 50),
+                SessionEvent::Position(101, 52),
+            ],
+            ipc,
+            20,
+            &mut keeper,
+        );
         // A position before the leave is dropped; IPC (unreachable here) gives nothing to keep.
-        tracker.take(&[SessionEvent::Position(5, 5), SessionEvent::Leave], ipc, 30, &mut keeper);
+        tracker.take(
+            &[SessionEvent::Position(5, 5), SessionEvent::Leave],
+            ipc,
+            30,
+            &mut keeper,
+        );
         assert!(!tracker.entered);
         // Back where it left: Hyprland sends no position equal to its last.
         tracker.take(&[SessionEvent::Enter], ipc, 300_000, &mut keeper);
-        assert_eq!(kept(&keeper), [(10, 1920.0, 0.0), (20, 2021.0, 52.0), (300_000, 1925.0, 5.0)]);
+        assert_eq!(
+            kept(&keeper),
+            [
+                (10, 1920.0, 0.0),
+                (20, 2021.0, 52.0),
+                (300_000, 1925.0, 5.0)
+            ]
+        );
         assert!(tracker.entered);
     }
 
@@ -889,7 +1042,12 @@ mod tests {
         let mut tracker = Tracker::new(RectF::new(1920.0, 0.0, 1280.0, 720.0));
         let mut keeper = Keeper::new(Arc::default());
         let ipc = b"/nonexistent/omareel-cursor-test.sock";
-        tracker.take(&[SessionEvent::Enter, SessionEvent::Position(100, 50)], ipc, 10, &mut keeper);
+        tracker.take(
+            &[SessionEvent::Enter, SessionEvent::Position(100, 50)],
+            ipc,
+            10,
+            &mut keeper,
+        );
         assert!(tracker.agrees(PointF::new(2020.0, 50.0)));
         assert!(tracker.agrees(PointF::new(2021.0, 49.0)));
         // A move the output never committed.
@@ -924,10 +1082,26 @@ mod tests {
         let output = RectF::new(1920.0, 0.0, 1280.0, 720.0);
         assert!(session_answered(true, None, output));
         assert!(!session_answered(false, None, output));
-        assert!(!session_answered(false, Some(PointF::new(1920.0, 0.0)), output));
-        assert!(!session_answered(false, Some(PointF::new(3199.0, 719.0)), output));
-        assert!(session_answered(false, Some(PointF::new(3200.0, 100.0)), output));
-        assert!(session_answered(false, Some(PointF::new(100.0, 100.0)), output));
+        assert!(!session_answered(
+            false,
+            Some(PointF::new(1920.0, 0.0)),
+            output
+        ));
+        assert!(!session_answered(
+            false,
+            Some(PointF::new(3199.0, 719.0)),
+            output
+        ));
+        assert!(session_answered(
+            false,
+            Some(PointF::new(3200.0, 100.0)),
+            output
+        ));
+        assert!(session_answered(
+            false,
+            Some(PointF::new(100.0, 100.0)),
+            output
+        ));
     }
 
     #[test]

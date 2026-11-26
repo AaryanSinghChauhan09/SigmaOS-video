@@ -14,7 +14,11 @@ use omareel_core::zoom_timeline;
 fn spring_from_array(value: &Value) -> Spring {
     let a = value.to_array();
     let at = |i: usize| a.get(i).map_or(0.0, |v| v.to_double(0.0));
-    Spring { mass: at(0), stiffness: at(1), damping: at(2) }
+    Spring {
+        mass: at(0),
+        stiffness: at(1),
+        damping: at(2),
+    }
 }
 
 /// The oracle's `applyOverride`: a `set` entry written straight into the project's field.
@@ -80,7 +84,11 @@ fn sample_txt() {
         let mut project = Project::defaults("Motion", duration);
         let zooms = c.get("zooms");
         project.zooms = if zooms.to_string_or("") == "generate" {
-            let clicks: Vec<f64> = log.click_downs(true).iter().map(|click| click.time).collect();
+            let clicks: Vec<f64> = log
+                .click_downs(true)
+                .iter()
+                .map(|click| click.time)
+                .collect();
             zoom_timeline::generate(&clicks, duration)
         } else {
             segments_from_json(zooms)

@@ -38,8 +38,16 @@ fn round_txt() {
     use omareel_core::compat::qround::{q_round, q_round64};
     let mut out = Text::new();
     for value in round_inputs() {
-        let int = if value.is_finite() && value.abs() < 2147483647.0 { q_round(value).to_string() } else { "-".into() };
-        let int64 = if value.is_finite() && value.abs() < 9.2e18 { q_round64(value).to_string() } else { "-".into() };
+        let int = if value.is_finite() && value.abs() < 2147483647.0 {
+            q_round(value).to_string()
+        } else {
+            "-".into()
+        };
+        let int64 = if value.is_finite() && value.abs() < 9.2e18 {
+            q_round64(value).to_string()
+        } else {
+            "-".into()
+        };
         out.row([hex(value), num(value), int, int64]);
     }
     assert_golden("qround/round.txt", &out.into_string());

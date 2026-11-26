@@ -24,7 +24,11 @@ fn ease_in_out_cubic_txt() {
         f64::NEG_INFINITY,
         f64::NAN,
     ]);
-    inputs.extend(read_doubles("numbers/doubles-format.txt").into_iter().filter(|v| (-0.5..=1.5).contains(v)));
+    inputs.extend(
+        read_doubles("numbers/doubles-format.txt")
+            .into_iter()
+            .filter(|v| (-0.5..=1.5).contains(v)),
+    );
 
     let mut out = Text::new();
     for t in inputs {

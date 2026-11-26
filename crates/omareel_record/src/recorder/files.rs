@@ -30,9 +30,14 @@ fn byte_array_to_long_long(bytes: &[u8]) -> Option<i64> {
 pub fn first_frame_timestamp(path: &str) -> i64 {
     // QFile opened ReadOnly | Text: readLine only turns a final "\r\n" into "\n", which the
     // trim removes anyway.
-    let Ok(bytes) = qfile::read_all(path) else { return 0 };
+    let Ok(bytes) = qfile::read_all(path) else {
+        return 0;
+    };
     for line in qfile::lines(&bytes) {
-        let first = qfile::trimmed(line).split(|&b| b == b'\t').next().unwrap_or_default();
+        let first = qfile::trimmed(line)
+            .split(|&b| b == b'\t')
+            .next()
+            .unwrap_or_default();
         if let Some(value) = byte_array_to_long_long(first) {
             return value;
         }
@@ -81,7 +86,11 @@ pub fn cursor_at(samples: &[RawCursorSample], time: i64) -> PointF {
     }
     // std::upper_bound: the first sample after `time`.
     let after = samples.partition_point(|sample| sample.monotonic_us <= time);
-    if after == 0 { samples[0].logical_position } else { samples[after - 1].logical_position }
+    if after == 0 {
+        samples[0].logical_position
+    } else {
+        samples[after - 1].logical_position
+    }
 }
 
 /// The lines of `input.jsonl` that [`write_input_log`] writes, each a compact JSON object, in
@@ -90,7 +99,11 @@ pub fn cursor_at(samples: &[RawCursorSample], time: i64) -> PointF {
 /// dy, x, y}` at the cursor's position then; keys `{t, k: "kd"|"ku", code}` with `name` and `mods`
 /// on key down, and `label` too when the key has one. Positions are in the capture's pixels
 /// ([`position_object`]).
-pub fn input_log_lines(cursor: &[RawCursorSample], devices: &[DeviceEvent], region: &CaptureRegion) -> Vec<String> {
+pub fn input_log_lines(
+    cursor: &[RawCursorSample],
+    devices: &[DeviceEvent],
+    region: &CaptureRegion,
+) -> Vec<String> {
     let mut all: Vec<(i64, Object)> = Vec::with_capacity(cursor.len() + devices.len());
     let with_position = |object: &mut Object, logical: PointF| {
         let position = position_object(logical, region);
@@ -109,7 +122,14 @@ pub fn input_log_lines(cursor: &[RawCursorSample], devices: &[DeviceEvent], regi
         object.insert("t", event.monotonic_us);
         match event.kind {
             DeviceEventKind::ButtonDown | DeviceEventKind::ButtonUp => {
-                object.insert("k", if event.kind == DeviceEventKind::ButtonDown { "d" } else { "u" });
+                object.insert(
+                    "k",
+                    if event.kind == DeviceEventKind::ButtonDown {
+                        "d"
+                    } else {
+                        "u"
+                    },
+                );
                 object.insert("b", event.button.as_str());
                 with_position(&mut object, cursor_at(cursor, event.monotonic_us));
             }
@@ -128,7 +148,11 @@ pub fn input_log_lines(cursor: &[RawCursorSample], devices: &[DeviceEvent], regi
                     if !event.key_label.is_empty() {
                         object.insert("label", event.key_label.as_str());
                     }
-                    let mods: Vec<Value> = event.modifiers.iter().map(|m| Value::from(m.as_str())).collect();
+                    let mods: Vec<Value> = event
+                        .modifiers
+                        .iter()
+                        .map(|m| Value::from(m.as_str()))
+                        .collect();
                     object.insert("mods", mods);
                 }
             }
@@ -136,7 +160,9 @@ pub fn input_log_lines(cursor: &[RawCursorSample], devices: &[DeviceEvent], regi
         all.push((event.monotonic_us, object));
     }
     all.sort_by_key(|(time, _)| *time);
-    all.into_iter().map(|(_, object)| Value::Object(object).to_json(Format::Compact)).collect()
+    all.into_iter()
+        .map(|(_, object)| Value::Object(object).to_json(Format::Compact))
+        .collect()
 }
 
 /// The file-static `writeInputLog`: `input.jsonl` from the cursor samples and device events
@@ -169,7 +195,11 @@ pub fn write_json(path: &str, object: &Object) -> Result<(), String> {
     if !file.open() {
         return Err(file.error_string());
     }
-    file.write(Value::Object(object.clone()).to_json(Format::Indented).as_bytes());
+    file.write(
+        Value::Object(object.clone())
+            .to_json(Format::Indented)
+            .as_bytes(),
+    );
     if !file.commit() {
         return Err(file.error_string());
     }
@@ -182,7 +212,11 @@ pub const RECORDER_OUTPUT_TAIL: usize = 4096;
 /// The file-static `drainRecorderOutput`: what the recorder printed since the last call (its
 /// merged channels), copied to the debug log when one is open (and flushed), and appended to
 /// `tail`, of which the last [`RECORDER_OUTPUT_TAIL`] bytes are kept.
-pub fn drain_recorder_output(process: &mut Process, tail: &mut Vec<u8>, debug_log: Option<&mut dyn Write>) {
+pub fn drain_recorder_output(
+    process: &mut Process,
+    tail: &mut Vec<u8>,
+    debug_log: Option<&mut dyn Write>,
+) {
     append_recorder_output(&process.read_all(), tail, debug_log);
 }
 

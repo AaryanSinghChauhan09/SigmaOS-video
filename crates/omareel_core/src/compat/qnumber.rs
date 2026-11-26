@@ -80,7 +80,10 @@ pub fn to_double_with_ok(text: &str) -> (f64, bool) {
 pub fn byte_array_to_double(bytes: &[u8]) -> Option<f64> {
     let space = |b: &u8| matches!(b, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r');
     let start = bytes.iter().position(|b| !space(b)).unwrap_or(bytes.len());
-    let end = bytes.iter().rposition(|b| !space(b)).map_or(start, |i| i + 1);
+    let end = bytes
+        .iter()
+        .rposition(|b| !space(b))
+        .map_or(start, |i| i + 1);
     match ascii_to_double(&bytes[start..end]) {
         (value, true) => Some(value),
         (_, false) => None,
@@ -101,13 +104,20 @@ pub fn to_int(text: &str) -> Option<i32> {
 /// `"12\0junk"` is 12.
 pub fn to_long_long(text: &str) -> Option<i64> {
     // Qt narrows to Latin-1 first; '?' stands in for wider characters, which are never valid.
-    let bytes: Vec<u8> = text.chars().map(|c| u8::try_from(u32::from(c)).unwrap_or(b'?')).collect();
+    let bytes: Vec<u8> = text
+        .chars()
+        .map(|c| u8::try_from(u32::from(c)).unwrap_or(b'?'))
+        .collect();
     let mut pos = skip_ascii_space(&bytes, 0);
     let negative = bytes.get(pos) == Some(&b'-');
     if negative || bytes.get(pos) == Some(&b'+') {
         pos += 1;
     }
-    let digits_end = pos + bytes[pos..].iter().take_while(|b| b.is_ascii_digit()).count();
+    let digits_end = pos
+        + bytes[pos..]
+            .iter()
+            .take_while(|b| b.is_ascii_digit())
+            .count();
     if digits_end == pos {
         return None;
     }
@@ -118,9 +128,15 @@ pub fn to_long_long(text: &str) -> Option<i64> {
     }
     let mut magnitude: u64 = 0;
     for &digit in &bytes[pos..digits_end] {
-        magnitude = magnitude.checked_mul(10)?.checked_add(u64::from(digit - b'0'))?;
+        magnitude = magnitude
+            .checked_mul(10)?
+            .checked_add(u64::from(digit - b'0'))?;
     }
-    if negative { 0i64.checked_sub_unsigned(magnitude) } else { i64::try_from(magnitude).ok() }
+    if negative {
+        0i64.checked_sub_unsigned(magnitude)
+    } else {
+        i64::try_from(magnitude).ok()
+    }
 }
 
 /// Qt's `ascii_isspace`: the six C-locale whitespace characters.
@@ -129,7 +145,10 @@ fn is_ascii_space(byte: u8) -> bool {
 }
 
 fn skip_ascii_space(bytes: &[u8], from: usize) -> usize {
-    from + bytes[from..].iter().take_while(|&&b| is_ascii_space(b)).count()
+    from + bytes[from..]
+        .iter()
+        .take_while(|&&b| is_ascii_space(b))
+        .count()
 }
 
 /// `QChar::isSpace`: Unicode categories Zs, Zl and Zp plus U+0009..U+000D and U+0085.
@@ -196,7 +215,11 @@ fn parse_inf_nan(num: &[u8]) -> Option<(f64, bool)> {
     if num.len() != offset + 3 {
         return Some((0.0, false));
     }
-    let word = [num[offset] | 0x20, num[offset + 1] | 0x20, num[offset + 2] | 0x20];
+    let word = [
+        num[offset] | 0x20,
+        num[offset + 1] | 0x20,
+        num[offset + 2] | 0x20,
+    ];
     Some(match &word {
         b"inf" if negative => (f64::NEG_INFINITY, true),
         b"inf" => (f64::INFINITY, true),
@@ -210,7 +233,12 @@ fn parse_inf_nan(num: &[u8]) -> Option<(f64, bool)> {
 /// and nothing else.
 fn is_plain_decimal(num: &[u8]) -> bool {
     let mut pos = usize::from(matches!(num.first(), Some(b'+' | b'-')));
-    let count_digits = |from: usize| num[from..].iter().take_while(|b| b.is_ascii_digit()).count();
+    let count_digits = |from: usize| {
+        num[from..]
+            .iter()
+            .take_while(|b| b.is_ascii_digit())
+            .count()
+    };
     let integer_digits = count_digits(pos);
     pos += integer_digits;
     let mut fraction_digits = 0;
@@ -253,15 +281,22 @@ struct Digits {
 /// `dtoString`: digits from [`double_to_ascii`], laid out as Qt does.
 fn dto_string(d: f64, mut form: Form, precision: i32, uppercase: bool) -> String {
     // Undocumented: aside from FloatingPointShortest, a negative precision means 6.
-    let precision =
-        if precision != FLOATING_POINT_SHORTEST && precision < 0 { 6 } else { precision };
+    let precision = if precision != FLOATING_POINT_SHORTEST && precision < 0 {
+        6
+    } else {
+        precision
+    };
     if !d.is_finite() {
         let text = match (d.is_nan(), d < 0.0) {
             (true, _) => "nan",
             (false, true) => "-inf",
             (false, false) => "inf",
         };
-        return if uppercase { text.to_ascii_uppercase() } else { text.to_owned() };
+        return if uppercase {
+            text.to_ascii_uppercase()
+        } else {
+            text.to_owned()
+        };
     }
     let Digits { digits, decpt } = double_to_ascii(d.abs(), form, precision);
     let succinct = form == Form::SignificantDigits;
@@ -303,7 +338,11 @@ fn resolve_format(precision: i32, decpt: i32, length: usize) -> Form {
         // printf's %g rule: decimal when -4 <= exponent < precision.
         decpt > -4 && decpt <= if precision != 0 { precision } else { 1 }
     };
-    if use_decimal { Form::Decimal } else { Form::Exponent }
+    if use_decimal {
+        Form::Decimal
+    } else {
+        Form::Exponent
+    }
 }
 
 /// The `DFExponent` branch of `dtoString`: `d.ddde+XX`, at least two exponent digits.
@@ -376,7 +415,10 @@ fn len_i32(text: &str) -> i32 {
 /// `DoubleToAscii` produces, with trailing zeros dropped.
 fn double_to_ascii(v: f64, form: Form, precision: i32) -> Digits {
     if v == 0.0 {
-        return Digits { digits: vec![b'0'], decpt: 1 };
+        return Digits {
+            digits: vec![b'0'],
+            decpt: 1,
+        };
     }
     let mut result = if precision == FLOATING_POINT_SHORTEST {
         shortest_digits(v)
@@ -405,8 +447,14 @@ fn shortest_digits(v: f64) -> Digits {
     let shortest: Vec<u8> = mantissa.bytes().filter(u8::is_ascii_digit).collect();
     let decpt = exponent.parse::<i32>().unwrap_or(0) + 1;
     match halfway_alternative(v, &shortest, decpt) {
-        Some(even) => Digits { digits: even, decpt },
-        None => Digits { digits: shortest, decpt },
+        Some(even) => Digits {
+            digits: even,
+            decpt,
+        },
+        None => Digits {
+            digits: shortest,
+            decpt,
+        },
     }
 }
 
@@ -427,7 +475,10 @@ fn halfway_alternative(v: f64, shortest: &[u8], decpt: i32) -> Option<Vec<u8>> {
     {
         return None;
     }
-    let down = Digits { digits: exact.digits[..shortest.len()].to_vec(), decpt };
+    let down = Digits {
+        digits: exact.digits[..shortest.len()].to_vec(),
+        decpt,
+    };
     let up = increment(&down);
     if digits_value(&down) != v || digits_value(&up) != v {
         // Only one candidate reads back; it is the one Rust chose.
@@ -448,7 +499,10 @@ fn fixed_digits(v: f64, precision: i32) -> Digits {
     let rounded = round_half_up(exact, keep);
     if rounded.digits.is_empty() {
         // Nothing left: double-conversion reports the point at -precision.
-        return Digits { digits: Vec::new(), decpt: -precision };
+        return Digits {
+            digits: Vec::new(),
+            decpt: -precision,
+        };
     }
     rounded
 }
@@ -463,14 +517,24 @@ fn precision_digits(v: f64, count: i32) -> Digits {
 fn round_half_up(exact: Digits, keep: i64) -> Digits {
     let Digits { digits, decpt } = exact;
     if keep < 0 {
-        return Digits { digits: Vec::new(), decpt };
+        return Digits {
+            digits: Vec::new(),
+            decpt,
+        };
     }
     let keep = usize::try_from(keep).unwrap_or(usize::MAX);
     if keep >= digits.len() {
         return Digits { digits, decpt };
     }
-    let kept = Digits { digits: digits[..keep].to_vec(), decpt };
-    if digits[keep] >= b'5' { increment(&kept) } else { kept }
+    let kept = Digits {
+        digits: digits[..keep].to_vec(),
+        decpt,
+    };
+    if digits[keep] >= b'5' {
+        increment(&kept)
+    } else {
+        kept
+    }
 }
 
 /// Adds one in the last place. When the carry runs off the front ("99" or nothing at all),
@@ -482,17 +546,25 @@ fn increment(value: &Digits) -> Digits {
             *digit = b'0';
         } else {
             *digit += 1;
-            return Digits { digits, decpt: value.decpt };
+            return Digits {
+                digits,
+                decpt: value.decpt,
+            };
         }
     }
     digits.insert(0, b'1');
-    Digits { digits, decpt: value.decpt + 1 }
+    Digits {
+        digits,
+        decpt: value.decpt + 1,
+    }
 }
 
 /// The double nearest to `0.DIGITS × 10^decpt`.
 fn digits_value(value: &Digits) -> f64 {
     let digits = std::str::from_utf8(&value.digits).unwrap_or("0");
-    format!("0.{digits}e{}", value.decpt).parse().unwrap_or(f64::NAN)
+    format!("0.{digits}e{}", value.decpt)
+        .parse()
+        .unwrap_or(f64::NAN)
 }
 
 /// `v = significand × 2^exponent` with an odd significand (for finite, non-zero `v`).
@@ -500,10 +572,16 @@ fn odd_significand(v: f64) -> (u64, i32) {
     let bits = v.to_bits();
     let biased = i32::try_from((bits >> 52) & 0x7ff).unwrap_or(0);
     let fraction = bits & ((1 << 52) - 1);
-    let (significand, exponent) =
-        if biased == 0 { (fraction, -1074) } else { (fraction | 1 << 52, biased - 1075) };
+    let (significand, exponent) = if biased == 0 {
+        (fraction, -1074)
+    } else {
+        (fraction | 1 << 52, biased - 1075)
+    };
     let zeros = significand.trailing_zeros();
-    (significand >> zeros, exponent + i32::try_from(zeros).unwrap_or(0))
+    (
+        significand >> zeros,
+        exponent + i32::try_from(zeros).unwrap_or(0),
+    )
 }
 
 /// The exact decimal expansion of a finite, positive `v`. A double with `k` binary fraction
@@ -580,9 +658,15 @@ mod tests {
         assert_eq!(number_f64(0.00001, 'g', SHORTEST), "1e-05");
         assert_eq!(number_f64(1e15, 'g', SHORTEST), "1e+15");
         assert_eq!(number_f64(123456e10, 'g', SHORTEST), "1.23456e+15");
-        assert_eq!(number_f64(9007199254740993.0, 'g', SHORTEST), "9007199254740992");
+        assert_eq!(
+            number_f64(9007199254740993.0, 'g', SHORTEST),
+            "9007199254740992"
+        );
         assert_eq!(number_f64(5e-324, 'g', SHORTEST), "5e-324");
-        assert_eq!(number_f64(1.7976931348623157e308, 'g', SHORTEST), "1.7976931348623157e+308");
+        assert_eq!(
+            number_f64(1.7976931348623157e308, 'g', SHORTEST),
+            "1.7976931348623157e+308"
+        );
         assert_eq!(number_f64(123.456, 'e', SHORTEST), "1.23456e+02");
         assert_eq!(number_f64(100.0, 'e', SHORTEST), "1e+02");
         assert_eq!(number_f64(1.0, 'f', SHORTEST), "1");
@@ -595,14 +679,26 @@ mod tests {
     #[allow(clippy::excessive_precision)] // the literals are the exact binary values
     fn shortest_halfway_cases_pick_the_even_digit() {
         // Exactly halfway between two 17-digit candidates; Rust's own formatting rounds up.
-        assert_eq!(number_f64(261537232372670.625, 'g', SHORTEST), "261537232372670.62");
-        assert_eq!(number_f64(1684788023902572.25, 'g', SHORTEST), "1684788023902572.2");
-        assert_eq!(number_f64(1125899906842624.75, 'g', SHORTEST), "1125899906842624.8");
+        assert_eq!(
+            number_f64(261537232372670.625, 'g', SHORTEST),
+            "261537232372670.62"
+        );
+        assert_eq!(
+            number_f64(1684788023902572.25, 'g', SHORTEST),
+            "1684788023902572.2"
+        );
+        assert_eq!(
+            number_f64(1125899906842624.75, 'g', SHORTEST),
+            "1125899906842624.8"
+        );
     }
 
     #[test]
     fn long_exact_expansions() {
-        assert_eq!(number_f64(0.1, 'e', 30), "1.000000000000000055511151231258e-01");
+        assert_eq!(
+            number_f64(0.1, 'e', 30),
+            "1.000000000000000055511151231258e-01"
+        );
         assert_eq!(
             number_f64(1e300, 'f', 2),
             concat!(
@@ -673,8 +769,9 @@ mod tests {
         assert_eq!(to_int("2147483648"), None);
         assert_eq!(to_int("12\0abc"), Some(12));
         assert_eq!(to_int(" 12 \0 x"), Some(12));
-        for bad in ["", " ", "+", "-", "+-5", "- 5", "0x10", "1.0", "1e3", "12abc", "\u{a0}5", "\0"]
-        {
+        for bad in [
+            "", " ", "+", "-", "+-5", "- 5", "0x10", "1.0", "1e3", "12abc", "\u{a0}5", "\0",
+        ] {
             assert_eq!(to_int(bad), None, "{bad:?}");
         }
         assert_eq!(to_long_long("-9223372036854775808"), Some(i64::MIN));

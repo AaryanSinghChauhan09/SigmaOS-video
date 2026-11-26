@@ -106,7 +106,11 @@ fn indices(subset: &[InputEvent], events: &[InputEvent]) -> String {
             }
         }
     }
-    if result.is_empty() { "-".into() } else { result.join(",") }
+    if result.is_empty() {
+        "-".into()
+    } else {
+        result.join(",")
+    }
 }
 
 pub fn event_row(event: &InputEvent) -> Vec<String> {
@@ -141,8 +145,14 @@ fn cases_txt() -> String {
             out.row(event_row(event));
         }
         out.row(["moves".into(), indices(&log.moves(), events)]);
-        out.row(["clickDowns".into(), indices(&log.click_downs(false), events)]);
-        out.row(["clickDowns(leftRightOnly)".into(), indices(&log.click_downs(true), events)]);
+        out.row([
+            "clickDowns".into(),
+            indices(&log.click_downs(false), events),
+        ]);
+        out.row([
+            "clickDowns(leftRightOnly)".into(),
+            indices(&log.click_downs(true), events),
+        ]);
         out.row(["keyCount".into(), log.key_count().to_string()]);
     }
     out.into_string()
@@ -162,7 +172,11 @@ fn cases_txt_without_qt_open_errors() {
     let keep = |label: &str| !QT_OPEN_ERRORS.contains(&label);
     let expected = keep_sections(&read_expected("inputlog/cases.txt"), keep);
     let actual = keep_sections(cases_txt().as_bytes(), keep);
-    assert_same("inputlog/cases.txt (without Qt's own open errors)", &expected, &actual);
+    assert_same(
+        "inputlog/cases.txt (without Qt's own open errors)",
+        &expected,
+        &actual,
+    );
 }
 
 #[test]
@@ -170,5 +184,9 @@ fn cases_txt_qt_open_errors() {
     let keep = |label: &str| QT_OPEN_ERRORS.contains(&label);
     let expected = keep_sections(&read_expected("inputlog/cases.txt"), keep);
     let actual = keep_sections(cases_txt().as_bytes(), keep);
-    assert_same("inputlog/cases.txt (Qt's own open errors)", &expected, &actual);
+    assert_same(
+        "inputlog/cases.txt (Qt's own open errors)",
+        &expected,
+        &actual,
+    );
 }

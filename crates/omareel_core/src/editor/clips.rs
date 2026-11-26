@@ -2,13 +2,15 @@
 //! `mergeClip`, `resetClipTrims`, `setClipSpeed`, `setClipLayout`, `setClipFit`, `reorderClip`)
 //! and inserting a video (`insertMedia`, `finishImport`).
 
-use super::bundle::{import_insert, ImportedInsert, ProbeVideo, VideoInfo};
+use super::bundle::{ImportedInsert, ProbeVideo, VideoInfo, import_insert};
 use super::{Document, Effect};
 use crate::clip_timeline::ClipTimeline;
 use crate::compat::cpp;
 use crate::compat::qdir;
 use crate::compat::qround::q_fuzzy_compare;
-use crate::project::{allowed_clip_fits, allowed_clip_layouts, allowed_clip_speeds, Clip, ZoomSegment};
+use crate::project::{
+    Clip, ZoomSegment, allowed_clip_fits, allowed_clip_layouts, allowed_clip_speeds,
+};
 
 /// A cut [`Document::prepare_delete_output_range`] worked out: where it starts, and the clips
 /// that are left.
@@ -58,7 +60,8 @@ impl Document {
         if let Some(info) = self.inserts.get(path) {
             return *info;
         }
-        let info = (self.probe_video)(&qdir::file_path(&self.recording.bundle_path, path)).unwrap_or_default();
+        let info = (self.probe_video)(&qdir::file_path(&self.recording.bundle_path, path))
+            .unwrap_or_default();
         self.inserts.insert(path.to_owned(), info);
         info
     }
@@ -68,10 +71,19 @@ impl Document {
     pub(crate) fn clip_bounds(&mut self, index: i32) -> (f64, f64) {
         let clip = self.project.clips[index as usize].clone();
         if !clip.is_media() {
-            return self.timeline().recording_bounds(index, self.recording.source_duration);
+            return self
+                .timeline()
+                .recording_bounds(index, self.recording.source_duration);
         }
         let info = self.insert_info(&clip.media);
-        (0.0, if info.is_valid() { info.duration } else { clip.out })
+        (
+            0.0,
+            if info.is_valid() {
+                info.duration
+            } else {
+                clip.out
+            },
+        )
     }
 
     /// `splitAtPlayhead()`: the clip at the playhead in two, unless that is within 0.1 s of its
@@ -154,13 +166,26 @@ impl Document {
         }
         let i = index as usize;
         // The recording always keeps at least one clip.
-        if !self.project.clips[i].is_media() && self.project.clips.iter().filter(|clip| !clip.is_media()).count() <= 1 {
+        if !self.project.clips[i].is_media()
+            && self
+                .project
+                .clips
+                .iter()
+                .filter(|clip| !clip.is_media())
+                .count()
+                <= 1
+        {
             return false;
         }
         self.snapshot("");
         self.project.clips.remove(i);
-        self.selected_clip_id = self.project.clips[i.min(self.project.clips.len() - 1)].id.clone();
-        self.emit(Effect::Seek(cpp::min(self.output_position, self.duration())));
+        self.selected_clip_id = self.project.clips[i.min(self.project.clips.len() - 1)]
+            .id
+            .clone();
+        self.emit(Effect::Seek(cpp::min(
+            self.output_position,
+            self.duration(),
+        )));
         self.changed(false);
         self.emit(Effect::SelectionChanged);
         true
@@ -173,7 +198,9 @@ impl Document {
     /// [`Effect::Pause`] first; the Qt side pauses between [`Document::prepare_delete_output_range`]
     /// and [`Document::apply_delete_output_range`] instead, where the C++ did.
     pub fn delete_output_range(&mut self, from: f64, to: f64) -> bool {
-        let Some(cut) = self.prepare_delete_output_range(from, to) else { return false };
+        let Some(cut) = self.prepare_delete_output_range(from, to) else {
+            return false;
+        };
         self.emit(Effect::Pause);
         self.apply_delete_output_range(cut);
         true
@@ -197,7 +224,10 @@ impl Document {
         if edited.clips().iter().all(Clip::is_media) {
             return None;
         }
-        Some(OutputCut { from, clips: edited.clips().to_vec() })
+        Some(OutputCut {
+            from,
+            clips: edited.clips().to_vec(),
+        })
     }
 
     /// The edit of `deleteOutputRange` after its pause, for a cut
@@ -227,7 +257,9 @@ impl Document {
             self.project.zooms = surviving;
         }
         let at = cpp::min(from, self.duration());
-        self.selected_clip_id = self.project.clips[self.clip_for_output(at).0 as usize].id.clone();
+        self.selected_clip_id = self.project.clips[self.clip_for_output(at).0 as usize]
+            .id
+            .clone();
         self.selected_zoom_id.clear();
         self.selected_zoom_ids.clear();
         self.changed(zooms_changed);
@@ -244,7 +276,9 @@ impl Document {
             return false;
         }
         // Only pieces of the recording join; an inserted clip has nothing to join across.
-        if self.project.clips[index as usize].is_media() || self.project.clips[other as usize].is_media() {
+        if self.project.clips[index as usize].is_media()
+            || self.project.clips[other as usize].is_media()
+        {
             return false;
         }
         self.snapshot("");
@@ -285,7 +319,10 @@ impl Document {
         self.snapshot("");
         self.project.clips[index as usize].speed = speed;
         self.changed(false);
-        self.emit(Effect::Seek(cpp::min(self.output_position, self.duration())));
+        self.emit(Effect::Seek(cpp::min(
+            self.output_position,
+            self.duration(),
+        )));
         true
     }
 
@@ -293,7 +330,10 @@ impl Document {
     /// undo step. The camera is synced at once, since its tolerance depends on the layout.
     pub fn set_clip_layout(&mut self, id: &str, layout: &str) -> bool {
         let index = self.clip_index(id);
-        if index < 0 || !allowed_clip_layouts().contains(&layout) || self.project.clips[index as usize].is_media() {
+        if index < 0
+            || !allowed_clip_layouts().contains(&layout)
+            || self.project.clips[index as usize].is_media()
+        {
             return false;
         }
         if self.project.clips[index as usize].layout == layout {
@@ -303,14 +343,20 @@ impl Document {
         self.project.clips[index as usize].layout = layout.to_owned();
         self.changed(false);
         // The camera now has to keep up with a full-frame layout, or may fall back to a bubble.
-        self.emit(Effect::SyncCamera { screen_source_time: self.source_position(), force: true });
+        self.emit(Effect::SyncCamera {
+            screen_source_time: self.source_position(),
+            force: true,
+        });
         true
     }
 
     /// `setClipFit(id, fit)`: inserted clips only.
     pub fn set_clip_fit(&mut self, id: &str, fit: &str) -> bool {
         let index = self.clip_index(id);
-        if index < 0 || !self.project.clips[index as usize].is_media() || !allowed_clip_fits().contains(&fit) {
+        if index < 0
+            || !self.project.clips[index as usize].is_media()
+            || !allowed_clip_fits().contains(&fit)
+        {
             return false;
         }
         if self.project.clips[index as usize].fit == fit {
@@ -339,7 +385,10 @@ impl Document {
     pub fn can_reorder_clip(&self, id: &str, direction: i32) -> bool {
         let index = self.clip_index(id);
         let other = index + if direction < 0 { -1 } else { 1 };
-        index >= 0 && other >= 0 && (other as usize) < self.project.clips.len() && self.project.clips[index as usize].is_media()
+        index >= 0
+            && other >= 0
+            && (other as usize) < self.project.clips.len()
+            && self.project.clips[index as usize].is_media()
     }
 
     /// The edit of `reorderClip` after its pause, once [`Document::can_reorder_clip`] said yes
@@ -354,7 +403,9 @@ impl Document {
         self.project.clips.swap(index as usize, other as usize);
         self.selected_clip_id = id.to_owned();
         self.changed(false);
-        let start = self.timeline().output_time(other, self.project.clips[other as usize].in_);
+        let start = self
+            .timeline()
+            .output_time(other, self.project.clips[other as usize].in_);
         self.emit(Effect::Seek(start));
         self.emit(Effect::SelectionChanged);
     }
@@ -447,7 +498,9 @@ impl Document {
         self.selected_zoom_id.clear();
         self.selected_zoom_ids.clear();
         self.changed(false);
-        self.emit(Effect::Seek(self.timeline().output_time(insert_at as i32, 0.0)));
+        self.emit(Effect::Seek(
+            self.timeline().output_time(insert_at as i32, 0.0),
+        ));
         self.emit(Effect::SelectionChanged);
         self.emit(Effect::ImportingChanged);
     }

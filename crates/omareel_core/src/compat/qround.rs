@@ -66,7 +66,11 @@ pub fn q_round64(d: f64) -> i64 {
 /// the same as rounding the value widened to double: on x86-64 `0.49999997f` rounds to 1 and
 /// odd integers between 2^23 and 2^24 round up by one.
 pub fn q_round_f32(f: f32) -> i32 {
-    let rounded = if cfg!(target_arch = "aarch64") { f.round() } else { f + 0.5f32.copysign(f) };
+    let rounded = if cfg!(target_arch = "aarch64") {
+        f.round()
+    } else {
+        f + 0.5f32.copysign(f)
+    };
     if cfg!(any(target_arch = "x86_64", target_arch = "x86")) {
         if (-2_147_483_648.0..2_147_483_648.0).contains(&rounded) {
             rounded as i32
@@ -80,7 +84,11 @@ pub fn q_round_f32(f: f32) -> i32 {
 
 /// The value `qRound` truncates: Qt's per-architecture `QRoundImpl::qRound`.
 fn round_half_away_f64(d: f64) -> f64 {
-    if cfg!(target_arch = "aarch64") { d.round() } else { d + 0.5f64.copysign(d) }
+    if cfg!(target_arch = "aarch64") {
+        d.round()
+    } else {
+        d + 0.5f64.copysign(d)
+    }
 }
 
 /// `qFuzzyCompare(double, double)`: `qAbs(p1 - p2) * 1e12 <= qMin(qAbs(p1), qAbs(p2))`.

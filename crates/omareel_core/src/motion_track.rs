@@ -45,7 +45,11 @@ pub struct RippleSample {
 
 impl Default for RippleSample {
     fn default() -> RippleSample {
-        RippleSample { x: 0.5, y: 0.5, progress: 0.0 }
+        RippleSample {
+            x: 0.5,
+            y: 0.5,
+            progress: 0.0,
+        }
     }
 }
 
@@ -83,7 +87,8 @@ fn integrate(state: &mut SpringState, target: f64, spring: &Spring, dt: f64) {
         state.velocity = 0.0;
         return;
     }
-    let acceleration = (spring.stiffness * (target - state.x) - spring.damping * state.velocity) / spring.mass;
+    let acceleration =
+        (spring.stiffness * (target - state.x) - spring.damping * state.velocity) / spring.mass;
     state.velocity += acceleration * dt;
     state.x += state.velocity * dt;
 }
@@ -101,7 +106,10 @@ impl MotionTrack {
         project: &Project,
         capture_fps: f64,
     ) -> MotionTrack {
-        let mut track = MotionTrack { duration: cpp::max(0.0, duration), ..MotionTrack::default() };
+        let mut track = MotionTrack {
+            duration: cpp::max(0.0, duration),
+            ..MotionTrack::default()
+        };
         let mut raw: Vec<CursorSample> = Vec::new();
         for event in events {
             let normalized = PointF::new(
@@ -109,14 +117,22 @@ impl MotionTrack {
                 event.position.y / f64::from(cpp::max(1, source_height)),
             );
             match event.kind {
-                InputKind::Move => raw.push(CursorSample { time: event.time, position: normalized }),
+                InputKind::Move => raw.push(CursorSample {
+                    time: event.time,
+                    position: normalized,
+                }),
                 InputKind::ButtonDown => track.clicks.push(Click {
                     down: event.time,
                     up: cpp::min(duration, event.time + 0.13),
                     position: normalized,
                 }),
                 InputKind::ButtonUp => {
-                    if let Some(click) = track.clicks.iter_mut().rev().find(|click| click.up <= click.down + 0.130001) {
+                    if let Some(click) = track
+                        .clicks
+                        .iter_mut()
+                        .rev()
+                        .find(|click| click.up <= click.down + 0.130001)
+                    {
                         click.up = cpp::max(click.down, event.time);
                     }
                 }
@@ -129,7 +145,10 @@ impl MotionTrack {
             let min_distance = 1.0 / f64::from(cpp::max(1, cpp::max(source_width, source_height)));
             let mut decimated = cursor_path::decimate(&raw, capture_fps, min_distance);
             if decimated.is_empty() {
-                decimated.push(CursorSample { time: 0.0, position: PointF::new(0.5, 0.5) });
+                decimated.push(CursorSample {
+                    time: 0.0,
+                    position: PointF::new(0.5, 0.5),
+                });
             }
             decimated
         };
@@ -137,7 +156,10 @@ impl MotionTrack {
         // int(ceil(...)) + 1 in the C++: out of int range (a duration over about 103 days) x86-64
         // gives INT_MIN + 1 and aarch64 INT_MAX + 1, which wraps; either way the count is 1, as
         // the saturating cast and wrapping add give here.
-        let count = cpp::max(1, ((track.duration * MotionTrack::SAMPLE_RATE).ceil() as i32).wrapping_add(1));
+        let count = cpp::max(
+            1,
+            ((track.duration * MotionTrack::SAMPLE_RATE).ceil() as i32).wrapping_add(1),
+        );
         track.samples.reserve(usize::try_from(count).unwrap_or(1));
         let initial_cursor = cursor_path::position_at(&raw, 0.0);
         let mut zoom_scale = SpringState::new(1.0, 0.0);
@@ -146,16 +168,25 @@ impl MotionTrack {
         let mut cursor_x = SpringState::new(initial_cursor.x, 0.0);
         let mut cursor_y = SpringState::new(initial_cursor.y, 0.0);
         let mut cursor_scale = SpringState::new(1.0, 0.0);
-        let mut cursor_opacity = SpringState::new(if project.cursor.visible { 1.0 } else { 0.0 }, 0.0);
+        let mut cursor_opacity =
+            SpringState::new(if project.cursor.visible { 1.0 } else { 0.0 }, 0.0);
         let mut cursor_rotation = SpringState::new(0.0, 0.0);
-        let click_spring = Spring { mass: 0.3, stiffness: 300.0, damping: 30.0 };
+        let click_spring = Spring {
+            mass: 0.3,
+            stiffness: 300.0,
+            damping: 30.0,
+        };
         let dt = 1.0 / MotionTrack::SAMPLE_RATE;
 
         for i in 0..count {
             let time = cpp::min(track.duration, f64::from(i) / MotionTrack::SAMPLE_RATE);
             let cursor_target = cursor_path::position_at(&raw, time);
-            let zoom_target = zoom_timeline::target_at(&project.zooms, &raw, time, &project.zoom_style);
-            let pressed = track.clicks.iter().any(|click| time >= click.down - 0.13 && time <= click.up);
+            let zoom_target =
+                zoom_timeline::target_at(&project.zooms, &raw, time, &project.zoom_style);
+            let pressed = track
+                .clicks
+                .iter()
+                .any(|click| time >= click.down - 0.13 && time <= click.up);
 
             let mut hidden = !project.cursor.visible;
             if !hidden && project.cursor.hide_when_idle_ms >= 0 {
@@ -169,7 +200,8 @@ impl MotionTrack {
                         break;
                     }
                 }
-                hidden = time - previous > f64::from(project.cursor.hide_when_idle_ms) / 1000.0 && time < next - 0.25;
+                hidden = time - previous > f64::from(project.cursor.hide_when_idle_ms) / 1000.0
+                    && time < next - 0.25;
             }
             let scale_target = if pressed {
                 project.cursor.click_shrink
@@ -187,15 +219,33 @@ impl MotionTrack {
                 20.0,
             );
             let near_boundary = project.zoom_style.instant_animation
-                && project.zooms.iter().any(|z| (time - z.start).abs() <= 0.1 || (time - z.end).abs() <= 0.1);
+                && project
+                    .zooms
+                    .iter()
+                    .any(|z| (time - z.start).abs() <= 0.1 || (time - z.end).abs() <= 0.1);
             if near_boundary {
                 zoom_scale = SpringState::new(zoom_target.scale, 0.0);
                 zoom_x = SpringState::new(zoom_target.center.x, 0.0);
                 zoom_y = SpringState::new(zoom_target.center.y, 0.0);
             } else if i > 0 {
-                integrate(&mut zoom_scale, zoom_target.scale, &project.zoom_style.spring, dt);
-                integrate(&mut zoom_x, zoom_target.center.x, &project.zoom_style.spring, dt);
-                integrate(&mut zoom_y, zoom_target.center.y, &project.zoom_style.spring, dt);
+                integrate(
+                    &mut zoom_scale,
+                    zoom_target.scale,
+                    &project.zoom_style.spring,
+                    dt,
+                );
+                integrate(
+                    &mut zoom_x,
+                    zoom_target.center.x,
+                    &project.zoom_style.spring,
+                    dt,
+                );
+                integrate(
+                    &mut zoom_y,
+                    zoom_target.center.y,
+                    &project.zoom_style.spring,
+                    dt,
+                );
             }
             if i > 0 {
                 if project.cursor.smoothing {
@@ -206,8 +256,18 @@ impl MotionTrack {
                     cursor_y = SpringState::new(cursor_target.y, 0.0);
                 }
                 integrate(&mut cursor_scale, scale_target, &click_spring, dt);
-                integrate(&mut cursor_opacity, if hidden { 0.0 } else { 1.0 }, &click_spring, dt);
-                integrate(&mut cursor_rotation, rotation_target, &project.cursor.spring, dt);
+                integrate(
+                    &mut cursor_opacity,
+                    if hidden { 0.0 } else { 1.0 },
+                    &click_spring,
+                    dt,
+                );
+                integrate(
+                    &mut cursor_rotation,
+                    rotation_target,
+                    &project.cursor.spring,
+                    dt,
+                );
             }
             track.samples.push(MotionSample {
                 zoom_scale: zoom_scale.x,
@@ -266,7 +326,11 @@ impl MotionTrack {
         for click in &self.clicks {
             let age = time - click.down;
             if (0.0..=0.45).contains(&age) {
-                result.push(RippleSample { x: click.position.x, y: click.position.y, progress: age / 0.45 });
+                result.push(RippleSample {
+                    x: click.position.x,
+                    y: click.position.y,
+                    progress: age / 0.45,
+                });
             }
         }
         result
@@ -292,7 +356,12 @@ mod tests {
     };
 
     fn moves_to(time: f64, x: f64, y: f64) -> InputEvent {
-        InputEvent { kind: InputKind::Move, time, position: PointF::new(x, y), ..InputEvent::default() }
+        InputEvent {
+            kind: InputKind::Move,
+            time,
+            position: PointF::new(x, y),
+            ..InputEvent::default()
+        }
     }
 
     // tests/test_cursorpath.cpp
@@ -336,18 +405,40 @@ mod tests {
     #[test]
     fn clicks_ripple_where_the_smoothed_cursor_is() {
         let project = Project::defaults("ripples", 1.0);
-        let down = InputEvent { kind: InputKind::ButtonDown, time: 0.5, position: PointF::new(50.0, 50.0), ..InputEvent::default() };
-        let up = InputEvent { kind: InputKind::ButtonUp, time: 0.7, ..down.clone() };
-        let track = MotionTrack::build(1.0, 100, 100, &[moves_to(0.0, 10.0, 20.0), down, up], &project, 60.0);
+        let down = InputEvent {
+            kind: InputKind::ButtonDown,
+            time: 0.5,
+            position: PointF::new(50.0, 50.0),
+            ..InputEvent::default()
+        };
+        let up = InputEvent {
+            kind: InputKind::ButtonUp,
+            time: 0.7,
+            ..down.clone()
+        };
+        let track = MotionTrack::build(
+            1.0,
+            100,
+            100,
+            &[moves_to(0.0, 10.0, 20.0), down, up],
+            &project,
+            60.0,
+        );
         assert_eq!(track.size(), 241);
         assert_eq!(track.duration(), 1.0);
         assert!(track.ripples(0.49).is_empty());
         let ripples = track.ripples(0.5 + 0.225);
         assert_eq!(ripples.len(), 1);
-        assert_eq!((ripples[0].x, ripples[0].y), (track.sample(0.5).cursor_x, track.sample(0.5).cursor_y));
+        assert_eq!(
+            (ripples[0].x, ripples[0].y),
+            (track.sample(0.5).cursor_x, track.sample(0.5).cursor_y)
+        );
         assert!((ripples[0].progress - 0.5).abs() < 1e-12);
         assert!(track.ripples(0.96).is_empty());
         assert_eq!(MotionTrack::default().sample(1.0), MotionSample::default());
-        assert_eq!(MotionTrack::build(f64::INFINITY, 100, 100, &[], &project, 60.0).size(), 1);
+        assert_eq!(
+            MotionTrack::build(f64::INFINITY, 100, 100, &[], &project, 60.0).size(),
+            1
+        );
     }
 }

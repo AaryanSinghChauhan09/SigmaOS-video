@@ -71,10 +71,21 @@ pub fn clamped_self_view_drag_position(
     screen_size: Size,
     bubble_pixels: i32,
 ) -> Point {
-    let delta = Point::new(q_round(pointer.x - press_pointer.x), q_round(pointer.y - press_pointer.y));
+    let delta = Point::new(
+        q_round(pointer.x - press_pointer.x),
+        q_round(pointer.y - press_pointer.y),
+    );
     Point::new(
-        q_bound(0, press_bubble.x.wrapping_add(delta.x), q_max(0, screen_size.width.wrapping_sub(bubble_pixels))),
-        q_bound(0, press_bubble.y.wrapping_add(delta.y), q_max(0, screen_size.height.wrapping_sub(bubble_pixels))),
+        q_bound(
+            0,
+            press_bubble.x.wrapping_add(delta.x),
+            q_max(0, screen_size.width.wrapping_sub(bubble_pixels)),
+        ),
+        q_bound(
+            0,
+            press_bubble.y.wrapping_add(delta.y),
+            q_max(0, screen_size.height.wrapping_sub(bubble_pixels)),
+        ),
     )
 }
 
@@ -89,7 +100,12 @@ pub fn elapsed_text(now_us: i64, started_us: i64) -> String {
 /// kept between 1 and 3.
 pub fn countdown_value(countdown_end_us: i64, now_us: i64) -> i32 {
     // int(...) of the 64-bit quotient, as the C++ converts it, then std::clamp.
-    ((countdown_end_us.wrapping_sub(now_us).max(0).wrapping_add(999_999) / 1_000_000) as i32).clamp(1, 3)
+    ((countdown_end_us
+        .wrapping_sub(now_us)
+        .max(0)
+        .wrapping_add(999_999)
+        / 1_000_000) as i32)
+        .clamp(1, 3)
 }
 
 /// The camera's shape in the project's vocabulary: `round`, or `square` with a corner radius
@@ -102,7 +118,10 @@ pub struct CameraShape {
 
 impl Default for CameraShape {
     fn default() -> CameraShape {
-        CameraShape { shape: "round".into(), radius: 16 }
+        CameraShape {
+            shape: "round".into(),
+            radius: 16,
+        }
     }
 }
 
@@ -110,8 +129,15 @@ impl CameraShape {
     /// The shape the bar starts with (the constructor): the preferences' `webcam.shape` when it
     /// is `square`, else round, and `webcam.radius` (16 when it is not an int) kept in `[0, 80]`.
     pub fn from_preferences(preferences: &RecordingPreferences) -> CameraShape {
-        let shape = if preferences.webcam.value("shape").to_string_or("") == "square" { "square" } else { "round" };
-        CameraShape { shape: shape.into(), radius: q_bound(0, preferences.webcam.value("radius").to_int(16), 80) }
+        let shape = if preferences.webcam.value("shape").to_string_or("") == "square" {
+            "square"
+        } else {
+            "round"
+        };
+        CameraShape {
+            shape: shape.into(),
+            radius: q_bound(0, preferences.webcam.value("radius").to_int(16), 80),
+        }
     }
 
     /// The start of `cycleCameraShape`: round, then square with rounded corners, then square
@@ -147,7 +173,13 @@ pub struct SelfViewGeometry {
 
 impl Default for SelfViewGeometry {
     fn default() -> SelfViewGeometry {
-        SelfViewGeometry { screen_size: Size::INVALID, pixels: 160, x: 16, y: 16, corner: 3 }
+        SelfViewGeometry {
+            screen_size: Size::INVALID,
+            pixels: 160,
+            x: 16,
+            y: 16,
+            corner: 3,
+        }
     }
 }
 
@@ -191,7 +223,10 @@ impl SelfViewGeometry {
         if self.screen_size.is_empty() {
             return Point::new(requested_x, requested_y);
         }
-        Point::new(requested_x.clamp(0, self.max_x()), requested_y.clamp(0, self.max_y()))
+        Point::new(
+            requested_x.clamp(0, self.max_x()),
+            requested_y.clamp(0, self.max_y()),
+        )
     }
 
     /// `snapSelfViewToNextCorner`: the next corner clockwise from the top left, 24 pixels in; the
@@ -205,8 +240,16 @@ impl SelfViewGeometry {
         let margin = 24;
         let max_x = margin.max(self.screen_size.width - self.pixels - margin);
         let max_y = margin.max(self.screen_size.height - self.pixels - margin);
-        let x = if self.corner == 0 || self.corner == 2 { margin } else { max_x };
-        let y = if self.corner == 0 || self.corner == 1 { margin } else { max_y };
+        let x = if self.corner == 0 || self.corner == 2 {
+            margin
+        } else {
+            max_x
+        };
+        let y = if self.corner == 0 || self.corner == 1 {
+            margin
+        } else {
+            max_y
+        };
         self.set_position(x, y)
     }
 
@@ -243,7 +286,10 @@ pub struct StandbyPlacement {
 /// The standby placement from what `hyprctl -j monitors` printed (`None` when it did not
 /// finish): the focused monitor, or the first one; the bubble placed by the preferences' saved
 /// fractions on its logical size.
-pub fn standby_placement_from(monitors_output: Option<&[u8]>, preferences: &RecordingPreferences) -> StandbyPlacement {
+pub fn standby_placement_from(
+    monitors_output: Option<&[u8]>,
+    preferences: &RecordingPreferences,
+) -> StandbyPlacement {
     let mut monitor = Object::new();
     if let Some(output) = monitors_output {
         if let Ok(Value::Array(values)) = qjson::from_json(output) {
@@ -261,7 +307,14 @@ pub fn standby_placement_from(monitors_output: Option<&[u8]>, preferences: &Reco
     let scale = q_max(0.01, monitor.value("scale").to_double(1.0));
     let pixels = self_view_pixels(&preferences.self_view_size);
     let recorded_monitor = monitor.value("name").to_string_or("");
-    let travel = |extent: &str| q_max(0, q_round(monitor.value(extent).to_double(0.0) / scale).wrapping_sub(pixels).wrapping_sub(32));
+    let travel = |extent: &str| {
+        q_max(
+            0,
+            q_round(monitor.value(extent).to_double(0.0) / scale)
+                .wrapping_sub(pixels)
+                .wrapping_sub(32),
+        )
+    };
     let mut state = Object::new();
     state.insert("camera_rotation", preferences.webcam_rotation);
     state.insert("camera_flip_horizontal", preferences.webcam_flip_horizontal);
@@ -271,9 +324,22 @@ pub fn standby_placement_from(monitors_output: Option<&[u8]>, preferences: &Reco
     state.insert("selfview_pixels", pixels);
     state.insert("camera_device", preferences.webcam_device.as_str());
     state.insert("camera_height", preferences.webcam_height);
-    state.insert("selfview_x", 16i32.wrapping_add(q_round(preferences.self_view_x * f64::from(travel("width")))));
-    state.insert("selfview_y", 16i32.wrapping_add(q_round(preferences.self_view_y * f64::from(travel("height")))));
-    StandbyPlacement { recorded_monitor, state }
+    state.insert(
+        "selfview_x",
+        16i32.wrapping_add(q_round(
+            preferences.self_view_x * f64::from(travel("width")),
+        )),
+    );
+    state.insert(
+        "selfview_y",
+        16i32.wrapping_add(q_round(
+            preferences.self_view_y * f64::from(travel("height")),
+        )),
+    );
+    StandbyPlacement {
+        recorded_monitor,
+        state,
+    }
 }
 
 /// The standby placement, asking `hyprctl -j monitors` (one second; the exit status is not
@@ -281,7 +347,9 @@ pub fn standby_placement_from(monitors_output: Option<&[u8]>, preferences: &Reco
 pub fn standby_placement(preferences: &RecordingPreferences) -> StandbyPlacement {
     let mut monitors = Process::new();
     monitors.start("hyprctl", &["-j", "monitors"]);
-    let output = monitors.wait_for_finished(1000).then(|| monitors.read_all_standard_output());
+    let output = monitors
+        .wait_for_finished(1000)
+        .then(|| monitors.read_all_standard_output());
     standby_placement_from(output.as_deref(), preferences)
 }
 
@@ -296,8 +364,15 @@ mod tests {
             for quit in [false, true] {
                 for owner in [-1, 0, 42] {
                     for alive in [false, true] {
-                        let expected = if active { false } else { quit || owner <= 0 || !alive };
-                        assert_eq!(self_view_host_should_exit(active, quit, owner, alive), expected);
+                        let expected = if active {
+                            false
+                        } else {
+                            quit || owner <= 0 || !alive
+                        };
+                        assert_eq!(
+                            self_view_host_should_exit(active, quit, owner, alive),
+                            expected
+                        );
                     }
                 }
             }
@@ -317,15 +392,33 @@ mod tests {
         let screen = Size::new(2400, 1350);
         let press = PointF::new(100.0, 100.0);
         assert_eq!(
-            clamped_self_view_drag_position(press, Point::new(400, 300), PointF::new(160.0, 140.0), screen, 160),
+            clamped_self_view_drag_position(
+                press,
+                Point::new(400, 300),
+                PointF::new(160.0, 140.0),
+                screen,
+                160
+            ),
             Point::new(460, 340)
         );
         assert_eq!(
-            clamped_self_view_drag_position(press, Point::new(2200, 1200), PointF::new(500.0, 500.0), screen, 160),
+            clamped_self_view_drag_position(
+                press,
+                Point::new(2200, 1200),
+                PointF::new(500.0, 500.0),
+                screen,
+                160
+            ),
             Point::new(2240, 1190)
         );
         assert_eq!(
-            clamped_self_view_drag_position(press, Point::new(20, 20), PointF::new(-100.0, -100.0), screen, 160),
+            clamped_self_view_drag_position(
+                press,
+                Point::new(20, 20),
+                PointF::new(-100.0, -100.0),
+                screen,
+                160
+            ),
             Point::new(0, 0)
         );
     }

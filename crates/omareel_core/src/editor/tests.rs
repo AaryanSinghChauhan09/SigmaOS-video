@@ -8,12 +8,15 @@ use crate::compat::qdir::tests::TempDir;
 use crate::compat::qjson::{Object, Value};
 use crate::compat::qround::q_fuzzy_compare;
 use crate::project::{Clip, Project};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// tests/fixtures/synthetic, which the C++ test copies into each bundle.
 fn fixture(file: &str) -> String {
-    format!("{}/../../tests/fixtures/synthetic/{file}", env!("CARGO_MANIFEST_DIR"))
+    format!(
+        "{}/../../tests/fixtures/synthetic/{file}",
+        env!("CARGO_MANIFEST_DIR")
+    )
 }
 
 /// What ffprobe says of the test's 2 s, 320x180, 30 fps screen and camera recordings (the fake
@@ -22,7 +25,13 @@ fn media_probe(path: &str) -> Result<MediaInfo, String> {
     if !std::path::Path::new(path).is_file() {
         return Err(format!("{path}: No such file or directory"));
     }
-    Ok(MediaInfo { width: 320, height: 180, duration: 2.0, fps: 30.0, audio: false })
+    Ok(MediaInfo {
+        width: 320,
+        height: 180,
+        duration: 2.0,
+        fps: 30.0,
+        audio: false,
+    })
 }
 
 /// What `probeVideo` says of an inserted file: a 0.7 s video for `*.mp4`, as MediaProbe words
@@ -35,11 +44,20 @@ fn video_probe(path: &str) -> Result<VideoInfo, String> {
     if !name.ends_with(".mp4") {
         return Err(format!("{name} is not a video"));
     }
-    Ok(VideoInfo { width: 320, height: 240, duration: 0.7, fps: 30.0, audio: false })
+    Ok(VideoInfo {
+        width: 320,
+        height: 240,
+        duration: 0.7,
+        fps: 30.0,
+        audio: false,
+    })
 }
 
 fn probes() -> Probes {
-    Probes { media: Arc::new(media_probe), video: Arc::new(video_probe) }
+    Probes {
+        media: Arc::new(media_probe),
+        video: Arc::new(video_probe),
+    }
 }
 
 /// A test directory with bundles, presets and caches in it.
@@ -49,7 +67,9 @@ struct World {
 
 impl World {
     fn new(tag: &str) -> World {
-        World { dir: TempDir::new(tag) }
+        World {
+            dir: TempDir::new(tag),
+        }
     }
 
     fn path(&self, name: &str) -> String {
@@ -79,12 +99,20 @@ impl World {
     }
 
     fn open(&self, bundle: &str) -> Qt {
-        let locations = Locations { config: Some(self.path("config")), cache: Some(self.path("cache")) };
-        let mut document =
-            Document::open_with(bundle, &probes(), locations).unwrap_or_else(|e| panic!("open {bundle}: {e}"));
+        let locations = Locations {
+            config: Some(self.path("config")),
+            cache: Some(self.path("cache")),
+        };
+        let mut document = Document::open_with(bundle, &probes(), locations)
+            .unwrap_or_else(|e| panic!("open {bundle}: {e}"));
         let counter = Arc::new(AtomicUsize::new(0));
-        document.set_id_generator(Box::new(move || format!("id{}", counter.fetch_add(1, Ordering::Relaxed) + 1)));
-        let mut qt = Qt { document, effects: Vec::new() };
+        document.set_id_generator(Box::new(move || {
+            format!("id{}", counter.fetch_add(1, Ordering::Relaxed) + 1)
+        }));
+        let mut qt = Qt {
+            document,
+            effects: Vec::new(),
+        };
         qt.drain();
         qt
     }
@@ -145,7 +173,12 @@ impl Qt {
     }
 
     fn zoom(&self, id: &str) -> Object {
-        self.document.zooms().iter().map(Value::to_object).find(|z| z.value("id").to_string_or("") == id).unwrap_or_default()
+        self.document
+            .zooms()
+            .iter()
+            .map(Value::to_object)
+            .find(|z| z.value("id").to_string_or("") == id)
+            .unwrap_or_default()
     }
 
     fn remove_all_zooms(&mut self) {
@@ -184,7 +217,9 @@ fn operations_history_autosave_and_mapping() {
     let d = &qt.document;
     assert_eq!(d.bundle_name(), "editor");
     assert_eq!(d.source_width(), 320);
-    assert!(!d.has_audio() && !d.has_desktop_audio() && !d.has_microphone_audio() && !d.has_camera());
+    assert!(
+        !d.has_audio() && !d.has_desktop_audio() && !d.has_microphone_audio() && !d.has_camera()
+    );
     assert!(d.duration() > 1.9);
     assert!(d.selected_clip_id().is_empty());
     // A new project is dirty and saves itself soon.
@@ -207,9 +242,17 @@ fn operations_history_autosave_and_mapping() {
 
     // The autosave timer's save.
     assert!(qt.run(Document::save_now));
-    assert!(std::fs::metadata(format!("{bundle}/project.json")).unwrap().len() > 0);
+    assert!(
+        std::fs::metadata(format!("{bundle}/project.json"))
+            .unwrap()
+            .len()
+            > 0
+    );
     assert!(!qt.document.dirty());
-    assert!(qt.effects.ends_with(&[Effect::DirtyChanged, Effect::Autosaved(format!("{bundle}/project.json"))]));
+    assert!(qt.effects.ends_with(&[
+        Effect::DirtyChanged,
+        Effect::Autosaved(format!("{bundle}/project.json"))
+    ]));
 }
 
 #[test]
@@ -242,16 +285,37 @@ fn gradient_preset_uses_requested_index() {
         let colours = d.gradients()[index].to_array();
         let last = (colours.len() - 1).max(1) as f64;
         Value::array(
-            colours.iter().enumerate().map(|(i, c)| Value::array(vec![c.clone(), (i as f64 / last).into()])).collect(),
+            colours
+                .iter()
+                .enumerate()
+                .map(|(i, c)| Value::array(vec![c.clone(), (i as f64 / last).into()]))
+                .collect(),
         )
     };
-    let stops = |qt: &Qt| qt.document.project_map().value("background").get("gradient").get("stops").clone();
+    let stops = |qt: &Qt| {
+        qt.document
+            .project_map()
+            .value("background")
+            .get("gradient")
+            .get("stops")
+            .clone()
+    };
     qt.run(|d| d.apply_gradient_preset(7));
-    assert_eq!(qt.document.project_map().value("background").get("type").to_string_or(""), "gradient");
+    assert_eq!(
+        qt.document
+            .project_map()
+            .value("background")
+            .get("type")
+            .to_string_or(""),
+        "gradient"
+    );
     assert_eq!(stops(&qt), expected_stops(&qt.document, 7));
     qt.run(|d| d.apply_gradient_preset(3));
     assert_eq!(stops(&qt), expected_stops(&qt.document, 3));
-    assert_ne!(expected_stops(&qt.document, 7), expected_stops(&qt.document, 3));
+    assert_ne!(
+        expected_stops(&qt.document, 7),
+        expected_stops(&qt.document, 3)
+    );
     // The same preset again changes nothing; out of range is ignored.
     let steps = qt.undo_steps();
     qt.run(|d| d.apply_gradient_preset(3));
@@ -325,7 +389,13 @@ fn scrubbing_and_seeking_clamp_to_the_timeline() {
     qt.seek(-1.0);
     assert_eq!(qt.document.output_position(), 0.0);
     qt.seek(1.2);
-    assert_eq!(qt.document.media_seek(qt.document.output_position()).unwrap().target_ms, 1200);
+    assert_eq!(
+        qt.document
+            .media_seek(qt.document.output_position())
+            .unwrap()
+            .target_ms,
+        1200
+    );
     qt.seek(0.5);
     assert_eq!(qt.document.media_seek(0.5).unwrap().target_ms, 500);
     // play() from the end starts over.
@@ -369,7 +439,13 @@ fn shift_drag_cuts_middle_as_one_undoable_edit() {
     assert!((qt.document.duration() - 2.0).abs() < 0.03);
     assert!(!qt.document.selected_clip_id().is_empty());
     assert_eq!(qt.document.selected_clip_id(), qt.clip_id(0));
-    assert_eq!(qt.document.media_seek(qt.document.output_position()).unwrap().target_ms, 400);
+    assert_eq!(
+        qt.document
+            .media_seek(qt.document.output_position())
+            .unwrap()
+            .target_ms,
+        400
+    );
     assert!((number(&qt.document.zooms()[0].to_object(), "start") - 0.9).abs() < 0.03);
     qt.run(Document::redo);
     assert_eq!(qt.document.clips().len(), 2);
@@ -398,7 +474,10 @@ fn delete_output_range_effects_and_refusals() {
     assert_eq!(qt.clip_id(1), "c-id3");
     let effects = std::mem::take(&mut qt.effects);
     assert_eq!(effects[..2], [Effect::Pause, Effect::HistoryChanged]);
-    assert_eq!(effects[effects.len() - 2..], [Effect::Seek(0.5), Effect::SelectionChanged]);
+    assert_eq!(
+        effects[effects.len() - 2..],
+        [Effect::Seek(0.5), Effect::SelectionChanged]
+    );
     // No zoom changed, so the motion track stays.
     assert!(!effects.contains(&Effect::StartMotionTimer));
     qt.run(Document::undo);
@@ -415,13 +494,28 @@ fn delete_output_range_effects_and_refusals() {
         ])
         .into()
     };
-    let zooms = Value::array(vec![zoom("before", 0.0, 0.3), zoom("inside", 0.6, 1.4), zoom("across", 1.0, 1.9)]);
+    let zooms = Value::array(vec![
+        zoom("before", 0.0, 0.3),
+        zoom("inside", 0.6, 1.4),
+        zoom("across", 1.0, 1.9),
+    ]);
     qt.run(|d| d.set_project_value("zooms", zooms, false));
     qt.effects.clear();
     assert!(qt.run(|d| d.delete_output_range(0.5, 1.5)));
-    let left: Vec<(String, f64, f64)> =
-        qt.document.project().zooms.iter().map(|z| (z.id.clone(), z.start, z.end)).collect();
-    assert_eq!(left, [("before".to_owned(), 0.0, 0.3), ("across".to_owned(), 1.5, 1.9)]);
+    let left: Vec<(String, f64, f64)> = qt
+        .document
+        .project()
+        .zooms
+        .iter()
+        .map(|z| (z.id.clone(), z.start, z.end))
+        .collect();
+    assert_eq!(
+        left,
+        [
+            ("before".to_owned(), 0.0, 0.3),
+            ("across".to_owned(), 1.5, 1.9)
+        ]
+    );
     assert!(qt.effects.contains(&Effect::StartMotionTimer));
     assert!(qt.document.selected_zoom_ids().is_empty());
     let whole = Value::array(vec![zoom("whole", 0.2, 1.8)]);
@@ -436,7 +530,9 @@ fn delete_output_range_effects_and_refusals() {
 fn video_thumbnail_urls_follow_source_times() {
     let world = World::new("editor-thumbnails");
     let mut qt = world.open(&world.bundle("thumbnails.omareel"));
-    let cache = qt.document.thumbnails.sources["screen"].cache_directory.clone();
+    let cache = qt.document.thumbnails.sources["screen"]
+        .cache_directory
+        .clone();
     assert!(cache.starts_with(&world.path("cache/clip-filmstrips-v2/")));
     // Nothing built yet: the frame at 0.3 s is queued.
     assert_eq!(qt.run(|d| d.video_thumbnail_url(0.25)), "");
@@ -457,7 +553,10 @@ fn video_thumbnail_urls_follow_source_times() {
     let first = qt.run(|d| d.video_thumbnail_url(0.25));
     assert_eq!(first, crate::compat::qurl::from_local_file(&job.path));
     // 0.4 within 0..0.5 is not built; the nearest built frame stands in.
-    assert_eq!(qt.run(|d| d.video_thumbnail_url_for_clip(0.4, 0.0, 0.5)), first);
+    assert_eq!(
+        qt.run(|d| d.video_thumbnail_url_for_clip(0.4, 0.0, 0.5)),
+        first
+    );
     // 1.25 s rounds to 1.3 s.
     let job = qt.document.next_video_thumbnail_job(false, false).unwrap();
     assert_eq!(job.milliseconds, 400);
@@ -474,7 +573,10 @@ fn video_thumbnail_urls_follow_source_times() {
     qt.run(|d| d.finish_video_thumbnail(&job, false));
     // A failed frame is not asked for again; spans under a millisecond and non-finite times
     // give nothing.
-    assert_eq!(qt.run(|d| d.video_thumbnail_url_for_clip(0.4, 0.4, 0.4005)), "");
+    assert_eq!(
+        qt.run(|d| d.video_thumbnail_url_for_clip(0.4, 0.4, 0.4005)),
+        ""
+    );
     assert_eq!(qt.run(|d| d.video_thumbnail_url(f64::INFINITY)), "");
     qt.run(|d| d.video_thumbnail_url_for_clip(0.4, 0.0, 0.5));
     assert_eq!(qt.document.next_video_thumbnail_job(false, false), None);
@@ -504,12 +606,23 @@ fn thumbnails_build_several_at_once_and_finish_in_any_order() {
         jobs.push(job);
     }
     assert_eq!(jobs.len(), thumbnail_workers());
-    assert_eq!(jobs.iter().map(|job| job.milliseconds).collect::<Vec<_>>(), (0..jobs.len() as i32).map(|i| i * 100).collect::<Vec<_>>());
+    assert_eq!(
+        jobs.iter().map(|job| job.milliseconds).collect::<Vec<_>>(),
+        (0..jobs.len() as i32).map(|i| i * 100).collect::<Vec<_>>()
+    );
     // The second finishes first: its frame leaves the queue, and the next waiting frame starts.
     let second = jobs.remove(1);
     qt.run(|d| d.finish_video_thumbnail(&second, false));
-    assert!(!qt.document.thumbnails.queue.contains(&("screen".into(), 100)));
-    assert_eq!(qt.document.thumbnails.queue.front(), Some(&("screen".into(), 0)));
+    assert!(
+        !qt.document
+            .thumbnails
+            .queue
+            .contains(&("screen".into(), 100))
+    );
+    assert_eq!(
+        qt.document.thumbnails.queue.front(),
+        Some(&("screen".into(), 0))
+    );
     let next = qt.document.next_video_thumbnail_job(false, false).unwrap();
     assert_eq!(next.milliseconds, thumbnail_workers() as i32 * 100);
     assert_eq!(qt.document.next_video_thumbnail_job(false, false), None);
@@ -534,12 +647,26 @@ fn playback_stays_within_selected_range() {
     // Playing from the range's end starts over at its start.
     assert_eq!(qt.document.play_start_seek(), Some(0.4));
     // A player position at the range's end stops there.
-    let transport = Transport { playing: true, active_clip: 0, playhead_position: 0.85, ..Transport::default() };
+    let transport = Transport {
+        playing: true,
+        active_clip: 0,
+        playhead_position: 0.85,
+        ..Transport::default()
+    };
     let step = qt.document.player_position(&transport, 899).unwrap();
     assert_eq!(step.stop_at_range_end, Some(0.9));
     // The playhead never runs past a millisecond before the end.
-    let transport = Transport { playing: true, active_clip: 0, playhead_position: 0.85, playhead_clock_position: 0.85, ..transport };
-    assert_eq!(qt.document.playhead_advance(&transport, 10_000), Some(0.899));
+    let transport = Transport {
+        playing: true,
+        active_clip: 0,
+        playhead_position: 0.85,
+        playhead_clock_position: 0.85,
+        ..transport
+    };
+    assert_eq!(
+        qt.document.playhead_advance(&transport, 10_000),
+        Some(0.899)
+    );
     qt.run(Document::clear_playback_range);
     qt.seek(0.0);
     assert!(qt.document.output_position().abs() < 0.002);
@@ -569,18 +696,46 @@ fn playhead_follows_the_clock_between_frames() {
     assert_eq!(d.playhead_update(0.0, 0.2), Some(0.2));
     assert_eq!(d.playhead_update(0.2, 0.2004), None);
     assert_eq!(d.playhead_update(0.2, 5.0), Some(2.0));
-    let transport =
-        Transport { playing: true, active_clip: 0, playhead_position: 0.2, playhead_clock_position: 0.2, ..Transport::default() };
+    let transport = Transport {
+        playing: true,
+        active_clip: 0,
+        playhead_position: 0.2,
+        playhead_clock_position: 0.2,
+        ..Transport::default()
+    };
     // Until the frame times are known the playhead leads by two frames at most (0.05 s floor
     // or 2/30 s).
     assert!((d.playhead_advance(&transport, 10).unwrap() - 0.21).abs() < 1e-12);
     assert!((d.playhead_advance(&transport, 1000).unwrap() - (0.2 + 2.0 / 30.0)).abs() < 1e-12);
     // A frame near the transport position anchors the clock; one from far away does not.
-    assert_eq!(d.frame_anchor(Player::Screen, &transport, 230_000, true), Some(0.23));
-    assert_eq!(d.frame_anchor(Player::Screen, &transport, 1_500_000, true), None);
-    assert_eq!(d.frame_anchor(Player::Screen, &transport, 230_000, false), None);
-    assert_eq!(d.frame_anchor(Player::Media, &transport, 230_000, true), None);
-    assert_eq!(d.frame_anchor(Player::Screen, &Transport { scrubbing: true, ..transport }, 230_000, true), None);
+    assert_eq!(
+        d.frame_anchor(Player::Screen, &transport, 230_000, true),
+        Some(0.23)
+    );
+    assert_eq!(
+        d.frame_anchor(Player::Screen, &transport, 1_500_000, true),
+        None
+    );
+    assert_eq!(
+        d.frame_anchor(Player::Screen, &transport, 230_000, false),
+        None
+    );
+    assert_eq!(
+        d.frame_anchor(Player::Media, &transport, 230_000, true),
+        None
+    );
+    assert_eq!(
+        d.frame_anchor(
+            Player::Screen,
+            &Transport {
+                scrubbing: true,
+                ..transport
+            },
+            230_000,
+            true
+        ),
+        None
+    );
 }
 
 #[test]
@@ -591,26 +746,68 @@ fn playback_runs_through_a_still_screen() {
     let times: Vec<f64> = (0..10).map(|i| f64::from(i) / 30.0).collect();
     qt.document.set_screen_frame_times(times);
     assert!(qt.document.screen_frame_times_ready());
-    assert_eq!(qt.document.next_screen_frame_time(0.1), 0.1 + 1.0 / 30.0 * 0.0 + (4.0 / 30.0 - 0.1));
+    assert_eq!(
+        qt.document.next_screen_frame_time(0.1),
+        0.1 + 1.0 / 30.0 * 0.0 + (4.0 / 30.0 - 0.1)
+    );
     assert_eq!(qt.document.next_screen_frame_time(0.3), 2.0);
     assert_eq!(qt.document.next_screen_frame_time(5.0), 5.0);
     qt.seek(0.31);
-    let transport =
-        Transport { playing: true, active_clip: 0, playhead_position: 0.31, playhead_clock_position: 0.31, ..Transport::default() };
+    let transport = Transport {
+        playing: true,
+        active_clip: 0,
+        playhead_position: 0.31,
+        playhead_clock_position: 0.31,
+        ..Transport::default()
+    };
     // The clock runs on through the still stretch, to the clip's end.
     assert_eq!(qt.document.playhead_advance(&transport, 1000), Some(1.31));
     assert_eq!(qt.document.playhead_advance(&transport, 60_000), Some(2.0));
     // The player holds its last frame's time; the position follows the playhead.
-    let transport = Transport { playhead_position: 1.2, ..transport };
+    let transport = Transport {
+        playhead_position: 1.2,
+        ..transport
+    };
     let step = qt.document.player_position(&transport, 300).unwrap();
-    assert_eq!(step, PlayerPosition { stop_at_range_end: None, sync_camera: Some(1.2), advance: false, position: Some(1.2) });
+    assert_eq!(
+        step,
+        PlayerPosition {
+            stop_at_range_end: None,
+            sync_camera: Some(1.2),
+            advance: false,
+            position: Some(1.2)
+        }
+    );
     // At the clip's out the next clip takes over.
-    let transport = Transport { playhead_position: 1.999, ..transport };
-    assert!(qt.document.player_position(&transport, 300).unwrap().advance);
+    let transport = Transport {
+        playhead_position: 1.999,
+        ..transport
+    };
+    assert!(
+        qt.document
+            .player_position(&transport, 300)
+            .unwrap()
+            .advance
+    );
     // Paused, the player's own time counts.
-    let paused = Transport { playing: false, ..transport };
-    assert_eq!(qt.document.player_position(&paused, 300).unwrap().position, Some(0.3));
-    assert_eq!(qt.document.player_position(&Transport { internal_seek: true, ..paused }, 300), None);
+    let paused = Transport {
+        playing: false,
+        ..transport
+    };
+    assert_eq!(
+        qt.document.player_position(&paused, 300).unwrap().position,
+        Some(0.3)
+    );
+    assert_eq!(
+        qt.document.player_position(
+            &Transport {
+                internal_seek: true,
+                ..paused
+            },
+            300
+        ),
+        None
+    );
 }
 
 #[test]
@@ -645,7 +842,10 @@ fn double_click_on_open_zoom_track_adds_zoom() {
     assert_ne!(added, existing);
     assert!(number(&zoom, "start").abs() < 0.03);
     assert!((number(&zoom, "end") - 1.0).abs() < 0.001);
-    assert_eq!(qt.document.selected_zoom_ids(), std::slice::from_ref(&added));
+    assert_eq!(
+        qt.document.selected_zoom_ids(),
+        std::slice::from_ref(&added)
+    );
     // The refused zoom drew no id.
     assert_eq!(added, "z-id2");
     // No room for a second anywhere now.
@@ -677,7 +877,11 @@ fn export_through_editor_api() {
     let bundle = world.bundle("editor.omareel");
     let mut qt = world.open(&bundle);
     let output = world.path("out/editor-api.mp4");
-    let settings = ExportDialogSettings { fps: 10, height: 180, quality: "web-low".into() };
+    let settings = ExportDialogSettings {
+        fps: 10,
+        height: 180,
+        quality: "web-low".into(),
+    };
     let request = qt.run(|d| d.begin_export(&output, &settings)).unwrap();
     assert_eq!(
         request,
@@ -694,32 +898,58 @@ fn export_through_editor_api() {
     // The project was saved first, and the output directory made.
     assert!(std::path::Path::new(&format!("{bundle}/project.json")).is_file());
     assert!(std::path::Path::new(&world.path("out")).is_dir());
-    assert!(qt.effects.ends_with(&[Effect::ExportingChanged, Effect::ExportProgressChanged, Effect::ExportErrorChanged]));
+    assert!(qt.effects.ends_with(&[
+        Effect::ExportingChanged,
+        Effect::ExportProgressChanged,
+        Effect::ExportErrorChanged
+    ]));
     assert!(qt.document.export_state().exporting);
     // One at a time.
     assert_eq!(qt.run(|d| d.begin_export(&output, &settings)), None);
     qt.run(|d| d.export_progressed(30, 120, 2000));
-    assert_eq!((qt.document.export_state().progress, qt.document.export_state().eta_seconds), (0.25, 6));
+    assert_eq!(
+        (
+            qt.document.export_state().progress,
+            qt.document.export_state().eta_seconds
+        ),
+        (0.25, 6)
+    );
     qt.run(|d| d.export_finished(&output));
     assert_eq!(qt.document.export_state().progress, 1.0);
     assert_eq!(qt.document.export_state().exported_path, output);
-    assert_eq!(qt.effects.last(), Some(&Effect::ExportFinished(output.clone())));
+    assert_eq!(
+        qt.effects.last(),
+        Some(&Effect::ExportFinished(output.clone()))
+    );
 
     // A GIF takes the rate and width as its own.
-    let gif = qt.run(|d| d.begin_export(&world.path("out/x.GIF"), &settings)).unwrap();
-    assert_eq!((gif.fps, gif.width, gif.gif_fps, gif.gif_width), (0, 0, 10, 320));
+    let gif = qt
+        .run(|d| d.begin_export(&world.path("out/x.GIF"), &settings))
+        .unwrap();
+    assert_eq!(
+        (gif.fps, gif.width, gif.gif_fps, gif.gif_width),
+        (0, 0, 10, 320)
+    );
     qt.run(|d| d.export_failed("ffmpeg died"));
     assert_eq!(qt.document.export_state().error, "ffmpeg died");
     assert!(!qt.document.export_state().exporting);
     // No height keeps the width 0; an empty path does nothing; a directory that can't be made
     // is an error.
-    let plain = qt.run(|d| d.begin_export(&world.path("out/y.mp4"), &ExportDialogSettings::default())).unwrap();
+    let plain = qt
+        .run(|d| d.begin_export(&world.path("out/y.mp4"), &ExportDialogSettings::default()))
+        .unwrap();
     assert_eq!(plain.width, 0);
     qt.run(|d| d.export_failed(""));
     assert_eq!(qt.run(|d| d.begin_export("", &settings)), None);
     std::fs::write(world.path("file"), b"").unwrap();
-    assert_eq!(qt.run(|d| d.begin_export(&world.path("file/z.mp4"), &settings)), None);
-    assert_eq!(qt.document.export_state().error, "Could not create the output directory");
+    assert_eq!(
+        qt.run(|d| d.begin_export(&world.path("file/z.mp4"), &settings)),
+        None
+    );
+    assert_eq!(
+        qt.document.export_state().error,
+        "Could not create the output directory"
+    );
     assert_eq!(qt.effects.last(), Some(&Effect::ExportErrorChanged));
 }
 
@@ -738,16 +968,36 @@ fn clip_layouts_are_undoable_and_survive_splits() {
     assert!(!qt.document.can_undo());
 
     assert!(qt.run(|d| d.set_clip_layout(&first, "camera")));
-    assert_eq!(qt.effects.last(), Some(&Effect::SyncCamera { screen_source_time: 0.0, force: true }));
+    assert_eq!(
+        qt.effects.last(),
+        Some(&Effect::SyncCamera {
+            screen_source_time: 0.0,
+            force: true
+        })
+    );
     assert_eq!(layout_of(&qt, 0), "camera");
     assert_eq!(camera_full(&qt), 1.0);
     assert!(qt.document.camera_visible());
     // A full-frame camera keeps closer to the screen.
-    assert_eq!(qt.document.camera_sync(1.0), Some(CameraSync { target_ms: 1000, tolerance_ms: 80, covered: true }));
+    assert_eq!(
+        qt.document.camera_sync(1.0),
+        Some(CameraSync {
+            target_ms: 1000,
+            tolerance_ms: 80,
+            covered: true
+        })
+    );
     qt.run(Document::undo);
     assert_eq!(layout_of(&qt, 0), "default");
     assert_eq!(camera_full(&qt), 0.0);
-    assert_eq!(qt.document.camera_sync(1.0), Some(CameraSync { target_ms: 1000, tolerance_ms: 250, covered: true }));
+    assert_eq!(
+        qt.document.camera_sync(1.0),
+        Some(CameraSync {
+            target_ms: 1000,
+            tolerance_ms: 250,
+            covered: true
+        })
+    );
     qt.run(Document::redo);
     assert_eq!(layout_of(&qt, 0), "camera");
     // The same layout again is success without an edit.
@@ -797,16 +1047,35 @@ fn camera_timing_and_status() {
     let world = World::new("editor-camera-status");
     let bundle = world.camera_bundle("status.omareel");
     let qt = world.open(&bundle);
-    assert_eq!(qt.document.camera_status(), "Webcam: 320×180 @30, offset +0.00 s");
-    assert_eq!(qt.document.camera_sync(2.5), Some(CameraSync { target_ms: 2000, tolerance_ms: 250, covered: false }));
-    assert!(qt.document.camera_thumbnail_job().unwrap().cache_directory.contains("/camera-filmstrips/"));
+    assert_eq!(
+        qt.document.camera_status(),
+        "Webcam: 320×180 @30, offset +0.00 s"
+    );
+    assert_eq!(
+        qt.document.camera_sync(2.5),
+        Some(CameraSync {
+            target_ms: 2000,
+            tolerance_ms: 250,
+            covered: false
+        })
+    );
+    assert!(
+        qt.document
+            .camera_thumbnail_job()
+            .unwrap()
+            .cache_directory
+            .contains("/camera-filmstrips/")
+    );
     std::fs::write(
         format!("{bundle}/capture.json"),
         br#"{"first_frame_us":1000000,"camera":{"first_frame_us":500000}}"#,
     )
     .unwrap();
     let late = world.open(&bundle);
-    assert_eq!(late.document.camera_status(), "Webcam: 320×180 @30, offset -0.50 s");
+    assert_eq!(
+        late.document.camera_status(),
+        "Webcam: 320×180 @30, offset -0.50 s"
+    );
     let plain = world.open(&world.bundle("plain.omareel"));
     assert_eq!(plain.document.camera_status(), "No webcam in this bundle");
     assert_eq!(plain.document.camera_sync(1.0), None);
@@ -824,7 +1093,11 @@ fn inserted_videos_split_the_timeline_and_keep_their_file() {
     qt.seek(1.0);
     qt.run(|d| d.insert_media(&demo));
     assert!(!qt.document.importing());
-    assert!(qt.document.import_error().is_empty(), "{}", qt.document.import_error());
+    assert!(
+        qt.document.import_error().is_empty(),
+        "{}",
+        qt.document.import_error()
+    );
     assert_eq!(qt.document.clips().len(), 3);
     assert_eq!(number(&qt.clip(0), "out"), 1.0);
     assert_eq!(text(&qt.clip(1), "kind"), "media");
@@ -840,7 +1113,10 @@ fn inserted_videos_split_the_timeline_and_keep_their_file() {
     assert!(!qt.document.camera_visible());
     assert!(qt.run(|d| d.add_zoom_at(1.2, 2.0)).is_empty());
     // The right half and the insert took the next ids, in that order.
-    assert_eq!((qt.clip_id(1), qt.clip_id(2)), ("m-id2".to_owned(), "c-id1".to_owned()));
+    assert_eq!(
+        (qt.clip_id(1), qt.clip_id(2)),
+        ("m-id2".to_owned(), "c-id1".to_owned())
+    );
 
     // Recording clips stay in recording order across the insert, which has its own bounds.
     let left = qt.clip_id(0);
@@ -903,8 +1179,16 @@ fn paused_operations_check_before_they_edit() {
     qt.effects.clear();
 
     let project = qt.document.project().to_json();
-    assert!(qt.document.prepare_delete_output_range(f64::NAN, 1.0).is_none());
-    assert!(qt.document.prepare_delete_output_range(-5.0, 50.0).is_none());
+    assert!(
+        qt.document
+            .prepare_delete_output_range(f64::NAN, 1.0)
+            .is_none()
+    );
+    assert!(
+        qt.document
+            .prepare_delete_output_range(-5.0, 50.0)
+            .is_none()
+    );
     let cut = qt.document.prepare_delete_output_range(1.5, 0.5).unwrap();
     assert_eq!(qt.document.project().to_json(), project);
     assert!(!qt.document.can_undo());
@@ -912,7 +1196,10 @@ fn paused_operations_check_before_they_edit() {
     qt.document.apply_delete_output_range(cut);
     let effects = qt.drain();
     assert_eq!(effects[0], Effect::HistoryChanged);
-    assert_eq!(effects[effects.len() - 2..], [Effect::Seek(0.5), Effect::SelectionChanged]);
+    assert_eq!(
+        effects[effects.len() - 2..],
+        [Effect::Seek(0.5), Effect::SelectionChanged]
+    );
     assert!(!effects.contains(&Effect::Pause));
     // The refused cut drew c-id1, the one that went through c-id2.
     assert_eq!(qt.clip_id(1), "c-id2");
@@ -922,7 +1209,10 @@ fn paused_operations_check_before_they_edit() {
     assert!(!qt.document.can_insert_media(""));
     qt.document.start_import(&demo);
     assert!(!qt.document.can_insert_media(&demo));
-    assert_eq!(qt.drain()[..2], [Effect::ImportingChanged, Effect::StartImport(demo.clone())]);
+    assert_eq!(
+        qt.drain()[..2],
+        [Effect::ImportingChanged, Effect::StartImport(demo.clone())]
+    );
     let insert = qt.clip_id(1);
     assert_eq!(text(&qt.clip(1), "kind"), "media");
 
@@ -934,7 +1224,10 @@ fn paused_operations_check_before_they_edit() {
     qt.document.apply_reorder_clip(&insert, -1);
     let effects = qt.drain();
     assert_eq!(effects[0], Effect::HistoryChanged);
-    assert_eq!(effects[effects.len() - 2..], [Effect::Seek(0.0), Effect::SelectionChanged]);
+    assert_eq!(
+        effects[effects.len() - 2..],
+        [Effect::Seek(0.0), Effect::SelectionChanged]
+    );
     assert_eq!((qt.clip_id(0), qt.undo_steps()), (insert, steps + 1));
 }
 
@@ -945,13 +1238,20 @@ fn insert_media_queues_the_import() {
     qt.document.insert_media("/somewhere/x.mp4");
     assert_eq!(
         qt.document.take_effects(),
-        [Effect::Pause, Effect::ImportingChanged, Effect::StartImport("/somewhere/x.mp4".into())]
+        [
+            Effect::Pause,
+            Effect::ImportingChanged,
+            Effect::StartImport("/somewhere/x.mp4".into())
+        ]
     );
     assert!(qt.document.importing());
     // One import at a time, and an empty source is ignored.
     qt.document.insert_media("/somewhere/y.mp4");
     assert!(qt.document.take_effects().is_empty());
-    qt.document.finish_import(ImportedInsert { error: "x.mp4 does not exist".into(), ..ImportedInsert::default() });
+    qt.document.finish_import(ImportedInsert {
+        error: "x.mp4 does not exist".into(),
+        ..ImportedInsert::default()
+    });
     assert_eq!(qt.document.take_effects(), [Effect::ImportingChanged]);
     qt.document.insert_media("");
     assert!(qt.document.take_effects().is_empty());
@@ -962,7 +1262,14 @@ fn missing_inserted_video_still_opens() {
     let world = World::new("editor-missing");
     let bundle = world.bundle("missing-insert.omareel");
     let mut project = Project::defaults("Missing", 2.0);
-    project.clips.push(Clip { id: "m".into(), in_: 0.0, out: 1.0, speed: 1.0, media: "media/gone.mp4".into(), ..Clip::default() });
+    project.clips.push(Clip {
+        id: "m".into(),
+        in_: 0.0,
+        out: 1.0,
+        speed: 1.0,
+        media: "media/gone.mp4".into(),
+        ..Clip::default()
+    });
     project.save(&format!("{bundle}/project.json")).unwrap();
     let mut qt = world.open(&bundle);
     assert_eq!(qt.document.clips().len(), 2);
@@ -984,11 +1291,30 @@ fn playback_crosses_into_an_inserted_video_and_back() {
     std::fs::create_dir_all(format!("{bundle}/media")).unwrap();
     std::fs::write(format!("{bundle}/media/demo.mp4"), b"demo").unwrap();
     let mut project = Project::defaults("Playback", 2.0);
-    let insert = Clip { id: "m".into(), in_: 0.2, out: 0.8, speed: 1.0, media: "media/demo.mp4".into(), ..Clip::default() };
+    let insert = Clip {
+        id: "m".into(),
+        in_: 0.2,
+        out: 0.8,
+        speed: 1.0,
+        media: "media/demo.mp4".into(),
+        ..Clip::default()
+    };
     project.clips = vec![
-        Clip { id: "a".into(), in_: 0.0, out: 0.6, speed: 1.0, ..Clip::default() },
+        Clip {
+            id: "a".into(),
+            in_: 0.0,
+            out: 0.6,
+            speed: 1.0,
+            ..Clip::default()
+        },
         insert,
-        Clip { id: "b".into(), in_: 0.6, out: 1.4, speed: 1.0, ..Clip::default() },
+        Clip {
+            id: "b".into(),
+            in_: 0.6,
+            out: 1.4,
+            speed: 1.0,
+            ..Clip::default()
+        },
     ];
     project.save(&format!("{bundle}/project.json")).unwrap();
     let mut qt = world.open(&bundle);
@@ -997,17 +1323,40 @@ fn playback_crosses_into_an_inserted_video_and_back() {
     // The insert after the playhead loads ahead and waits on its first frame.
     assert_eq!(
         d.next_clip(0),
-        Some(NextClip { index: 1, kind: NextClipKind::IntoMedia("media/demo.mp4".into()), speed: 1.0, target_ms: 200 })
+        Some(NextClip {
+            index: 1,
+            kind: NextClipKind::IntoMedia("media/demo.mp4".into()),
+            speed: 1.0,
+            target_ms: 200
+        })
     );
-    assert_eq!(d.next_clip(1), Some(NextClip { index: 2, kind: NextClipKind::IntoRecording, speed: 1.0, target_ms: 600 }));
+    assert_eq!(
+        d.next_clip(1),
+        Some(NextClip {
+            index: 2,
+            kind: NextClipKind::IntoRecording,
+            speed: 1.0,
+            target_ms: 600
+        })
+    );
     assert_eq!(d.next_clip(2), None);
     assert_eq!(d.next_clip(-1), None);
     assert_eq!(d.advance_target(0), Some(0.6));
     assert!(fuzzy(d.advance_target(1).unwrap(), 1.2));
     assert_eq!(d.advance_target(2), None);
-    assert_eq!((d.player_for(0), d.player_for(1), d.player_for(9)), (Player::Screen, Player::Media, Player::Screen));
-    let transport = Transport { playing: true, active_clip: 1, ..Transport::default() };
-    assert!(d.player_should_play(Player::Media, &transport) && !d.player_should_play(Player::Screen, &transport));
+    assert_eq!(
+        (d.player_for(0), d.player_for(1), d.player_for(9)),
+        (Player::Screen, Player::Media, Player::Screen)
+    );
+    let transport = Transport {
+        playing: true,
+        active_clip: 1,
+        ..Transport::default()
+    };
+    assert!(
+        d.player_should_play(Player::Media, &transport)
+            && !d.player_should_play(Player::Screen, &transport)
+    );
     assert!(d.player_should_play(Player::Camera, &transport));
     // The media player is heard only during its clip.
     assert_eq!(d.insert_audio(1, false), (1.0, false));
@@ -1030,9 +1379,22 @@ fn playback_crosses_into_an_inserted_video_and_back() {
     assert!(qt.document.preview_keystroke_pills().is_empty());
     assert_eq!(qt.document.source_position(), 0.6);
     // The camera never runs for an inserted clip, and the end of the media ends its clip.
-    let at_end = Transport { playing: true, active_clip: 1, playhead_position: 1.2, ..Transport::default() };
+    let at_end = Transport {
+        playing: true,
+        active_clip: 1,
+        playhead_position: 1.2,
+        ..Transport::default()
+    };
     let step = qt.document.player_position(&at_end, 798).unwrap();
-    assert_eq!(step, PlayerPosition { stop_at_range_end: None, sync_camera: None, advance: true, position: None });
+    assert_eq!(
+        step,
+        PlayerPosition {
+            stop_at_range_end: None,
+            sync_camera: None,
+            advance: true,
+            position: None
+        }
+    );
 }
 
 #[test]
@@ -1044,10 +1406,22 @@ fn frame_steps_move_the_paused_player() {
     // One frame at 30 fps is 33 ms.
     let next = qt.document.step_target(1);
     qt.seek(next);
-    assert_eq!(qt.document.media_seek(qt.document.output_position()).unwrap().target_ms, 533);
+    assert_eq!(
+        qt.document
+            .media_seek(qt.document.output_position())
+            .unwrap()
+            .target_ms,
+        533
+    );
     let back = qt.document.step_target(-1);
     qt.seek(back);
-    assert_eq!(qt.document.media_seek(qt.document.output_position()).unwrap().target_ms, 500);
+    assert_eq!(
+        qt.document
+            .media_seek(qt.document.output_position())
+            .unwrap()
+            .target_ms,
+        500
+    );
     assert_eq!(qt.document.boundary_target(-1), 0.0);
     assert_eq!(qt.document.boundary_target(1), qt.document.duration());
 }
@@ -1074,7 +1448,12 @@ fn coalesced_edits_make_one_undo_step() {
     assert_eq!(qt.undo_steps(), steps + 2);
     // An open coalesced edit gathers different paths under its key.
     qt.run(|d| d.begin_coalesced_edit("crop"));
-    for (path, value) in [("crop.x", 0.1), ("crop.y", 0.1), ("crop.w", 0.8), ("crop.h", 0.8)] {
+    for (path, value) in [
+        ("crop.x", 0.1),
+        ("crop.y", 0.1),
+        ("crop.w", 0.8),
+        ("crop.h", 0.8),
+    ] {
         qt.run(|d| d.set_project_value(path, value.into(), true));
     }
     qt.run(Document::end_coalesced_edit);
@@ -1156,7 +1535,10 @@ fn edits_signal_as_editor_cpp_did() {
     qt.run(|d| d.set_project_value("frame.padding", 0.2.into(), false));
     let changed = [
         Effect::HistoryChanged,
-        Effect::SetScreenAudio { volume: 1.0, muted: true },
+        Effect::SetScreenAudio {
+            volume: 1.0,
+            muted: true,
+        },
         Effect::UpdateInsertAudio,
         Effect::DirtyChanged,
         Effect::StartAutosaveTimer,
@@ -1177,7 +1559,10 @@ fn edits_signal_as_editor_cpp_did() {
         std::mem::take(&mut qt.effects),
         [
             Effect::HistoryChanged,
-            Effect::SetScreenAudio { volume: 1.0, muted: true },
+            Effect::SetScreenAudio {
+                volume: 1.0,
+                muted: true
+            },
             Effect::UpdateInsertAudio,
             Effect::StartAutosaveTimer,
             Effect::ProjectChanged,
@@ -1196,12 +1581,23 @@ fn edits_signal_as_editor_cpp_did() {
     qt.run(Document::undo);
     let effects = std::mem::take(&mut qt.effects);
     assert!(
-        effects.ends_with(&[Effect::CompositionChanged, Effect::Seek(0.9), Effect::SelectionChanged, Effect::HistoryChanged]),
+        effects.ends_with(&[
+            Effect::CompositionChanged,
+            Effect::Seek(0.9),
+            Effect::SelectionChanged,
+            Effect::HistoryChanged
+        ]),
         "{effects:?}"
     );
     assert!(!effects.contains(&Effect::DirtyChanged));
     qt.run(Document::save_now);
-    assert_eq!(qt.effects, [Effect::DirtyChanged, Effect::Autosaved(format!("{bundle}/project.json"))]);
+    assert_eq!(
+        qt.effects,
+        [
+            Effect::DirtyChanged,
+            Effect::Autosaved(format!("{bundle}/project.json"))
+        ]
+    );
 }
 
 #[test]
@@ -1210,11 +1606,17 @@ fn motion_builds_one_at_a_time() {
     let mut qt = world.open(&world.bundle("editor.omareel"));
     let job = qt.document.motion_job().unwrap();
     assert!(qt.document.motion_job().is_none());
-    assert_eq!((job.width, job.height, job.duration, job.capture_fps), (320, 180, 2.0, 30.0));
+    assert_eq!(
+        (job.width, job.height, job.duration, job.capture_fps),
+        (320, 180, 2.0, 30.0)
+    );
     // An edit while it builds asks for another build when it lands.
     qt.run(|d| d.set_project_value("cursor.size", 2.into(), false));
     qt.document.apply_motion(job.run());
-    assert_eq!(qt.document.take_effects(), [Effect::CompositionChanged, Effect::StartMotionTimer]);
+    assert_eq!(
+        qt.document.take_effects(),
+        [Effect::CompositionChanged, Effect::StartMotionTimer]
+    );
     let job = qt.document.motion_job().unwrap();
     qt.document.apply_motion(job.run());
     assert_eq!(qt.document.take_effects(), [Effect::CompositionChanged]);
@@ -1278,16 +1680,33 @@ fn set_project_value_takes_every_value_qml_sends() {
     assert_eq!(p(&qt).cursor.hide_when_idle_ms, 1500);
     qt.run(|d| d.set_project_value("cursor.hideWhenIdleMs", Value::Null, false));
     assert_eq!(p(&qt).cursor.hide_when_idle_ms, -1);
-    assert!(qt.document.project_map().value("cursor").get("hideWhenIdleMs").is_null());
+    assert!(
+        qt.document
+            .project_map()
+            .value("cursor")
+            .get("hideWhenIdleMs")
+            .is_null()
+    );
     // Colours arrive as QVariant(QColor).toString(): #aarrggbb when not opaque. The project
     // keeps the name without alpha.
     qt.run(|d| d.set_project_value("frame.border.color", "#80ff0000".into(), false));
-    assert_eq!(qt.document.project_map().value("frame").get("border").get("color").to_string_or(""), "#ff0000");
+    assert_eq!(
+        qt.document
+            .project_map()
+            .value("frame")
+            .get("border")
+            .get("color")
+            .to_string_or(""),
+        "#ff0000"
+    );
     qt.run(|d| d.set_project_value("cursor.ringColor", "#00ff00".into(), false));
     assert_eq!(p(&qt).cursor.ring_color.name(), "#00ff00");
     // Something that is no colour falls back to the default, not to the old one.
     qt.run(|d| d.set_project_value("cursor.ringColor", "not a colour".into(), false));
-    assert_eq!(p(&qt).cursor.ring_color, Project::default().cursor.ring_color);
+    assert_eq!(
+        p(&qt).cursor.ring_color,
+        Project::default().cursor.ring_color
+    );
     // Undefined (an unset variant) removes the key, so the default comes back.
     qt.run(|d| d.set_project_value("frame.padding", Value::Undefined, false));
     assert_eq!(p(&qt).frame.padding, 0.10);
@@ -1301,12 +1720,21 @@ fn set_project_value_takes_every_value_qml_sends() {
     qt.run(|d| {
         d.set_project_value(
             "background.gradient.stops",
-            Value::array(vec![Value::array(vec!["#000000".into(), 0.into()]), Value::array(vec!["#ffffff".into(), 1.into()])]),
+            Value::array(vec![
+                Value::array(vec!["#000000".into(), 0.into()]),
+                Value::array(vec!["#ffffff".into(), 1.into()]),
+            ]),
             false,
         )
     });
     assert_eq!(p(&qt).background.gradient.stops.len(), 2);
-    qt.run(|d| d.set_project_value("zoomStyle.spring", Object::from_iter([("mass", 3)]).into(), false));
+    qt.run(|d| {
+        d.set_project_value(
+            "zoomStyle.spring",
+            Object::from_iter([("mass", 3)]).into(),
+            false,
+        )
+    });
     assert_eq!(p(&qt).zoom_style.spring.mass, 3.0);
     // Keys left out take the zoom spring's defaults.
     assert_eq!(p(&qt).zoom_style.spring.stiffness, 200.0);
@@ -1316,9 +1744,19 @@ fn set_project_value_takes_every_value_qml_sends() {
     qt.run(|d| d.set_project_value("background.type", "image".into(), false));
     qt.run(|d| d.set_project_value("background.image", "/tmp/a b%.png".into(), false));
     let background = qt.document.project_map().value("background").to_object();
-    assert_eq!(background.value("resolvedImage").to_string_or(""), "file:///tmp/a b%25.png");
+    assert_eq!(
+        background.value("resolvedImage").to_string_or(""),
+        "file:///tmp/a b%25.png"
+    );
     qt.run(|d| d.set_project_value("background.type", "color".into(), false));
-    assert_eq!(qt.document.project_map().value("background").get("resolvedImage").to_string_or("?"), "");
+    assert_eq!(
+        qt.document
+            .project_map()
+            .value("background")
+            .get("resolvedImage")
+            .to_string_or("?"),
+        ""
+    );
 }
 
 #[test]
@@ -1342,7 +1780,12 @@ fn project_map_types_match_to_variant_map() {
     assert!(!clip.contains("mediaName"));
     assert!(map.value("aspect").is_null());
     assert!(map.value("background").get("image").is_null());
-    assert_eq!(map.value("background").get("resolvedImage").to_string_or("?"), "");
+    assert_eq!(
+        map.value("background")
+            .get("resolvedImage")
+            .to_string_or("?"),
+        ""
+    );
     // What project.json holds otherwise.
     let mut json = qt.document.project().to_json();
     let mut plain = map.clone();
@@ -1377,7 +1820,10 @@ fn selection_rules() {
     assert!(qt.document.picking_zoom_target());
     assert!(qt.run(|d| d.set_zoom_target_from_preview(1.5, -0.25)));
     assert!(!qt.document.picking_zoom_target());
-    assert_eq!(qt.zoom(&a).value("target").to_object(), Object::from_iter([("x", 1.0), ("y", 0.0)]));
+    assert_eq!(
+        qt.zoom(&a).value("target").to_object(),
+        Object::from_iter([("x", 1.0), ("y", 0.0)])
+    );
     assert!(qt.run(|d| d.set_zoom_target(&a, ZoomTarget::Auto)));
     assert_eq!(qt.zoom(&a).value("target").to_string_or(""), "auto");
     assert!(ZoomTarget::is_auto("AUTO") && !ZoomTarget::is_auto("auto "));
@@ -1413,7 +1859,14 @@ fn selection_rules() {
     assert!(qt.document.selected_zoom_ids().is_empty());
     // Regenerating selects the first automatic zoom, if any.
     qt.run(Document::regenerate_zooms);
-    assert_eq!(qt.document.selected_zoom_id(), qt.document.project().zooms.first().map_or("", |z| z.id.as_str()));
+    assert_eq!(
+        qt.document.selected_zoom_id(),
+        qt.document
+            .project()
+            .zooms
+            .first()
+            .map_or("", |z| z.id.as_str())
+    );
 }
 
 #[test]
@@ -1483,11 +1936,26 @@ fn presets_save_load_list_and_delete() {
     qt.run(|d| d.save_preset("  My preset  "));
     assert_eq!(qt.effects.last(), Some(&Effect::PresetsChanged));
     let saved = std::fs::read_to_string(format!("{directory}/My preset.json")).unwrap();
-    assert_eq!(saved, qt.document.style_preset().to_json(crate::compat::qjson::Format::Indented));
+    assert_eq!(
+        saved,
+        qt.document
+            .style_preset()
+            .to_json(crate::compat::qjson::Format::Indented)
+    );
     let preset = crate::compat::qjson::object_from_json(saved.as_bytes()).unwrap();
     assert_eq!(
         preset.keys().collect::<Vec<_>>(),
-        ["audio", "background", "camera", "cursor", "defaultsVersion", "export", "frame", "version", "zoomStyle"]
+        [
+            "audio",
+            "background",
+            "camera",
+            "cursor",
+            "defaultsVersion",
+            "export",
+            "frame",
+            "version",
+            "zoomStyle"
+        ]
     );
     qt.run(|d| d.save_preset("b"));
     qt.run(|d| d.save_preset("A"));
@@ -1515,7 +1983,10 @@ fn presets_save_load_list_and_delete() {
     assert_eq!(qt.document.project().frame.padding, 0.2);
     // A missing one is an error.
     qt.run(|d| d.load_preset("missing"));
-    assert_eq!(qt.effects.last(), Some(&Effect::ErrorOccurred("No such file or directory".into())));
+    assert_eq!(
+        qt.effects.last(),
+        Some(&Effect::ErrorOccurred("No such file or directory".into()))
+    );
 
     qt.run(|d| d.delete_preset("My preset"));
     assert_eq!(qt.effects.last(), Some(&Effect::PresetsChanged));
@@ -1526,7 +1997,9 @@ fn presets_save_load_list_and_delete() {
     // A presets directory that can't be made: the save reports why.
     let mut blocked = world.open(&world.bundle("blocked.omareel"));
     std::fs::write(world.path("not-a-dir"), b"").unwrap();
-    blocked.document.set_config_location(Some(world.path("not-a-dir")));
+    blocked
+        .document
+        .set_config_location(Some(world.path("not-a-dir")));
     blocked.run(|d| d.save_preset("x"));
     let effects = std::mem::take(&mut blocked.effects);
     assert!(matches!(&effects[effects.len() - 2], Effect::ErrorOccurred(e) if !e.is_empty()));
@@ -1549,7 +2022,10 @@ fn loading_an_old_preset_migrates_it() {
     let project = qt.document.project();
     assert_eq!(project.frame.padding, 0.05);
     assert_eq!(project.frame.shadow, crate::project::Shadow::default());
-    assert_eq!((project.camera.shape.as_str(), project.camera.radius), ("rectangle", 0.0));
+    assert_eq!(
+        (project.camera.shape.as_str(), project.camera.radius),
+        ("rectangle", 0.0)
+    );
 }
 
 // -------------------------------------------------------------------------------------------
@@ -1559,16 +2035,25 @@ fn loading_an_old_preset_migrates_it() {
 fn opening_reports_what_is_wrong() {
     let world = World::new("editor-open-errors");
     let missing = world.path("missing.omareel");
-    assert_eq!(Document::open(&missing, &probes()).err(), Some(format!("Bundle does not exist: {missing}")));
+    assert_eq!(
+        Document::open(&missing, &probes()).err(),
+        Some(format!("Bundle does not exist: {missing}"))
+    );
     let bundle = world.bundle("broken.omareel");
     std::fs::remove_file(format!("{bundle}/screen.mp4")).unwrap();
     assert!(Document::open(&bundle, &probes()).is_err());
     std::fs::write(format!("{bundle}/screen.mp4"), b"x").unwrap();
     std::fs::write(format!("{bundle}/project.json"), b"[]").unwrap();
-    assert_eq!(Document::open(&bundle, &probes()).err(), Some("no error occurred".into()));
+    assert_eq!(
+        Document::open(&bundle, &probes()).err(),
+        Some("no error occurred".into())
+    );
     std::fs::remove_file(format!("{bundle}/project.json")).unwrap();
     std::fs::remove_file(format!("{bundle}/capture.json")).unwrap();
-    assert_eq!(Document::open(&bundle, &probes()).err(), Some("No such file or directory".into()));
+    assert_eq!(
+        Document::open(&bundle, &probes()).err(),
+        Some("No such file or directory".into())
+    );
 }
 
 #[test]
@@ -1576,12 +2061,22 @@ fn a_project_without_recording_clips_gets_one() {
     let world = World::new("editor-only-inserts");
     let bundle = world.bundle("inserts-only.omareel");
     let mut project = Project::defaults("Only", 2.0);
-    project.clips = vec![Clip { id: "m".into(), in_: 0.0, out: 1.0, speed: 1.0, media: "media/gone.mp4".into(), ..Clip::default() }];
+    project.clips = vec![Clip {
+        id: "m".into(),
+        in_: 0.0,
+        out: 1.0,
+        speed: 1.0,
+        media: "media/gone.mp4".into(),
+        ..Clip::default()
+    }];
     project.audio.desktop = true;
     project.save(&format!("{bundle}/project.json")).unwrap();
     let qt = world.open(&bundle);
     let clips = &qt.document.project().clips;
-    assert_eq!((clips[0].id.as_str(), clips[0].in_, clips[0].out), ("c1", 0.0, 2.0));
+    assert_eq!(
+        (clips[0].id.as_str(), clips[0].in_, clips[0].out),
+        ("c1", 0.0, 2.0)
+    );
     assert_eq!(clips[1].id, "m");
     // Audio the recording does not have is off.
     assert!(!qt.document.project().audio.desktop);
@@ -1596,9 +2091,20 @@ fn default_export_path_and_output_size() {
     let qt = world.open(&world.bundle("named.omareel"));
     let path = qt.document.default_export_path("gif");
     assert!(path.ends_with("/named.gif"), "{path}");
-    assert!(qt.document.default_export_path("mp4").ends_with("/named.mp4"));
-    assert!(qt.document.default_export_path("webm").ends_with("/named.mp4"));
-    assert_eq!((qt.document.output_width(), qt.document.output_height()), (1280, 720));
+    assert!(
+        qt.document
+            .default_export_path("mp4")
+            .ends_with("/named.mp4")
+    );
+    assert!(
+        qt.document
+            .default_export_path("webm")
+            .ends_with("/named.mp4")
+    );
+    assert_eq!(
+        (qt.document.output_width(), qt.document.output_height()),
+        (1280, 720)
+    );
 }
 
 // -------------------------------------------------------------------------------------------
@@ -1636,7 +2142,20 @@ fn real_ffmpeg_probes_and_builds_frames() {
     let screen = format!("{bundle}/screen.mp4");
     let made = crate::compat::qprocess::run(
         "ffmpeg",
-        &["-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30", "-t", "1", "-c:v", "libx264", &screen],
+        &[
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=320x180:rate=30",
+            "-t",
+            "1",
+            "-c:v",
+            "libx264",
+            &screen,
+        ],
         30000,
     );
     if !made.is_some_and(|f| f.succeeded()) {
@@ -1644,7 +2163,10 @@ fn real_ffmpeg_probes_and_builds_frames() {
         return;
     }
     let info = probe(&screen).unwrap();
-    assert_eq!((info.width, info.height, info.fps, info.audio), (320, 180, 30.0, false));
+    assert_eq!(
+        (info.width, info.height, info.fps, info.audio),
+        (320, 180, 30.0, false)
+    );
     assert!((info.duration - 1.0).abs() < 0.1);
     // ffprobe's own complaint, trimmed.
     let error = probe(&format!("{bundle}/input.jsonl")).unwrap_err();
@@ -1654,31 +2176,77 @@ fn real_ffmpeg_probes_and_builds_frames() {
     assert!(build_video_thumbnail(&screen, "", &frame, 300));
     assert_eq!(jpeg_size(&frame), Some((160, 90)));
     // The temporary file is gone.
-    let names: Vec<String> = std::fs::read_dir(world.path("cache")).unwrap().map(|e| e.unwrap().file_name().into_string().unwrap()).collect();
+    let names: Vec<String> = std::fs::read_dir(world.path("cache"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
     assert_eq!(names, ["0000000300.jpg"]);
     // A frame already there is kept.
     let before = std::fs::read(&frame).unwrap();
     assert!(build_video_thumbnail(&screen, "hflip", &frame, 300));
     assert_eq!(std::fs::read(&frame).unwrap(), before);
-    assert!(!build_video_thumbnail(&format!("{bundle}/missing.mp4"), "", &world.path("cache/0000000400.jpg"), 400));
+    assert!(!build_video_thumbnail(
+        &format!("{bundle}/missing.mp4"),
+        "",
+        &world.path("cache/0000000400.jpg"),
+        400
+    ));
 
     let strip = build_camera_thumbnails(&screen, 1.0, &world.path("camera-cache"));
     assert_eq!(strip.len(), CAMERA_THUMBNAIL_COUNT);
-    assert_eq!(strip[0], crate::compat::qurl::from_local_file(&world.path("camera-cache/camera-01.jpg")));
-    assert_eq!(jpeg_size(&world.path("camera-cache/camera-08.jpg")), Some((112, 72)));
-    assert!(build_camera_thumbnails(&format!("{bundle}/missing.mp4"), 1.0, &world.path("other-cache")).is_empty());
+    assert_eq!(
+        strip[0],
+        crate::compat::qurl::from_local_file(&world.path("camera-cache/camera-01.jpg"))
+    );
+    assert_eq!(
+        jpeg_size(&world.path("camera-cache/camera-08.jpg")),
+        Some((112, 72))
+    );
+    assert!(
+        build_camera_thumbnails(
+            &format!("{bundle}/missing.mp4"),
+            1.0,
+            &world.path("other-cache")
+        )
+        .is_empty()
+    );
 
     // A video stored turned with a display matrix (a phone's) is left to ffmpeg, which stands it
     // upright; the in-process decoder would scale the stored, sideways pixels.
     let turned = format!("{bundle}/turned.mp4");
     let made = crate::compat::qprocess::run(
         "ffmpeg",
-        &["-y", "-v", "error", "-display_rotation", "90", "-i", &screen, "-c", "copy", &turned],
+        &[
+            "-y",
+            "-v",
+            "error",
+            "-display_rotation",
+            "90",
+            "-i",
+            &screen,
+            "-c",
+            "copy",
+            &turned,
+        ],
         30000,
     );
     if made.is_some_and(|f| f.succeeded()) {
-        assert!(crate::media_av::thumbnail(&screen, 0.3, (160, 90), 4, 1, &world.path("upright.jpg")));
-        assert!(!crate::media_av::thumbnail(&turned, 0.3, (160, 90), 4, 1, &world.path("turned.jpg")));
+        assert!(crate::media_av::thumbnail(
+            &screen,
+            0.3,
+            (160, 90),
+            4,
+            1,
+            &world.path("upright.jpg")
+        ));
+        assert!(!crate::media_av::thumbnail(
+            &turned,
+            0.3,
+            (160, 90),
+            4,
+            1,
+            &world.path("turned.jpg")
+        ));
         let frame = world.path("turned-cache/0000000300.jpg");
         assert!(build_video_thumbnail(&turned, "", &frame, 300));
         assert_eq!(jpeg_size(&frame), Some((160, 90)));

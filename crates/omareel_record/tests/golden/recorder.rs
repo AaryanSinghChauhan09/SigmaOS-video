@@ -16,7 +16,9 @@ use omareel_core::compat::geometry::PointF;
 use omareel_core::compat::qjson::{Format, Object, Value};
 use omareel_core::compat::qprocess::{ChannelMode, Process, ProcessState};
 use omareel_record::capture::*;
-use omareel_record::recorder::audio::{AudioCaptureStart, finish_audio_capture, start_audio_capture};
+use omareel_record::recorder::audio::{
+    AudioCaptureStart, finish_audio_capture, start_audio_capture,
+};
 use omareel_record::recorder::files::*;
 use omareel_record::recorder::self_view::*;
 use omareel_record::recorder::*;
@@ -49,7 +51,11 @@ fn compact(object: &Object) -> String {
 }
 
 fn strings(value: &Value) -> Vec<String> {
-    value.to_array().iter().map(|item| item.to_string_or("")).collect()
+    value
+        .to_array()
+        .iter()
+        .map(|item| item.to_string_or(""))
+        .collect()
 }
 
 fn cases() -> Value {
@@ -62,7 +68,17 @@ fn classify_gsr_exit_txt() {
     for exit_code in [-1, 0, 1, 2, 130, 255] {
         for requested in [false, true] {
             for size in [-1i64, 0, 1, 1048576] {
-                for duration in [f64::NAN, f64::NEG_INFINITY, -1.0, -0.0, 0.0, 5e-324, 0.001, 2.5, f64::INFINITY] {
+                for duration in [
+                    f64::NAN,
+                    f64::NEG_INFINITY,
+                    -1.0,
+                    -0.0,
+                    0.0,
+                    5e-324,
+                    0.001,
+                    2.5,
+                    f64::INFINITY,
+                ] {
                     let name = match classify_gsr_exit(exit_code, requested, size, duration) {
                         GsrExitClassification::UserStop => "UserStop",
                         GsrExitClassification::ExternalStop => "ExternalStop",
@@ -85,11 +101,17 @@ fn classify_gsr_exit_txt() {
 #[test]
 fn even_capture_region_txt() {
     let mut out = Text::new();
-    for mode in [CaptureMode::Region, CaptureMode::Fullscreen, CaptureMode::Window] {
+    for mode in [
+        CaptureMode::Region,
+        CaptureMode::Fullscreen,
+        CaptureMode::Window,
+    ] {
         for scale in [1.0, 2.0, 1.5, 1.25, 0.0, -1.0, f64::NAN] {
             for width in [-3, -2, -1, 0, 1, 2, 3, 1520, 1521] {
                 for height in [-1, 0, 1, 2, 835, 836] {
-                    if mode != CaptureMode::Region && (scale != 2.0 || (width != 1521 && width != 1520)) {
+                    if mode != CaptureMode::Region
+                        && (scale != 2.0 || (width != 1521 && width != 1520))
+                    {
                         continue;
                     }
                     let region = CaptureRegion {
@@ -153,8 +175,11 @@ impl Default for CameraCall {
 fn camera_capture_block_txt() {
     let mut out = Text::new();
     let mut row = |label: &str, call: CameraCall, defaults: bool| {
-        let (shape, radius) =
-            if defaults { (DEFAULT_CAMERA_SHAPE, DEFAULT_CAMERA_RADIUS) } else { (call.shape.as_str(), call.radius) };
+        let (shape, radius) = if defaults {
+            (DEFAULT_CAMERA_SHAPE, DEFAULT_CAMERA_RADIUS)
+        } else {
+            (call.shape.as_str(), call.radius)
+        };
         let block = camera_capture_block(
             &call.device,
             call.requested_height,
@@ -179,8 +204,16 @@ fn camera_capture_block_txt() {
             quote(&call.backend),
             call.rotation.to_string(),
             boolean(call.flip).into(),
-            if defaults { "<default>".into() } else { quote(&call.shape) },
-            if defaults { "<default>".into() } else { num(call.radius) },
+            if defaults {
+                "<default>".into()
+            } else {
+                quote(&call.shape)
+            },
+            if defaults {
+                "<default>".into()
+            } else {
+                num(call.radius)
+            },
             compact(&block),
         ]);
     };
@@ -188,29 +221,96 @@ fn camera_capture_block_txt() {
     row("base", base(), false);
     row("default shape and radius", base(), true);
     for device in ["", "/dev/video0", "Cámara \"1\""] {
-        row("device", CameraCall { device: device.into(), ..base() }, false);
+        row(
+            "device",
+            CameraCall {
+                device: device.into(),
+                ..base()
+            },
+            false,
+        );
     }
     for height in [720, 0, 480, 1440, -720, 721] {
-        row("requestedHeight", CameraCall { requested_height: height, ..base() }, false);
+        row(
+            "requestedHeight",
+            CameraCall {
+                requested_height: height,
+                ..base()
+            },
+            false,
+        );
     }
     for (width, height) in [(0, 0), (-1, 7), (1280, 720), (i32::MAX, i32::MIN)] {
-        row("size", CameraCall { width, height, ..base() }, false);
+        row(
+            "size",
+            CameraCall {
+                width,
+                height,
+                ..base()
+            },
+            false,
+        );
     }
-    for fps in [29.97002997002997, 0.0, -30.0, 1e-300, 60.000000000000007, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+    for fps in [
+        29.97002997002997,
+        0.0,
+        -30.0,
+        1e-300,
+        60.000000000000007,
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+    ] {
         row("fps", CameraCall { fps, ..base() }, false);
     }
     for first in [0, -1, (1i64 << 53) + 1, i64::MAX, i64::MIN] {
-        row("firstFrameUs", CameraCall { first_frame_us: first, ..base() }, false);
+        row(
+            "firstFrameUs",
+            CameraCall {
+                first_frame_us: first,
+                ..base()
+            },
+            false,
+        );
     }
     for backend in ["", "v4l2"] {
-        row("backend", CameraCall { backend: backend.into(), ..base() }, false);
+        row(
+            "backend",
+            CameraCall {
+                backend: backend.into(),
+                ..base()
+            },
+            false,
+        );
     }
     for rotation in [0, 45, 180, 270, -90, 360] {
         row("rotation", CameraCall { rotation, ..base() }, false);
     }
-    row("flipHorizontal", CameraCall { flip: false, ..base() }, false);
-    for shape in ["square", "rectangle", "Square", "circle", "", "square ", "rect"] {
-        row("shape", CameraCall { shape: shape.into(), ..base() }, false);
+    row(
+        "flipHorizontal",
+        CameraCall {
+            flip: false,
+            ..base()
+        },
+        false,
+    );
+    for shape in [
+        "square",
+        "rectangle",
+        "Square",
+        "circle",
+        "",
+        "square ",
+        "rect",
+    ] {
+        row(
+            "shape",
+            CameraCall {
+                shape: shape.into(),
+                ..base()
+            },
+            false,
+        );
     }
     for radius in [0.0, -1.0, 0.5, 80.0, 1e300, f64::NAN, f64::INFINITY] {
         row("radius", CameraCall { radius, ..base() }, false);
@@ -226,7 +326,11 @@ fn microphone_missing_and_peak_db_txt() {
     let mut out = Text::new();
     for device in strings(microphone.value("devices")) {
         for (name, list) in sources.iter() {
-            out.row([quote(&device), name.to_owned(), boolean(microphone_missing(&device, &strings(list))).into()]);
+            out.row([
+                quote(&device),
+                name.to_owned(),
+                boolean(microphone_missing(&device, &strings(list))).into(),
+            ]);
         }
     }
     let mut peaks = Text::new();
@@ -236,7 +340,9 @@ fn microphone_missing_and_peak_db_txt() {
             continue;
         }
         // As daemonMain reads audio.mka.log.
-        let text = omareel_core::compat::qstring::from_utf8(&std::fs::read(logs.join(&name)).expect("log"));
+        let text = omareel_core::compat::qstring::from_utf8(
+            &std::fs::read(logs.join(&name)).expect("log"),
+        );
         let peak = microphone_peak_db(&text);
         peaks.row([name, num(peak), hex(peak)]);
     }
@@ -271,17 +377,29 @@ fn pactl_sources_txt() {
         out.row([label.to_owned(), quote_list(&pactl_sources())]);
     };
     for name in sorted_entries(&directory, false) {
-        run(&name, Answer::stdout(std::fs::read(directory.join(&name)).expect("corpus file")));
+        run(
+            &name,
+            Answer::stdout(std::fs::read(directory.join(&name)).expect("corpus file")),
+        );
     }
-    let failing =
-        Answer { status: 1, ..Answer::stdout(std::fs::read(directory.join("crafted-dock.txt")).expect("corpus file")) };
+    let failing = Answer {
+        status: 1,
+        ..Answer::stdout(std::fs::read(directory.join("crafted-dock.txt")).expect("corpus file"))
+    };
     run("<crafted-dock.txt, exit status 1>", failing);
     assert_golden("recorder/pactl-sources.txt", &out.into_string());
 }
 
 #[test]
 fn discard_timeline_txt() {
-    let names = ["abortCapture", "killAudio", "requestCameraStop", "waitForCameraStop", "removeBundle", "removeState"];
+    let names = [
+        "abortCapture",
+        "killAudio",
+        "requestCameraStop",
+        "waitForCameraStop",
+        "removeBundle",
+        "removeState",
+    ];
     let mut out = Text::new();
     for mask in 0..64 {
         for removes in [true, false] {
@@ -301,7 +419,9 @@ fn discard_timeline_txt() {
                 actions.request_camera_stop = Some(Box::new(|| push("requestCameraStop")));
             }
             if mask & 8 != 0 {
-                actions.wait_for_camera_stop = Some(Box::new(|timeout| push(&format!("waitForCameraStop({timeout})"))));
+                actions.wait_for_camera_stop = Some(Box::new(|timeout| {
+                    push(&format!("waitForCameraStop({timeout})"))
+                }));
             }
             if mask & 16 != 0 {
                 actions.remove_bundle = Some(Box::new(|| {
@@ -312,12 +432,23 @@ fn discard_timeline_txt() {
             if mask & 32 != 0 {
                 actions.remove_state = Some(Box::new(|| push("removeState")));
             }
-            let present: Vec<&str> = (0..6).filter(|bit| mask & (1 << bit) != 0).map(|bit| names[bit]).collect();
+            let present: Vec<&str> = (0..6)
+                .filter(|bit| mask & (1 << bit) != 0)
+                .map(|bit| names[bit])
+                .collect();
             let result = discard_timeline(&mut actions);
             drop(actions);
             out.row([
-                if present.is_empty() { "-".into() } else { present.join(",") },
-                if mask & 16 != 0 { boolean(removes).into() } else { "-".into() },
+                if present.is_empty() {
+                    "-".into()
+                } else {
+                    present.join(",")
+                },
+                if mask & 16 != 0 {
+                    boolean(removes).into()
+                } else {
+                    "-".into()
+                },
                 quote_list(&calls.borrow()),
                 boolean(result).into(),
             ]);
@@ -352,7 +483,11 @@ fn timestamps_txt() {
         ("<directory>", dir.to_owned()),
         ("<empty path>", String::new()),
     ] {
-        out.row(["firstFrameTimestamp".to_owned(), label.into(), first_frame_timestamp(&path).to_string()]);
+        out.row([
+            "firstFrameTimestamp".to_owned(),
+            label.into(),
+            first_frame_timestamp(&path).to_string(),
+        ]);
     }
     let files = format!("{}/timestamps", h.scratch());
     std::fs::create_dir_all(format!("{files}/directory.ts")).expect("mkpath");
@@ -379,7 +514,11 @@ fn timestamps_txt() {
     write("zero", &format!("{files}/zero.ts"), 0);
     write("negative", &format!("{files}/negative.ts"), -5);
     write("maximum", &format!("{files}/maximum.ts"), i64::MAX);
-    write("missing directory", &format!("{files}/missing/audio.mka.ts"), 1);
+    write(
+        "missing directory",
+        &format!("{files}/missing/audio.mka.ts"),
+        1,
+    );
     write("path is a directory", &format!("{files}/directory.ts"), 1);
     assert_golden("recorder/timestamps.txt", &out.into_string());
 }
@@ -432,7 +571,11 @@ fn input_log_txt() {
             Ok(()) => (true, "<untouched>".to_owned()),
             Err(error) => (false, error),
         };
-        out.row(["ok".to_owned(), boolean(ok).into(), quote(&h.sanitize(&error))]);
+        out.row([
+            "ok".to_owned(),
+            boolean(ok).into(),
+            quote(&h.sanitize(&error)),
+        ]);
         let Some(bytes) = readable(path).filter(|_| !path.is_empty()) else {
             out.row(["file", "-"]);
             return;
@@ -443,7 +586,10 @@ fn input_log_txt() {
             if i + 1 == lines.len() && line.is_empty() {
                 break;
             }
-            out.row(["line".to_owned(), String::from_utf8_lossy(line).into_owned()]);
+            out.row([
+                "line".to_owned(),
+                String::from_utf8_lossy(line).into_owned(),
+            ]);
         }
     };
     for (name, input) in inputs.iter() {
@@ -477,13 +623,24 @@ fn input_log_txt() {
         out.section(name);
         dump(&mut out, &path, result);
     }
-    let one = [RawCursorSample { monotonic_us: 1, logical_position: PointF::new(1.0, 1.0) }];
-    for (label, path) in
-        [("<missing directory>", format!("{files}/missing/input.jsonl")), ("<path is a directory>", files.clone())]
-    {
+    let one = [RawCursorSample {
+        monotonic_us: 1,
+        logical_position: PointF::new(1.0, 1.0),
+    }];
+    for (label, path) in [
+        (
+            "<missing directory>",
+            format!("{files}/missing/input.jsonl"),
+        ),
+        ("<path is a directory>", files.clone()),
+    ] {
         let result = write_input_log(&path, &one, &[], &CaptureRegion::default());
         out.section(label);
-        let shown = if std::path::Path::new(&path).is_dir() { String::new() } else { path };
+        let shown = if std::path::Path::new(&path).is_dir() {
+            String::new()
+        } else {
+            path
+        };
         dump(&mut out, &shown, result);
     }
     assert_golden("recorder/input-log.txt", &out.into_string());
@@ -505,7 +662,10 @@ fn write_json_txt() {
     let recording = read_json("recorder/state/recording.json").to_object();
     let objects = [
         ("empty", Object::new()),
-        ("recording-json", object(vec![("overlay_exclusion", "plugin".into())])),
+        (
+            "recording-json",
+            object(vec![("overlay_exclusion", "plugin".into())]),
+        ),
         ("state", recording),
         (
             "special-values",
@@ -518,7 +678,11 @@ fn write_json_txt() {
                 ("text", "line\nbreak \"q\" \\ é\u{1F3AC}".into()),
                 (
                     "nested",
-                    object(vec![("a", Value::array(vec![1.into(), 2.5.into(), Value::Null, true.into()]))]).into(),
+                    object(vec![(
+                        "a",
+                        Value::array(vec![1.into(), 2.5.into(), Value::Null, true.into()]),
+                    )])
+                    .into(),
                 ),
             ]),
         ),
@@ -531,9 +695,18 @@ fn write_json_txt() {
             Ok(()) => (true, "<untouched>".to_owned()),
             Err(error) => (false, error),
         };
-        out.row([(*name).to_owned(), boolean(ok).into(), quote(&h.sanitize(&error)), octal_mode(&path)]);
+        out.row([
+            (*name).to_owned(),
+            boolean(ok).into(),
+            quote(&h.sanitize(&error)),
+            octal_mode(&path),
+        ]);
         let golden = format!("recorder/write-json/{name}.json");
-        reports.extend(difference(&golden, &read_expected(&golden), &std::fs::read(&path).unwrap_or_default()));
+        reports.extend(difference(
+            &golden,
+            &read_expected(&golden),
+            &std::fs::read(&path).unwrap_or_default(),
+        ));
     }
     let existing = format!("{files}/existing-0600.json");
     write_file(&existing, "old");
@@ -541,7 +714,10 @@ fn write_json_txt() {
     let version = object(vec![("version", 1.into())]);
     for (label, path) in [
         ("<existing file, mode 0600>", existing.clone()),
-        ("<missing directory>", format!("{files}/missing/capture.json")),
+        (
+            "<missing directory>",
+            format!("{files}/missing/capture.json"),
+        ),
         ("<path is a directory>", files.clone()),
         ("<empty path>", String::new()),
     ] {
@@ -549,12 +725,20 @@ fn write_json_txt() {
             Ok(()) => (true, "<untouched>".to_owned()),
             Err(error) => (false, error),
         };
-        let bytes = if path.is_empty() { None } else { readable(&path) };
+        let bytes = if path.is_empty() {
+            None
+        } else {
+            readable(&path)
+        };
         out.row([
             label.to_owned(),
             boolean(ok).into(),
             quote(&h.sanitize(&error)),
-            if path.is_empty() { "-".into() } else { octal_mode(&path) },
+            if path.is_empty() {
+                "-".into()
+            } else {
+                octal_mode(&path)
+            },
             bytes.map_or("-".into(), |bytes| quote_bytes(&bytes)),
         ]);
     }
@@ -575,16 +759,29 @@ fn recorder_output_txt() {
         let line = last_non_empty_line(&std::fs::read(directory.join(&name)).expect("corpus file"));
         out.row(["lastNonEmptyLine".to_owned(), name, quote(&line)]);
     }
-    out.row(["lastNonEmptyLine".to_owned(), "<empty>".into(), quote(&last_non_empty_line(b""))]);
+    out.row([
+        "lastNonEmptyLine".to_owned(),
+        "<empty>".into(),
+        quote(&last_non_empty_line(b"")),
+    ]);
     // Each chunk is what one `cat <file>` printed, read as daemonMain reads gpu-screen-recorder:
     // merged channels, drained into one tail.
     let sequences: [(&str, &[&str]); 6] = [
         ("one chunk", &["gsr-error.txt"]),
         ("big chunk", &["big.txt"]),
-        ("three chunks", &["gsr-error.txt", "big.txt", "no-newline.txt"]),
-        ("growing past the limit", &["big.txt", "big.txt", "unicode.txt"]),
+        (
+            "three chunks",
+            &["gsr-error.txt", "big.txt", "no-newline.txt"],
+        ),
+        (
+            "growing past the limit",
+            &["big.txt", "big.txt", "unicode.txt"],
+        ),
         ("empty chunks", &["empty.txt", "crlf.txt", "empty.txt"]),
-        ("bytes", &["invalid-utf8.bin", "nul.bin", "carriage-return.txt"]),
+        (
+            "bytes",
+            &["invalid-utf8.bin", "nul.bin", "carriage-return.txt"],
+        ),
     ];
     let debug_path = format!("{}/omareel.log", h.scratch());
     for (label, chunks) in sequences {
@@ -593,15 +790,26 @@ fn recorder_output_txt() {
             let _ = std::fs::remove_file(&debug_path);
             // QFile::open(WriteOnly | Append); "closed" is a QFile that was never opened.
             let mut log = (debug == "open").then(|| {
-                std::fs::OpenOptions::new().append(true).create(true).open(&debug_path).expect("open the debug log")
+                std::fs::OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(&debug_path)
+                    .expect("open the debug log")
             });
             let mut tail = Vec::new();
             for chunk in chunks {
                 let mut process = Process::new();
                 process.set_process_channel_mode(ChannelMode::Merged);
-                process.start("cat", &[directory.join(chunk).to_str().expect("UTF-8 path")]);
+                process.start(
+                    "cat",
+                    &[directory.join(chunk).to_str().expect("UTF-8 path")],
+                );
                 assert!(process.wait_for_finished(10000), "cat did not finish");
-                drain_recorder_output(&mut process, &mut tail, log.as_mut().map(|f| f as &mut dyn std::io::Write));
+                drain_recorder_output(
+                    &mut process,
+                    &mut tail,
+                    log.as_mut().map(|f| f as &mut dyn std::io::Write),
+                );
                 out.row([
                     "drain".to_owned(),
                     (*chunk).to_owned(),
@@ -611,7 +819,10 @@ fn recorder_output_txt() {
                 ]);
             }
             drop(log);
-            out.row(["debugLog".to_owned(), readable(&debug_path).map_or("-".into(), |bytes| quote_bytes(&bytes))]);
+            out.row([
+                "debugLog".to_owned(),
+                readable(&debug_path).map_or("-".into(), |bytes| quote_bytes(&bytes)),
+            ]);
         }
     }
     let _ = std::fs::remove_file(&debug_path);
@@ -647,10 +858,21 @@ fn monitor_layouts_txt() {
         }
     };
     for name in sorted_entries(&directory, false) {
-        dump(&name, Answer::stdout(std::fs::read(directory.join(&name)).expect("corpus file")), true);
+        dump(
+            &name,
+            Answer::stdout(std::fs::read(directory.join(&name)).expect("corpus file")),
+            true,
+        );
     }
     let two = std::fs::read(directory.join("crafted-two.json")).expect("corpus file");
-    dump("<crafted-two.json, exit status 1>", Answer { status: 1, ..Answer::stdout(two) }, true);
+    dump(
+        "<crafted-two.json, exit status 1>",
+        Answer {
+            status: 1,
+            ..Answer::stdout(two)
+        },
+        true,
+    );
     dump("<hyprctl not on PATH>", Answer::default(), false);
     assert_golden("recorder/monitor-layouts.txt", &out.into_string());
 }
@@ -676,9 +898,14 @@ fn self_view_placement_txt() {
             self_view_size: input.value("size").to_string_or(""),
             ..RecordOptions::default()
         };
-        let capture =
-            CaptureRegion { monitor_name: input.value("monitor").to_string_or(""), ..CaptureRegion::default() };
-        let (x, y) = (input.value("x").to_double(0.0), input.value("y").to_double(0.0));
+        let capture = CaptureRegion {
+            monitor_name: input.value("monitor").to_string_or(""),
+            ..CaptureRegion::default()
+        };
+        let (x, y) = (
+            input.value("x").to_double(0.0),
+            input.value("y").to_double(0.0),
+        );
         let preferences = omareel_core::recording_preferences::RecordingPreferences {
             self_view_x: x,
             self_view_y: y,
@@ -704,7 +931,11 @@ fn self_view_placement_txt() {
         ]);
     }
     for size in ["S", "M", "L", "s", "XL", ""] {
-        out.row(["selfViewPixels".to_owned(), quote(size), self_view_pixels(size).to_string()]);
+        out.row([
+            "selfViewPixels".to_owned(),
+            quote(size),
+            self_view_pixels(size).to_string(),
+        ]);
     }
     assert_golden("recorder/self-view-placement.txt", &out.into_string());
 }
@@ -725,8 +956,16 @@ fn helpers_txt() {
             ]);
         }
     }
-    for mode in [CaptureMode::Fullscreen, CaptureMode::Region, CaptureMode::Window] {
-        out.row(["modeName".to_owned(), mode_text(mode).into(), quote(mode_name(mode))]);
+    for mode in [
+        CaptureMode::Fullscreen,
+        CaptureMode::Region,
+        CaptureMode::Window,
+    ] {
+        out.row([
+            "modeName".to_owned(),
+            mode_text(mode).into(),
+            quote(mode_name(mode)),
+        ]);
     }
     let position = cases.get("positionObject").to_object();
     for region in position.value("regions").to_array() {
@@ -751,13 +990,28 @@ fn helpers_txt() {
         for time in at.value("times").to_array() {
             let time = time.to_integer(0);
             let point = cursor_at(&samples, time);
-            out.row(["cursorAt".to_owned(), name.to_owned(), time.to_string(), num(point.x), num(point.y)]);
+            out.row([
+                "cursorAt".to_owned(),
+                name.to_owned(),
+                time.to_string(),
+                num(point.x),
+                num(point.y),
+            ]);
         }
     }
     // The Mode7 row (a CaptureMode outside the enum) has no Rust counterpart.
-    let golden = keep_lines(&read_expected("recorder/helpers.txt"), |line| line != b"modeName\tMode7\t\"region\"");
-    assert_eq!(golden.len() + "modeName\tMode7\t\"region\"\n".len(), read_expected("recorder/helpers.txt").len());
-    assert_same("recorder/helpers.txt", &golden, out.into_string().as_bytes());
+    let golden = keep_lines(&read_expected("recorder/helpers.txt"), |line| {
+        line != b"modeName\tMode7\t\"region\""
+    });
+    assert_eq!(
+        golden.len() + "modeName\tMode7\t\"region\"\n".len(),
+        read_expected("recorder/helpers.txt").len()
+    );
+    assert_same(
+        "recorder/helpers.txt",
+        &golden,
+        out.into_string().as_bytes(),
+    );
 }
 
 struct Start {
@@ -820,9 +1074,26 @@ fn audio_capture_txt() {
             sink: Some((0, "alsa_output.pci-0000_00_1f.3.analog-stereo\n")),
             ..START
         },
-        Start { label: "microphone", microphone: true, device: yeti, ..START },
-        Start { label: "default microphone", microphone: true, source: Some((0, "  alsa_input.default \n")), ..START },
-        Start { label: "both", desktop: true, microphone: true, device: yeti, sink: Some((0, "sink")), ..START },
+        Start {
+            label: "microphone",
+            microphone: true,
+            device: yeti,
+            ..START
+        },
+        Start {
+            label: "default microphone",
+            microphone: true,
+            source: Some((0, "  alsa_input.default \n")),
+            ..START
+        },
+        Start {
+            label: "both",
+            desktop: true,
+            microphone: true,
+            device: yeti,
+            sink: Some((0, "sink")),
+            ..START
+        },
         Start {
             label: "both defaults",
             desktop: true,
@@ -831,8 +1102,18 @@ fn audio_capture_txt() {
             source: Some((0, "source")),
             ..START
         },
-        Start { label: "no default sink", desktop: true, sink: Some((1, "sink")), ..START },
-        Start { label: "empty default source", microphone: true, source: Some((0, "\n")), ..START },
+        Start {
+            label: "no default sink",
+            desktop: true,
+            sink: Some((1, "sink")),
+            ..START
+        },
+        Start {
+            label: "empty default source",
+            microphone: true,
+            source: Some((0, "\n")),
+            ..START
+        },
         Start {
             label: "sink fails, microphone left",
             desktop: true,
@@ -849,9 +1130,23 @@ fn audio_capture_txt() {
             source: Some((1, "source")),
             ..START
         },
-        Start { label: "nothing requested", ..START },
-        Start { label: "empty device", microphone: true, device: "", ..START },
-        Start { label: "ffmpeg not on PATH", desktop: true, sink: Some((0, "sink")), ffmpeg: false, ..START },
+        Start {
+            label: "nothing requested",
+            ..START
+        },
+        Start {
+            label: "empty device",
+            microphone: true,
+            device: "",
+            ..START
+        },
+        Start {
+            label: "ffmpeg not on PATH",
+            desktop: true,
+            sink: Some((0, "sink")),
+            ffmpeg: false,
+            ..START
+        },
         Start {
             label: "log file cannot be created",
             desktop: true,
@@ -865,12 +1160,34 @@ fn audio_capture_txt() {
         std::fs::create_dir_all(format!("{files}/bundle")).expect("mkpath");
         let mut replay = Replay::new(&format!("{}/replay-audio", h.scratch()));
         if let Some((status, sink)) = start.sink {
-            replay.answer("pactl", &["get-default-sink"], &Answer { status, ..Answer::stdout(sink) }, 0);
+            replay.answer(
+                "pactl",
+                &["get-default-sink"],
+                &Answer {
+                    status,
+                    ..Answer::stdout(sink)
+                },
+                0,
+            );
         }
         if let Some((status, source)) = start.source {
-            replay.answer("pactl", &["get-default-source"], &Answer { status, ..Answer::stdout(source) }, 0);
+            replay.answer(
+                "pactl",
+                &["get-default-source"],
+                &Answer {
+                    status,
+                    ..Answer::stdout(source)
+                },
+                0,
+            );
         }
-        replay.answer_any("ffmpeg", &Answer { err: b"on stderr\n".to_vec(), ..Answer::stdout("ffmpeg shim log\n") });
+        replay.answer_any(
+            "ffmpeg",
+            &Answer {
+                err: b"on stderr\n".to_vec(),
+                ..Answer::stdout("ffmpeg shim log\n")
+            },
+        );
         replay.activate(&h);
         let mut environment = ScopedEnvironment::new(&h);
         if !start.ffmpeg {
@@ -882,7 +1199,9 @@ fn audio_capture_txt() {
             microphone_device: start.device.into(),
             ..RecordOptions::default()
         };
-        let path = start.path.map_or(audio_path.clone(), |path| format!("{files}/{path}"));
+        let path = start
+            .path
+            .map_or(audio_path.clone(), |path| format!("{files}/{path}"));
         let mut process = Process::new();
         let before = realtime_now_us();
         let started = start_audio_capture(&mut process, &options, &path);
@@ -899,7 +1218,10 @@ fn audio_capture_txt() {
             },
         ]);
         replay.dump_calls(&h, &mut out);
-        out.row(["log".to_owned(), readable(&format!("{path}.log")).map_or("-".into(), |log| quote_bytes(&log))]);
+        out.row([
+            "log".to_owned(),
+            readable(&format!("{path}.log")).map_or("-".into(), |log| quote_bytes(&log)),
+        ]);
         // The monotonic column is startedUs, a reading of the machine's clock.
         let ts = readable(&format!("{path}.ts")).map(|ts| {
             let marker = format!("\n{}\t", started.started_us.unwrap_or(-7));
@@ -907,17 +1229,46 @@ fn audio_capture_txt() {
             quote_bytes(&mask_realtime(replaced.as_bytes(), before, after))
         });
         out.row(["ts".to_owned(), ts.unwrap_or_else(|| "-".into())]);
-        let parent = std::path::Path::new(&path).parent().expect("a directory").to_str().expect("UTF-8").to_owned();
+        let parent = std::path::Path::new(&path)
+            .parent()
+            .expect("a directory")
+            .to_str()
+            .expect("UTF-8")
+            .to_owned();
         out.row(["bundle".to_owned(), directory_listing(&parent)]);
     }
 
     let finishes = [
-        Finish { label: "muxes", audio: Some(b"audio bytes"), ..FINISH },
-        Finish { label: "audio empty", audio: Some(b""), ..FINISH },
-        Finish { label: "audio missing", audio: None, ..FINISH },
-        Finish { label: "mux fails", mux_status: 1, ..FINISH },
-        Finish { label: "mux writes nothing", creates: false, ..FINISH },
-        Finish { label: "no screen duration", screen_duration_us: 0, ..FINISH },
+        Finish {
+            label: "muxes",
+            audio: Some(b"audio bytes"),
+            ..FINISH
+        },
+        Finish {
+            label: "audio empty",
+            audio: Some(b""),
+            ..FINISH
+        },
+        Finish {
+            label: "audio missing",
+            audio: None,
+            ..FINISH
+        },
+        Finish {
+            label: "mux fails",
+            mux_status: 1,
+            ..FINISH
+        },
+        Finish {
+            label: "mux writes nothing",
+            creates: false,
+            ..FINISH
+        },
+        Finish {
+            label: "no screen duration",
+            screen_duration_us: 0,
+            ..FINISH
+        },
         Finish {
             label: "audio started first",
             screen_started_us: 2000000,
@@ -973,8 +1324,11 @@ fn audio_capture_txt() {
             assert!(recorder.wait_for_started(5000), "sleep did not start");
         }
         // No log beside the audio: it is placed by when its recorder started.
-        let start =
-            AudioCaptureStart { started: true, started_us: Some(finish.audio_started_us), realtime_offset_us: 0 };
+        let start = AudioCaptureStart {
+            started: true,
+            started_us: Some(finish.audio_started_us),
+            realtime_offset_us: 0,
+        };
         let ok = finish_audio_capture(
             &mut recorder,
             &screen,
@@ -1001,7 +1355,10 @@ fn audio_capture_txt() {
         };
         out.row(["result".to_owned(), boolean(ok).into(), state.into()]);
         replay.dump_calls(&h, &mut out);
-        out.row(["output".to_owned(), readable(&output).map_or("-".into(), |bytes| quote_bytes(&bytes))]);
+        out.row([
+            "output".to_owned(),
+            readable(&output).map_or("-".into(), |bytes| quote_bytes(&bytes)),
+        ]);
         if recorder.state() != ProcessState::NotRunning {
             recorder.kill();
             recorder.wait_for_finished(1000);

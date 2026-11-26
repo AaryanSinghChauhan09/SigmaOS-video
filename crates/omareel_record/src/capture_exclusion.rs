@@ -40,7 +40,8 @@ fn hyprctl(arguments: &[&str]) -> Answer {
     let mut process = Process::new();
     process.start("hyprctl", arguments);
     let finished = process.wait_for_finished(2000);
-    let success = finished && process.exit_status() == ExitStatus::NormalExit && process.exit_code() == 0;
+    let success =
+        finished && process.exit_status() == ExitStatus::NormalExit && process.exit_code() == 0;
     if !success && process.state() != ProcessState::NotRunning {
         process.kill();
         process.wait_for_finished(1000);
@@ -54,7 +55,11 @@ fn hyprctl(arguments: &[&str]) -> Answer {
     } else if reply.is_empty() && process.error() == ProcessError::FailedToStart {
         reply = "hyprctl could not be started".into();
     }
-    Answer { output: if success { output } else { Vec::new() }, ok: success, reply }
+    Answer {
+        output: if success { output } else { Vec::new() },
+        ok: success,
+        reply,
+    }
 }
 
 /// `QJsonDocument::fromJson(bytes).object()`.
@@ -81,7 +86,12 @@ fn json_array(bytes: &[u8]) -> Vec<Value> {
 fn set_no_hardware_cursors(value: i32) -> bool {
     let accepted = |answer: Answer| answer.ok && answer.reply == "ok";
     let eval = format!("hl.config({{ cursor = {{ no_hardware_cursors = {value} }} }})");
-    accepted(hyprctl(&["eval", &eval])) || accepted(hyprctl(&["keyword", "cursor:no_hardware_cursors", &value.to_string()]))
+    accepted(hyprctl(&["eval", &eval]))
+        || accepted(hyprctl(&[
+            "keyword",
+            "cursor:no_hardware_cursors",
+            &value.to_string(),
+        ]))
 }
 
 /// `cursor:no_hardware_cursors` as `hyprctl -j getoption` gives it, `None` when it can't be read
@@ -109,9 +119,17 @@ impl HoldLock {
     fn acquire() -> HoldLock {
         let path = state::hardware_cursor_hold_lock_path();
         qdir::mkpath(&FileInfo::new(path.clone()).absolute_path());
-        let Ok(path) = std::ffi::CString::new(path) else { return HoldLock { _fd: None } };
+        let Ok(path) = std::ffi::CString::new(path) else {
+            return HoldLock { _fd: None };
+        };
         // SAFETY: a NUL-terminated path; open returns a new descriptor or -1.
-        let fd = unsafe { libc::open(path.as_ptr(), libc::O_RDWR | libc::O_CREAT | libc::O_CLOEXEC, 0o600) };
+        let fd = unsafe {
+            libc::open(
+                path.as_ptr(),
+                libc::O_RDWR | libc::O_CREAT | libc::O_CLOEXEC,
+                0o600,
+            )
+        };
         if fd < 0 {
             return HoldLock { _fd: None };
         }
@@ -157,7 +175,12 @@ fn hyprland_instance() -> String {
 /// `$XDG_RUNTIME_DIR/hypr/`.
 fn instance_running(instance: &str) -> bool {
     let runtime = std::env::var_os("XDG_RUNTIME_DIR").unwrap_or_default();
-    !instance.is_empty() && std::path::Path::new(&runtime).join("hypr").join(instance).join(".socket.sock").exists()
+    !instance.is_empty()
+        && std::path::Path::new(&runtime)
+            .join("hypr")
+            .join(instance)
+            .join(".socket.sock")
+            .exists()
 }
 
 /// Removes the markers of Hyprland instances that are gone (a new Hyprland read its
@@ -165,7 +188,9 @@ fn instance_running(instance: &str) -> bool {
 /// ones' alone.
 fn forget_gone_instances(current: &str) {
     let directory = FileInfo::new(state::hardware_cursor_hold_lock_path()).absolute_path();
-    let Ok(entries) = std::fs::read_dir(&directory) else { return };
+    let Ok(entries) = std::fs::read_dir(&directory) else {
+        return;
+    };
     for entry in entries.flatten() {
         let name = entry.file_name();
         let name = name.to_string_lossy();
@@ -176,7 +201,9 @@ fn forget_gone_instances(current: &str) {
         if path == current {
             continue;
         }
-        let marker = qfile::read_all(&path).map(|bytes| json_object(&bytes)).unwrap_or_default();
+        let marker = qfile::read_all(&path)
+            .map(|bytes| json_object(&bytes))
+            .unwrap_or_default();
         if !instance_running(&marker.value("instance").to_string_or("")) {
             qfile::remove(&path);
         }
@@ -187,7 +214,9 @@ fn forget_gone_instances(current: &str) {
 fn restore_abandoned_locked() -> bool {
     let path = state::hardware_cursor_hold_path(&hyprland_instance());
     forget_gone_instances(&path);
-    let Ok(bytes) = qfile::read_all(&path) else { return false };
+    let Ok(bytes) = qfile::read_all(&path) else {
+        return false;
+    };
     let marker = json_object(&bytes);
     let pid = marker.value("pid").to_variant_long_long();
     if pid == i64::from(std::process::id()) || state::recorder_daemon_alive(pid) {
@@ -249,8 +278,13 @@ impl HardwareCursorHold {
         let _lock = HoldLock::acquire();
         restore_abandoned_locked();
         let marker = state::hardware_cursor_hold_path(&hyprland_instance());
-        let mut hold = HardwareCursorHold { previous: -1, marker };
-        let Some(previous) = no_hardware_cursors() else { return hold };
+        let mut hold = HardwareCursorHold {
+            previous: -1,
+            marker,
+        };
+        let Some(previous) = no_hardware_cursors() else {
+            return hold;
+        };
         if previous == 0 {
             return hold;
         }
@@ -289,7 +323,11 @@ impl Drop for HardwareCursorHold {
 /// digits, `^[a-f0-9]{40}$`, whose `$` also matches before a final newline) and Hyprland's.
 pub fn compatible_hash(built: &str, running: &str) -> bool {
     let digits = built.strip_suffix('\n').unwrap_or(built);
-    digits.len() == 40 && digits.bytes().all(|b| matches!(b, b'a'..=b'f' | b'0'..=b'9')) && built == running
+    digits.len() == 40
+        && digits
+            .bytes()
+            .all(|b| matches!(b, b'a'..=b'f' | b'0'..=b'9'))
+        && built == running
 }
 
 /// `CaptureExclusion::status`: whether `omareel-capture-exclude` is in `hyprctl -j plugin list`,
@@ -304,8 +342,14 @@ pub fn status() -> Status {
         result.details = json_object(&hyprctl(&["omareel-exclude", "status"]).output);
         result.built_hash = result.details.value("built_hash").to_string_or("");
         let version = json_object(&hyprctl(&["-j", "version"]).output);
-        result.loaded = compatible_hash(&result.built_hash, &version.value("commit").to_string_or(""))
-            && result.details.value("prefixes").to_array().contains(&Value::from("omareel-"));
+        result.loaded = compatible_hash(
+            &result.built_hash,
+            &version.value("commit").to_string_or(""),
+        ) && result
+            .details
+            .value("prefixes")
+            .to_array()
+            .contains(&Value::from("omareel-"));
         if !result.loaded {
             result.reason = "Plugin status or default prefix is unavailable".into();
         }
@@ -324,11 +368,16 @@ pub fn status() -> Status {
 /// reported as needing a rebuild.
 pub fn ensure_loaded(application_dir_path: &str) -> Status {
     let variable = std::env::var_os("OMAREEL_PLUGIN_PATH");
-    let override_path =
-        variable.as_ref().map(|value| String::from_utf8_lossy(value.as_encoded_bytes()).into_owned()).unwrap_or_default();
+    let override_path = variable
+        .as_ref()
+        .map(|value| String::from_utf8_lossy(value.as_encoded_bytes()).into_owned())
+        .unwrap_or_default();
     // An explicit path is authoritative, including an intentionally unavailable path.
     if variable.is_some() && !FileInfo::new(override_path.clone()).is_file() {
-        return Status { reason: "Configured capture exclusion plugin does not exist".into(), ..Status::default() };
+        return Status {
+            reason: "Configured capture exclusion plugin does not exist".into(),
+            ..Status::default()
+        };
     }
     let mut result = status();
     if result.loaded {
@@ -352,7 +401,9 @@ pub fn ensure_loaded(application_dir_path: &str) -> Status {
             Err(_) => String::new(),
         };
         let commit = running.get_or_insert_with(|| {
-            json_object(&hyprctl(&["-j", "version"]).output).value("commit").to_string_or("")
+            json_object(&hyprctl(&["-j", "version"]).output)
+                .value("commit")
+                .to_string_or("")
         });
         if !compatible_hash(&built, commit) {
             mismatched.get_or_insert(built);
@@ -362,7 +413,11 @@ pub fn ensure_loaded(application_dir_path: &str) -> Status {
         let load = hyprctl(&["plugin", "load", &absolute]);
         // Hyprctl can exit successfully while the compositor returns a load error.
         if !load.ok || load.reply != "ok" {
-            let reply = if load.reply.is_empty() { "no reply".to_owned() } else { load.reply };
+            let reply = if load.reply.is_empty() {
+                "no reply".to_owned()
+            } else {
+                load.reply
+            };
             return Status {
                 built_hash: built,
                 reason: format!("Hyprland refused to load the capture exclusion plugin ({reply})"),
@@ -378,7 +433,9 @@ pub fn ensure_loaded(application_dir_path: &str) -> Status {
             ..Status::default()
         };
     }
-    result.reason = "Capture exclusion plugin is not installed or was not built (it needs Hyprland's headers)".into();
+    result.reason =
+        "Capture exclusion plugin is not installed or was not built (it needs Hyprland's headers)"
+            .into();
     result
 }
 
@@ -391,7 +448,12 @@ pub fn plugin_builds(directory: &str) -> Vec<String> {
         .flatten()
         .filter_map(Result::ok)
         .filter(|entry| entry.file_name().to_string_lossy().starts_with("hyprland-"))
-        .map(|entry| qdir::file_path(&entry.path().to_string_lossy(), "omareel-capture-exclude.so"))
+        .map(|entry| {
+            qdir::file_path(
+                &entry.path().to_string_lossy(),
+                "omareel-capture-exclude.so",
+            )
+        })
         .collect();
     others.sort();
     let mut builds = vec![qdir::file_path(directory, "omareel-capture-exclude.so")];
@@ -405,7 +467,11 @@ pub fn overlay_monitor(plugin: bool, recorded: &str, monitors: &[String]) -> Str
     if plugin && monitors.iter().any(|name| name == recorded) {
         return recorded.to_owned();
     }
-    monitors.iter().find(|name| *name != recorded).cloned().unwrap_or_default()
+    monitors
+        .iter()
+        .find(|name| *name != recorded)
+        .cloned()
+        .unwrap_or_default()
 }
 
 /// `CaptureExclusion::overlaysOffMonitor`: whether `hyprctl -j layers` (a valid JSON object
@@ -415,14 +481,25 @@ pub fn overlays_off_monitor(monitor: &str) -> bool {
     if !answer.ok {
         return false;
     }
-    let Ok(Value::Object(document)) = qjson::from_json(&answer.output) else { return false };
+    let Ok(Value::Object(document)) = qjson::from_json(&answer.output) else {
+        return false;
+    };
     if !document.contains(monitor) {
         return false;
     }
-    let levels = document.value(monitor).to_object().value("levels").to_object();
+    let levels = document
+        .value(monitor)
+        .to_object()
+        .value("levels")
+        .to_object();
     for (_, level) in levels.iter() {
         for layer in level.to_array() {
-            if layer.to_object().value("namespace").to_string_or("").starts_with("omareel-") {
+            if layer
+                .to_object()
+                .value("namespace")
+                .to_string_or("")
+                .starts_with("omareel-")
+            {
                 return false;
             }
         }

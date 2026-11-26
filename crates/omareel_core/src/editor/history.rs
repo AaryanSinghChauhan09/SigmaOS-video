@@ -24,7 +24,10 @@ impl History {
     /// `Editor::snapshot(coalesceKey)` without the signal: true when a snapshot was pushed (and
     /// `historyChanged` is due).
     pub fn snapshot(&mut self, coalesce_key: &str, current: Object) -> bool {
-        if !coalesce_key.is_empty() && self.coalesce_key == coalesce_key && self.coalesce_snapshot_taken {
+        if !coalesce_key.is_empty()
+            && self.coalesce_key == coalesce_key
+            && self.coalesce_snapshot_taken
+        {
             return false;
         }
         self.undo.push(current);
@@ -54,6 +57,10 @@ impl History {
 
     /// The key a coalescing edit uses: the open coalesced edit's, or `fallback`.
     pub fn key_or(&self, fallback: &str) -> String {
-        if self.coalesce_key.is_empty() { fallback.to_owned() } else { self.coalesce_key.clone() }
+        if self.coalesce_key.is_empty() {
+            fallback.to_owned()
+        } else {
+            self.coalesce_key.clone()
+        }
     }
 }

@@ -34,7 +34,9 @@ pub(crate) fn section(line: &str) -> Option<&str> {
 /// `^\s*([A-Za-z0-9_-]+)\s*=\s*(?:["']([^"']*)["']|([^#\s][^#]*?))\s*(?:#.*)?$`
 pub(crate) fn value(line: &str) -> Option<(&str, &str)> {
     let rest = skip_space(line);
-    let key_end = rest.find(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '-')).unwrap_or(rest.len());
+    let key_end = rest
+        .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '-'))
+        .unwrap_or(rest.len());
     if key_end == 0 {
         return None;
     }
@@ -82,7 +84,9 @@ pub(crate) fn decoded_lines(bytes: &[u8]) -> impl Iterator<Item = String> + '_ {
 /// The values of a TOML file Theme reads; empty when it can't be opened.
 pub fn read(path: &str) -> HashMap<String, String> {
     let mut values = HashMap::new();
-    let Ok(bytes) = qfile::read_all(path) else { return values };
+    let Ok(bytes) = qfile::read_all(path) else {
+        return values;
+    };
     let mut current = String::new();
     for line in decoded_lines(&bytes) {
         if let Some(name) = section(&line) {
@@ -101,7 +105,12 @@ mod tests {
     /// Compares with Qt's regexes over a corpus recorded by a scratch program, when given.
     #[test]
     fn matches_recorded_qt_results() {
-        let (Ok(lines), Ok(qt)) = (std::env::var("OMAREEL_TOML_LINES"), std::env::var("OMAREEL_TOML_QT")) else { return };
+        let (Ok(lines), Ok(qt)) = (
+            std::env::var("OMAREEL_TOML_LINES"),
+            std::env::var("OMAREEL_TOML_QT"),
+        ) else {
+            return;
+        };
         let lines = std::fs::read(lines).unwrap();
         let qt = std::fs::read(qt).unwrap();
         let mut bad = 0;
@@ -119,7 +128,12 @@ mod tests {
             };
             if got.as_bytes() != expected {
                 bad += 1;
-                if bad < 10 { eprintln!("{line:?}: qt {:?} rust {got:?}", String::from_utf8_lossy(expected)); }
+                if bad < 10 {
+                    eprintln!(
+                        "{line:?}: qt {:?} rust {got:?}",
+                        String::from_utf8_lossy(expected)
+                    );
+                }
             }
         }
         assert_eq!(bad, 0);
@@ -130,7 +144,10 @@ mod tests {
     #[test]
     fn reads_values_the_way_the_regexes_do() {
         assert_eq!(value("accent = \"#89b4fa\"\n"), Some(("accent", "#89b4fa")));
-        assert_eq!(value("  mode='dark' # light or dark\n"), Some(("mode", "dark")));
+        assert_eq!(
+            value("  mode='dark' # light or dark\n"),
+            Some(("mode", "dark"))
+        );
         assert_eq!(value("size = 12   # px\n"), Some(("size", "12")));
         assert_eq!(value("a-b_c=1.5"), Some(("a-b_c", "1.5")));
         assert_eq!(value("x = \"a#b\"\n"), Some(("x", "a#b")));
@@ -149,8 +166,12 @@ mod tests {
         // QString::fromUtf8 drops a byte-order mark at the start of each line it is given.
         // (Checked against Qt 6.11.2.)
         let lines: Vec<String> =
-            decoded_lines(b"\xef\xbb\xbfaccent = \"#ff0000\"\r\n\xef\xbb\xbfx = 1\nb\xffad\n").collect();
-        assert_eq!(lines, ["accent = \"#ff0000\"\r\n", "x = 1\n", "b\u{fffd}ad\n"]);
+            decoded_lines(b"\xef\xbb\xbfaccent = \"#ff0000\"\r\n\xef\xbb\xbfx = 1\nb\xffad\n")
+                .collect();
+        assert_eq!(
+            lines,
+            ["accent = \"#ff0000\"\r\n", "x = 1\n", "b\u{fffd}ad\n"]
+        );
         assert_eq!(value(&lines[0]), Some(("accent", "#ff0000")));
     }
 }

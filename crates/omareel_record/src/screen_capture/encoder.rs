@@ -61,7 +61,10 @@ impl Encoder {
             let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
             encoded.push(CString::new(&bytes[..end]).unwrap_or_default());
         }
-        let mut argv: Vec<*mut c_char> = encoded.iter().map(|argument| argument.as_ptr().cast_mut()).collect();
+        let mut argv: Vec<*mut c_char> = encoded
+            .iter()
+            .map(|argument| argument.as_ptr().cast_mut())
+            .collect();
         argv.push(std::ptr::null_mut());
         let mut pid: libc::pid_t = 0;
         // SAFETY: the file actions are initialised, used and destroyed here; argv and environ
@@ -69,8 +72,16 @@ impl Encoder {
         let result = unsafe {
             let mut actions: libc::posix_spawn_file_actions_t = std::mem::zeroed();
             libc::posix_spawn_file_actions_init(&mut actions);
-            libc::posix_spawn_file_actions_adddup2(&mut actions, input_read.as_raw_fd(), libc::STDIN_FILENO);
-            libc::posix_spawn_file_actions_adddup2(&mut actions, error_write.as_raw_fd(), libc::STDERR_FILENO);
+            libc::posix_spawn_file_actions_adddup2(
+                &mut actions,
+                input_read.as_raw_fd(),
+                libc::STDIN_FILENO,
+            );
+            libc::posix_spawn_file_actions_adddup2(
+                &mut actions,
+                error_write.as_raw_fd(),
+                libc::STDERR_FILENO,
+            );
             libc::posix_spawn_file_actions_addclose(&mut actions, input_write.as_raw_fd());
             libc::posix_spawn_file_actions_addclose(&mut actions, error_read.as_raw_fd());
             let result = libc::posix_spawnp(
@@ -91,19 +102,27 @@ impl Encoder {
         }
         set_nonblocking(input_write.as_raw_fd());
         set_nonblocking(error_read.as_raw_fd());
-        Ok(Encoder { pid, input: Some(input_write), error_pipe: Some(error_read), error_output: Vec::new() })
+        Ok(Encoder {
+            pid,
+            input: Some(input_write),
+            error_pipe: Some(error_read),
+            error_output: Vec::new(),
+        })
     }
 
     /// `readEncoderError`: what the encoder's standard error holds now, up to 256 reads of 4096
     /// bytes.
     pub fn read_error(&mut self) {
-        let Some(fd) = self.error_pipe.as_ref().map(AsRawFd::as_raw_fd) else { return };
+        let Some(fd) = self.error_pipe.as_ref().map(AsRawFd::as_raw_fd) else {
+            return;
+        };
         let mut buffer = [0u8; 4096];
         for _ in 0..256 {
             // SAFETY: reads into the local buffer.
             let count = unsafe { libc::read(fd, buffer.as_mut_ptr().cast(), buffer.len()) };
             if count > 0 {
-                self.error_output.extend_from_slice(&buffer[..count as usize]);
+                self.error_output
+                    .extend_from_slice(&buffer[..count as usize]);
                 continue;
             }
             if count < 0 && errno() == libc::EINTR {
@@ -154,5 +173,9 @@ pub fn wait_for_encoder(encoder: &mut Encoder, timeout_ms: u64) -> EncoderExit {
         }
         return EncoderExit::TimedOut;
     }
-    if result < 0 { EncoderExit::Lost } else { EncoderExit::Reaped(status) }
+    if result < 0 {
+        EncoderExit::Lost
+    } else {
+        EncoderExit::Reaped(status)
+    }
 }

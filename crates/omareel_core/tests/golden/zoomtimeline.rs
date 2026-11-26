@@ -72,7 +72,10 @@ fn generate_txt() {
 
 /// `synthetic-generated` first, then the crafted sets in key order.
 fn segment_sets(cases: &Value) -> Vec<(String, Vec<ZoomSegment>)> {
-    let mut sets = vec![("synthetic-generated".to_owned(), zoom_timeline::generate(&synthetic_click_times(), 8.0))];
+    let mut sets = vec![(
+        "synthetic-generated".to_owned(),
+        zoom_timeline::generate(&synthetic_click_times(), 8.0),
+    )];
     for (name, segments) in cases.get("segments").to_object().iter() {
         sets.push((name.to_owned(), segments_from_json(segments)));
     }
@@ -84,28 +87,40 @@ fn target_at_txt() {
     let cases = cases();
     let sets = segment_sets(&cases);
     let synthetic = cursor_path::decimate(&synthetic_samples(true), 60.0, 1.0 / 640.0);
-    let crafted = read_json("cursorpath/cases.json").get("samples").to_object();
+    let crafted = read_json("cursorpath/cases.json")
+        .get("samples")
+        .to_object();
     let sample_sets: Vec<(&str, Vec<CursorSample>)> = vec![
         ("synthetic", synthetic.clone()),
-        ("random-walk-normalized", samples_from_json(crafted.value("random-walk-normalized"))),
+        (
+            "random-walk-normalized",
+            samples_from_json(crafted.value("random-walk-normalized")),
+        ),
         ("empty", Vec::new()),
         ("single", samples_from_json(crafted.value("single"))),
     ];
     let times: Vec<f64> = (-15..=255).map(|i| f64::from(i) / 30.0).collect();
     let mut out = Text::new();
-    let mut emit = |label: String, segments: &[ZoomSegment], samples: &[CursorSample], style: &ZoomStyle| {
-        out.section(&label);
-        for &time in &times {
-            let frame = zoom_timeline::target_at(segments, samples, time, style);
-            let [x, y] = point(frame.center);
-            out.row([num(time), num(frame.scale), x, y]);
-        }
-    };
+    let mut emit =
+        |label: String, segments: &[ZoomSegment], samples: &[CursorSample], style: &ZoomStyle| {
+            out.section(&label);
+            for &time in &times {
+                let frame = zoom_timeline::target_at(segments, samples, time, style);
+                let [x, y] = point(frame.center);
+                out.row([num(time), num(frame.scale), x, y]);
+            }
+        };
     let (generated_name, generated) = &sets[0];
     for ratio in doubles(cases.get("snapRatios")) {
-        let style = ZoomStyle { snap_to_edges_ratio: ratio, ..ZoomStyle::default() };
+        let style = ZoomStyle {
+            snap_to_edges_ratio: ratio,
+            ..ZoomStyle::default()
+        };
         emit(
-            format!("segments={generated_name} samples=synthetic snapToEdgesRatio={}", num(ratio)),
+            format!(
+                "segments={generated_name} samples=synthetic snapToEdgesRatio={}",
+                num(ratio)
+            ),
             generated,
             &synthetic,
             &style,
@@ -130,8 +145,13 @@ fn target_at_txt() {
     );
     // Zooms and zoom styles as projects store them: `Project::fromJson` of
     // `QJsonDocument::fromJson(bytes).object()`.
-    for file in ["crafted-edited.json", "crafted-clamps.json", "crafted-wrong-types.json"] {
-        let object = qjson::object_from_json(&read_corpus(&format!("project/{file}"))).unwrap_or_default();
+    for file in [
+        "crafted-edited.json",
+        "crafted-clamps.json",
+        "crafted-wrong-types.json",
+    ] {
+        let object =
+            qjson::object_from_json(&read_corpus(&format!("project/{file}"))).unwrap_or_default();
         let project = Project::from_json(&object);
         emit(
             format!(
@@ -154,7 +174,10 @@ fn clamp_center_txt() {
     let mut out = Text::new();
     for p in clamp.get("points").to_array() {
         let p = doubles(&p);
-        let center = PointF::new(p.first().copied().unwrap_or(0.0), p.get(1).copied().unwrap_or(0.0));
+        let center = PointF::new(
+            p.first().copied().unwrap_or(0.0),
+            p.get(1).copied().unwrap_or(0.0),
+        );
         for &level in &levels {
             let [x, y] = point(center);
             let [rx, ry] = point(zoom_timeline::clamp_center(center, level));
@@ -169,7 +192,11 @@ fn target_to_json_txt() {
     let mut out = Text::new();
     for (name, segments) in segment_sets(&cases()) {
         for segment in &segments {
-            out.row([name.clone(), quote(&segment.id), wrapped(&zoom_timeline::target_to_json(segment))]);
+            out.row([
+                name.clone(),
+                quote(&segment.id),
+                wrapped(&zoom_timeline::target_to_json(segment)),
+            ]);
         }
     }
     let explicit = |id: &str, automatic_target: bool, x: f64, y: f64| ZoomSegment {
@@ -186,7 +213,11 @@ fn target_to_json_txt() {
         explicit("manual-big", false, 1e21, 123456789.125),
         explicit("manual-nan", false, f64::NAN, f64::INFINITY),
     ] {
-        out.row(["explicit".into(), quote(&segment.id), wrapped(&zoom_timeline::target_to_json(&segment))]);
+        out.row([
+            "explicit".into(),
+            quote(&segment.id),
+            wrapped(&zoom_timeline::target_to_json(&segment)),
+        ]);
     }
     assert_golden("zoomtimeline/target-to-json.txt", &out.into_string());
 }

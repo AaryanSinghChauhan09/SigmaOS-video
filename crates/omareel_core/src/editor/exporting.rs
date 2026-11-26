@@ -47,10 +47,22 @@ pub struct ExportState {
 /// The progress lambda in `exportTo`: the fraction done, frames per second so far, and the
 /// seconds left at that rate.
 pub fn export_progress(frame: i32, total: i32, elapsed_ms: i64) -> (f64, f64, i32) {
-    let progress = if total > 0 { f64::from(frame) / f64::from(total) } else { 0.0 };
+    let progress = if total > 0 {
+        f64::from(frame) / f64::from(total)
+    } else {
+        0.0
+    };
     let elapsed = elapsed_ms as f64 / 1000.0;
-    let fps = if elapsed > 0.0 { f64::from(frame) / elapsed } else { 0.0 };
-    let eta = if fps > 0.0 { cpp::max(0, q_round(f64::from(total.wrapping_sub(frame)) / fps)) } else { 0 };
+    let fps = if elapsed > 0.0 {
+        f64::from(frame) / elapsed
+    } else {
+        0.0
+    };
+    let eta = if fps > 0.0 {
+        cpp::max(0, q_round(f64::from(total.wrapping_sub(frame)) / fps))
+    } else {
+        0
+    };
     (progress, fps, eta)
 }
 
@@ -87,12 +99,21 @@ pub fn trace_input_line(object_name: &str, phase: &str, x: f64, y: f64) -> Strin
 }
 
 /// `handlePreviewStats`' line (with `OMAREEL_PREVIEW_STATS=1`), or `None` when no time passed.
-pub fn preview_stats_line(frames: i32, cost_ns: i64, elapsed_ms: i64, recording_fps: f64) -> Option<String> {
+pub fn preview_stats_line(
+    frames: i32,
+    cost_ns: i64,
+    elapsed_ms: i64,
+    recording_fps: f64,
+) -> Option<String> {
     if elapsed_ms <= 0 {
         return None;
     }
     let fps = f64::from(frames) * 1000.0 / elapsed_ms as f64;
-    let average_ms = if frames > 0 { cost_ns as f64 / 1_000_000.0 / f64::from(frames) } else { 0.0 };
+    let average_ms = if frames > 0 {
+        cost_ns as f64 / 1_000_000.0 / f64::from(frames)
+    } else {
+        0.0
+    };
     let expected = q_round(recording_fps * elapsed_ms as f64 / 1000.0);
     let drops = cpp::max(0, expected.wrapping_sub(frames));
     Some(format!(
@@ -107,7 +128,11 @@ pub fn preview_stats_line(frames: i32, cost_ns: i64, elapsed_ms: i64, recording_
 /// directory, else the directory it is in; `None` for an empty path.
 pub fn containing_folder(path: &str) -> Option<String> {
     let file = FileInfo::new(path);
-    let directory = if file.is_dir() { file.absolute_file_path() } else { file.absolute_path() };
+    let directory = if file.is_dir() {
+        file.absolute_file_path()
+    } else {
+        file.absolute_path()
+    };
     (!directory.is_empty()).then_some(directory)
 }
 
@@ -116,14 +141,26 @@ impl Document {
     /// "gif" and `.mp4` otherwise.
     pub fn default_export_path(&self, format: &str) -> String {
         let suffix = if format == "gif" { ".gif" } else { ".mp4" };
-        qdir::file_path(&omarchy_paths::recordings_directory(), &format!("{}{suffix}", self.project.name))
+        qdir::file_path(
+            &omarchy_paths::recordings_directory(),
+            &format!("{}{suffix}", self.project.name),
+        )
     }
 
     /// `cameraStatus`: the webcam's size, rate and offset, as the camera panel shows them.
     pub fn camera_status(&self) -> String {
-        let Some(camera) = self.recording.camera else { return "No webcam in this bundle".into() };
-        let fps_precision = if q_fuzzy_compare(camera.fps, f64::from(q_round(camera.fps))) { 0 } else { 2 };
-        let mut text = qstring::arg("Webcam: %1×%2 @%3, offset %4%5 s", &camera.width.to_string());
+        let Some(camera) = self.recording.camera else {
+            return "No webcam in this bundle".into();
+        };
+        let fps_precision = if q_fuzzy_compare(camera.fps, f64::from(q_round(camera.fps))) {
+            0
+        } else {
+            2
+        };
+        let mut text = qstring::arg(
+            "Webcam: %1×%2 @%3, offset %4%5 s",
+            &camera.width.to_string(),
+        );
         text = qstring::arg(&text, &camera.height.to_string());
         text = qstring::arg(&text, &qnumber::number_f64(camera.fps, 'f', fps_precision));
         text = qstring::arg(&text, if camera.offset >= 0.0 { "+" } else { "" });
@@ -138,7 +175,11 @@ impl Document {
     /// URL into a path by the Qt side: saves the project, makes the output directory, and starts
     /// the export state. `None` when an export is running, the path is empty, or the directory
     /// can't be made (then `exportError` says so). A GIF takes the fps and width as its own.
-    pub fn begin_export(&mut self, path: &str, settings: &ExportDialogSettings) -> Option<ExportRequest> {
+    pub fn begin_export(
+        &mut self,
+        path: &str,
+        settings: &ExportDialogSettings,
+    ) -> Option<ExportRequest> {
         if self.export.exporting {
             return None;
         }
@@ -148,7 +189,11 @@ impl Document {
 
     /// The part of [`Document::begin_export`] after its save, for a Qt side that performs the
     /// save's effects first, where the C++ emitted them.
-    pub fn begin_saved_export(&mut self, path: &str, settings: &ExportDialogSettings) -> Option<ExportRequest> {
+    pub fn begin_saved_export(
+        &mut self,
+        path: &str,
+        settings: &ExportDialogSettings,
+    ) -> Option<ExportRequest> {
         if path.is_empty() {
             return None;
         }
@@ -167,16 +212,26 @@ impl Document {
         if settings.height > 0 {
             request.width = q_round(
                 f64::from(settings.height)
-                    * aspect_ratio(&self.project, self.recording.source_width, self.recording.source_height),
+                    * aspect_ratio(
+                        &self.project,
+                        self.recording.source_width,
+                        self.recording.source_height,
+                    ),
             );
         }
-        if path.len() >= 4 && path.is_char_boundary(path.len() - 4) && path[path.len() - 4..].eq_ignore_ascii_case(".gif") {
+        if path.len() >= 4
+            && path.is_char_boundary(path.len() - 4)
+            && path[path.len() - 4..].eq_ignore_ascii_case(".gif")
+        {
             request.gif_fps = request.fps;
             request.gif_width = request.width;
             request.fps = 0;
             request.width = 0;
         }
-        self.export = ExportState { exporting: true, ..ExportState::default() };
+        self.export = ExportState {
+            exporting: true,
+            ..ExportState::default()
+        };
         self.emit(Effect::ExportingChanged);
         self.emit(Effect::ExportProgressChanged);
         self.emit(Effect::ExportErrorChanged);
@@ -240,10 +295,16 @@ mod tests {
 
     #[test]
     fn trace_and_stats_lines() {
-        assert_eq!(trace_input_line("clip", "press", 1.25, -0.04), "OMAREEL_INPUT object=clip phase=press local=(1.3,-0.0)\n");
+        assert_eq!(
+            trace_input_line("clip", "press", 1.25, -0.04),
+            "OMAREEL_INPUT object=clip phase=press local=(1.3,-0.0)\n"
+        );
         // Placeholders in the names are filled by the later args, lowest number first, as
         // QString::arg fills them: x takes the phase's %1, then y every %3.
-        assert_eq!(trace_input_line("%3", "%1", 1.0, 2.0), "OMAREEL_INPUT object=2.0 phase=1.0 local=(2.0,%4)\n");
+        assert_eq!(
+            trace_input_line("%3", "%1", 1.0, 2.0),
+            "OMAREEL_INPUT object=2.0 phase=1.0 local=(2.0,%4)\n"
+        );
         assert_eq!(preview_stats_line(0, 0, 0, 60.0), None);
         assert_eq!(
             preview_stats_line(58, 116_000_000, 1000, 60.0).unwrap(),

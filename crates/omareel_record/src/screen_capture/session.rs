@@ -37,25 +37,34 @@ use std::thread::JoinHandle;
 use std::time::Instant;
 use wayland_client::backend::WaylandError;
 use wayland_client::protocol::{wl_buffer, wl_output, wl_registry, wl_shm, wl_shm_pool};
-use wayland_client::{Connection, Dispatch, DispatchError, EventQueue, QueueHandle, WEnum, delegate_noop};
+use wayland_client::{
+    Connection, Dispatch, DispatchError, EventQueue, QueueHandle, WEnum, delegate_noop,
+};
 use wayland_protocols::ext::image_capture_source::v1::client::{
     ext_image_capture_source_v1::ExtImageCaptureSourceV1,
     ext_output_image_capture_source_manager_v1::ExtOutputImageCaptureSourceManagerV1,
-};
-use wayland_protocols::wp::linux_dmabuf::zv1::client::{
-    zwp_linux_buffer_params_v1::{self, ZwpLinuxBufferParamsV1},
-    zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1,
 };
 use wayland_protocols::ext::image_copy_capture::v1::client::{
     ext_image_copy_capture_frame_v1::{self, ExtImageCopyCaptureFrameV1},
     ext_image_copy_capture_manager_v1::{self, ExtImageCopyCaptureManagerV1},
     ext_image_copy_capture_session_v1::{self, ExtImageCopyCaptureSessionV1},
 };
+use wayland_protocols::wp::linux_dmabuf::zv1::client::{
+    zwp_linux_buffer_params_v1::{self, ZwpLinuxBufferParamsV1},
+    zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1,
+};
 
 /// The in-process VA-API path bypasses ffmpeg's argument selection, so it must
 /// respect the same CPU-conversion override before allocating GPU-only buffers.
-fn use_vaapi(is_nvidia: bool, capture_encoder: &str, native_encoder: &str, native_conversion: &str) -> bool {
-    !is_nvidia && capture_encoder != "ffmpeg" && native_encoder != "lossless"
+fn use_vaapi(
+    is_nvidia: bool,
+    capture_encoder: &str,
+    native_encoder: &str,
+    native_conversion: &str,
+) -> bool {
+    !is_nvidia
+        && capture_encoder != "ffmpeg"
+        && native_encoder != "lossless"
         && !native_conversion.eq_ignore_ascii_case("cpu")
 }
 
@@ -118,19 +127,33 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
         _: &Connection,
         queue: &QueueHandle<State>,
     ) {
-        let wl_registry::Event::Global { name, interface, version } = event else { return };
+        let wl_registry::Event::Global {
+            name,
+            interface,
+            version,
+        } = event
+        else {
+            return;
+        };
         match interface.as_str() {
             "wl_shm" => state.shm = Some(registry.bind(name, 1, queue, ())),
             // Version 2 brings create_immed; the format events of 3 and the feedback of 4 aren't
             // used (the capture session names its own formats).
-            "zwp_linux_dmabuf_v1" if version >= 2 => state.dmabuf = Some(registry.bind(name, version.min(4), queue, ())),
-            "ext_image_copy_capture_manager_v1" => state.capture_manager = Some(registry.bind(name, 1, queue, ())),
+            "zwp_linux_dmabuf_v1" if version >= 2 => {
+                state.dmabuf = Some(registry.bind(name, version.min(4), queue, ()))
+            }
+            "ext_image_copy_capture_manager_v1" => {
+                state.capture_manager = Some(registry.bind(name, 1, queue, ()))
+            }
             "ext_output_image_capture_source_manager_v1" => {
                 state.source_manager = Some(registry.bind(name, 1, queue, ()));
             }
             "wl_output" => {
                 let object = registry.bind(name, version.min(4), queue, ());
-                state.outputs.push(Output { object, name: String::new() });
+                state.outputs.push(Output {
+                    object,
+                    name: String::new(),
+                });
             }
             _ => {}
         }
@@ -147,7 +170,11 @@ impl Dispatch<wl_output::WlOutput, ()> for State {
         _: &QueueHandle<State>,
     ) {
         if let wl_output::Event::Name { name } = event {
-            for entry in state.outputs.iter_mut().filter(|entry| entry.object == *output) {
+            for entry in state
+                .outputs
+                .iter_mut()
+                .filter(|entry| entry.object == *output)
+            {
                 entry.name = name.clone();
             }
         }
@@ -178,8 +205,10 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for State {
                 state.dmabuf_device = device.as_slice().try_into().ok().map(u64::from_ne_bytes);
             }
             Event::DmabufFormat { format, modifiers } => {
-                let modifiers =
-                    modifiers.chunks_exact(8).filter_map(|bytes| bytes.try_into().ok().map(u64::from_ne_bytes)).collect();
+                let modifiers = modifiers
+                    .chunks_exact(8)
+                    .filter_map(|bytes| bytes.try_into().ok().map(u64::from_ne_bytes))
+                    .collect();
                 state.dmabuf_formats.push((format, modifiers));
             }
             Event::Done => state.constraints_done = true,
@@ -200,13 +229,24 @@ impl Dispatch<ExtImageCopyCaptureFrameV1, usize> for State {
     ) {
         use ext_image_copy_capture_frame_v1::Event;
         // libwayland drops the events of a destroyed frame; a slot only listens to its own.
-        let Some(slot) = state.slots.get_mut(*index).filter(|slot| slot.frame.as_ref() == Some(frame)) else {
+        let Some(slot) = state
+            .slots
+            .get_mut(*index)
+            .filter(|slot| slot.frame.as_ref() == Some(frame))
+        else {
             return;
         };
         match event {
-            Event::PresentationTime { tv_sec_hi, tv_sec_lo, tv_nsec } => {
+            Event::PresentationTime {
+                tv_sec_hi,
+                tv_sec_lo,
+                tv_nsec,
+            } => {
                 let seconds = (u64::from(tv_sec_hi) << 32) | u64::from(tv_sec_lo);
-                slot.presentation_us = seconds.wrapping_mul(1_000_000).wrapping_add(u64::from(tv_nsec / 1000)) as i64;
+                slot.presentation_us = seconds
+                    .wrapping_mul(1_000_000)
+                    .wrapping_add(u64::from(tv_nsec / 1000))
+                    as i64;
             }
             Event::Ready => slot.ready = true,
             Event::Failed { .. } => slot.failed = true,
@@ -257,7 +297,9 @@ fn connect_display() -> Option<Connection> {
     if let Some(stream) = take_wayland_socket() {
         return Connection::from_socket(stream).ok();
     }
-    let name = std::env::var_os("WAYLAND_DISPLAY").map(|value| value.as_bytes().to_vec()).unwrap_or(b"wayland-0".into());
+    let name = std::env::var_os("WAYLAND_DISPLAY")
+        .map(|value| value.as_bytes().to_vec())
+        .unwrap_or(b"wayland-0".into());
     let path = if name.first() == Some(&b'/') {
         name
     } else {
@@ -290,7 +332,14 @@ fn connect_registry(state: &mut State) -> Option<(Registry, bool)> {
     let mut queue = connection.new_event_queue();
     let registry = connection.display().get_registry(&queue.handle(), ());
     let ok = queue.roundtrip(state).is_ok() && queue.roundtrip(state).is_ok();
-    Some((Registry { connection, queue, _registry: registry }, ok))
+    Some((
+        Registry {
+            connection,
+            queue,
+            _registry: registry,
+        },
+        ok,
+    ))
 }
 
 /// `releaseRegistry`'s requests: the two managers' destructors (outputs, the shm and the
@@ -340,7 +389,10 @@ struct Probes(Option<JoinHandle<EncoderProbeResults>>);
 
 impl Probes {
     fn get(&mut self) -> EncoderProbeResults {
-        self.0.take().and_then(|thread| thread.join().ok()).unwrap_or_default()
+        self.0
+            .take()
+            .and_then(|thread| thread.join().ok())
+            .unwrap_or_default()
     }
 }
 
@@ -437,7 +489,10 @@ impl ScreenCapture {
             gpu_buffers: Vec::new(),
             mapped: None,
             gpu_encoding: false,
-            config: ScreenCaptureConfig { fps: 60, ..ScreenCaptureConfig::default() },
+            config: ScreenCaptureConfig {
+                fps: 60,
+                ..ScreenCaptureConfig::default()
+            },
             crop: CaptureCrop::default(),
             frames: Arc::new(FrameQueue::new(SLOT_COUNT)),
             writer: None,
@@ -461,27 +516,44 @@ impl ScreenCapture {
     /// then what arrived. A signal (the daemon's SIGUSR1/2) interrupting the wait is not a
     /// failure. `Err` holds the errno and display error of a failure.
     fn dispatch_once(&mut self, timeout_ms: i32) -> Result<(), (i32, i32)> {
-        let Some(registry) = self.registry.as_mut() else { return Err((libc::EINVAL, 0)) };
-        registry.queue.dispatch_pending(&mut self.state).map_err(|error| dispatch_failure(&error))?;
+        let Some(registry) = self.registry.as_mut() else {
+            return Err((libc::EINVAL, 0));
+        };
+        registry
+            .queue
+            .dispatch_pending(&mut self.state)
+            .map_err(|error| dispatch_failure(&error))?;
         match registry.connection.flush() {
             Ok(()) => {}
             Err(WaylandError::Io(error)) if error.raw_os_error() == Some(libc::EAGAIN) => {}
             Err(error) => return Err(dispatch_failure(&DispatchError::Backend(error))),
         }
         let backend = registry.connection.backend();
-        let mut descriptor = libc::pollfd { fd: backend.poll_fd().as_raw_fd(), events: libc::POLLIN, revents: 0 };
+        let mut descriptor = libc::pollfd {
+            fd: backend.poll_fd().as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
         // SAFETY: one pollfd.
         let result = unsafe { libc::poll(&mut descriptor, 1, timeout_ms) };
         if result < 0 {
             let code = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
-            return if code == libc::EINTR { Ok(()) } else { Err((code, 0)) };
+            return if code == libc::EINTR {
+                Ok(())
+            } else {
+                Err((code, 0))
+            };
         }
         if result == 0 {
             return Ok(());
         }
         match registry.queue.blocking_dispatch(&mut self.state) {
             Ok(_) => Ok(()),
-            Err(DispatchError::Backend(WaylandError::Io(error))) if error.raw_os_error() == Some(libc::EINTR) => Ok(()),
+            Err(DispatchError::Backend(WaylandError::Io(error)))
+                if error.raw_os_error() == Some(libc::EINTR) =>
+            {
+                Ok(())
+            }
             Err(error) => Err(dispatch_failure(&error)),
         }
     }
@@ -491,18 +563,30 @@ impl ScreenCapture {
     /// take the compositor's uncompressed modifiers, then linear, and the encoder that imports
     /// them is returned. Otherwise, or when VA-API can't import them, they are linear and read
     /// back for ffmpeg ([`MappedSlots`]), with the crop's row copies redone for their stride.
-    fn make_dmabuf_slots(&mut self, handle: &QueueHandle<State>) -> Result<Option<gpu::Encoder>, String> {
-        let (Some(dmabuf), Some(device)) = (self.state.dmabuf.clone(), self.state.dmabuf_device) else {
+    fn make_dmabuf_slots(
+        &mut self,
+        handle: &QueueHandle<State>,
+    ) -> Result<Option<gpu::Encoder>, String> {
+        let (Some(dmabuf), Some(device)) = (self.state.dmabuf.clone(), self.state.dmabuf_device)
+        else {
             return Err("the compositor offers none".into());
         };
         let (format, modifiers) = [gpu::XRGB8888, gpu::ARGB8888]
             .iter()
-            .find_map(|wanted| self.state.dmabuf_formats.iter().find(|(format, _)| format == wanted).cloned())
+            .find_map(|wanted| {
+                self.state
+                    .dmabuf_formats
+                    .iter()
+                    .find(|(format, _)| format == wanted)
+                    .cloned()
+            })
             .ok_or("no XRGB8888 or ARGB8888 dmabufs are offered")?;
         let device = gpu::Device::open(device)?;
         let (width, height) = (self.state.width as u32, self.state.height as u32);
         let allocate = |modifiers: &[u64]| -> Result<Vec<gpu::Buffer>, String> {
-            (0..SLOT_COUNT).map(|_| gpu::Buffer::new(&device, width, height, format, modifiers)).collect()
+            (0..SLOT_COUNT)
+                .map(|_| gpu::Buffer::new(&device, width, height, format, modifiers))
+                .collect()
         };
         let linear = modifiers.contains(&gpu::MOD_LINEAR);
         let implicit = modifiers.is_empty() || modifiers == [gpu::MOD_INVALID];
@@ -514,7 +598,11 @@ impl ScreenCapture {
             &environment("OMAREEL_NATIVE_CONVERSION"),
         );
         if vaapi {
-            let plain: Vec<u64> = modifiers.iter().copied().filter(|&modifier| gpu::plain_modifier(modifier)).collect();
+            let plain: Vec<u64> = modifiers
+                .iter()
+                .copied()
+                .filter(|&modifier| gpu::plain_modifier(modifier))
+                .collect();
             let mut attempts = Vec::new();
             if !plain.is_empty() {
                 attempts.push(plain.clone());
@@ -531,14 +619,20 @@ impl ScreenCapture {
                 width,
                 height,
                 format,
-                crop: (crop.x() as u32, crop.y() as u32, encoded.width as u32, encoded.height as u32),
+                crop: (
+                    crop.x() as u32,
+                    crop.y() as u32,
+                    encoded.width as u32,
+                    encoded.height as u32,
+                ),
                 fps: self.config.fps,
                 qp: capture_qp(encoded),
                 path: &self.config.output_path,
             };
             for modifiers in attempts {
                 match allocate(&modifiers).and_then(|buffers| {
-                    gpu::Encoder::open(&device, &config, &buffers).map(|encoder| (buffers, Some(encoder)))
+                    gpu::Encoder::open(&device, &config, &buffers)
+                        .map(|encoder| (buffers, Some(encoder)))
                 }) {
                     Ok(slots) => {
                         made = Some(slots);
@@ -563,7 +657,13 @@ impl ScreenCapture {
             None => {
                 let mapped = MappedSlots::new(buffers)?;
                 let mut crop = CaptureCrop::default();
-                trim_capture_crop(width as i32, height as i32, mapped.stride() as i32, self.config.crop, &mut crop)?;
+                trim_capture_crop(
+                    width as i32,
+                    height as i32,
+                    mapped.stride() as i32,
+                    self.config.crop,
+                    &mut crop,
+                )?;
                 self.crop = crop;
                 (Vec::new(), Some(mapped))
             }
@@ -576,7 +676,14 @@ impl ScreenCapture {
             let params = dmabuf.create_params(handle, ());
             let modifier = buffer.modifier();
             for (plane, (fd, offset, stride)) in buffer.planes().enumerate() {
-                params.add(fd, plane as u32, offset, stride, (modifier >> 32) as u32, modifier as u32);
+                params.add(
+                    fd,
+                    plane as u32,
+                    offset,
+                    stride,
+                    (modifier >> 32) as u32,
+                    modifier as u32,
+                );
             }
             let created = params.create_immed(
                 width as i32,
@@ -587,7 +694,10 @@ impl ScreenCapture {
                 (),
             );
             params.destroy();
-            self.state.slots.push(Slot { buffer: Some(created), ..Slot::default() });
+            self.state.slots.push(Slot {
+                buffer: Some(created),
+                ..Slot::default()
+            });
         }
         self.gpu_buffers = buffers;
         self.mapped = mapped.map(Arc::new);
@@ -597,7 +707,12 @@ impl ScreenCapture {
 
     /// Five slots in one shared-memory pool, XRGB8888 or ARGB8888, which the compositor reads
     /// frames back into.
-    fn make_shm_slots(&mut self, shm: &wl_shm::WlShm, handle: &QueueHandle<State>, error: &mut String) -> bool {
+    fn make_shm_slots(
+        &mut self,
+        shm: &wl_shm::WlShm,
+        handle: &QueueHandle<State>,
+        error: &mut String,
+    ) -> bool {
         let mut format = wl_shm::Format::Xrgb8888;
         if !self.state.shm_formats.contains(&(format as u32)) {
             format = wl_shm::Format::Argb8888;
@@ -610,7 +725,8 @@ impl ScreenCapture {
         let slot_bytes = i64::from(stride) * i64::from(height);
         let memory_size = slot_bytes * i64::from(SLOT_COUNT);
         // SAFETY: memfd_create with a static name.
-        let memory_fd = unsafe { libc::memfd_create(c"omareel-capture".as_ptr(), libc::MFD_CLOEXEC) };
+        let memory_fd =
+            unsafe { libc::memfd_create(c"omareel-capture".as_ptr(), libc::MFD_CLOEXEC) };
         if memory_fd < 0 {
             *error = strerror(std::io::Error::last_os_error().raw_os_error().unwrap_or(0));
             return false;
@@ -620,7 +736,11 @@ impl ScreenCapture {
         // SAFETY: ftruncate on the memfd.
         if unsafe { libc::ftruncate(memory_fd.as_raw_fd(), memory_size as libc::off_t) } != 0 {
             *error = strerror(std::io::Error::last_os_error().raw_os_error().unwrap_or(0));
-            self.memory = Some(Memory { _fd: memory_fd, base: std::ptr::null_mut(), size: 0 });
+            self.memory = Some(Memory {
+                _fd: memory_fd,
+                base: std::ptr::null_mut(),
+                size: 0,
+            });
             return false;
         }
         // SAFETY: maps the whole memfd shared; the result is checked.
@@ -636,11 +756,19 @@ impl ScreenCapture {
         };
         if base == libc::MAP_FAILED {
             *error = strerror(std::io::Error::last_os_error().raw_os_error().unwrap_or(0));
-            self.memory = Some(Memory { _fd: memory_fd, base: std::ptr::null_mut(), size: 0 });
+            self.memory = Some(Memory {
+                _fd: memory_fd,
+                base: std::ptr::null_mut(),
+                size: 0,
+            });
             return false;
         }
         let pool = shm.create_pool(memory_fd.as_fd(), memory_size as i32, handle, ());
-        self.memory = Some(Memory { _fd: memory_fd, base: base.cast(), size: memory_size as usize });
+        self.memory = Some(Memory {
+            _fd: memory_fd,
+            base: base.cast(),
+            size: memory_size as usize,
+        });
         self.state.slots = (0..SLOT_COUNT)
             .map(|index| Slot {
                 buffer: Some(pool.create_buffer(
@@ -684,18 +812,31 @@ impl ScreenCapture {
                 qnumber::number_f64((monotonic_us() - registry_start_us) as f64 / 1000.0, 'f', 3)
             ),
         );
-        let (Some(capture_manager), Some(source_manager), Some(shm)) =
-            (self.state.capture_manager.clone(), self.state.source_manager.clone(), self.state.shm.clone())
-        else {
+        let (Some(capture_manager), Some(source_manager), Some(shm)) = (
+            self.state.capture_manager.clone(),
+            self.state.source_manager.clone(),
+            self.state.shm.clone(),
+        ) else {
             *error = "The in-process capture protocol is unavailable".into();
             return false;
         };
-        let Some(output) = self.state.outputs.iter().find(|output| output.name == config.monitor) else {
+        let Some(output) = self
+            .state
+            .outputs
+            .iter()
+            .find(|output| output.name == config.monitor)
+        else {
             *error = "The requested monitor is unavailable".into();
             return false;
         };
         let output = output.object.clone();
-        let Some(handle) = self.registry.as_ref().map(|registry| registry.queue.handle()) else { return false };
+        let Some(handle) = self
+            .registry
+            .as_ref()
+            .map(|registry| registry.queue.handle())
+        else {
+            return false;
+        };
         let source = source_manager.create_source(&output, &handle, ());
         let session = capture_manager.create_session(
             &source,
@@ -716,7 +857,8 @@ impl ScreenCapture {
             return false;
         }
         let (width, height, stride) = (self.state.width, self.state.height, self.state.stride);
-        if let Err(message) = trim_capture_crop(width, height, stride, config.crop, &mut self.crop) {
+        if let Err(message) = trim_capture_crop(width, height, stride, config.crop, &mut self.crop)
+        {
             *error = message;
             return false;
         }
@@ -748,7 +890,9 @@ impl ScreenCapture {
             self.gpu_encoding = true;
             self.conversion = "vaapi".into();
             drop(probes);
-            self.writer = Some(std::thread::spawn(move || run_writer(&frames, &writer_config, &mut encoder)));
+            self.writer = Some(std::thread::spawn(move || {
+                run_writer(&frames, &writer_config, &mut encoder)
+            }));
         } else {
             let probe_results = probes.get();
             debug_start_stage(
@@ -775,20 +919,33 @@ impl ScreenCapture {
                     return false;
                 }
             }
-            let mut sink =
-                FdSink(self.encoder.as_ref().and_then(|e| e.input.as_ref()).map_or(-1, AsRawFd::as_raw_fd));
+            let mut sink = FdSink(
+                self.encoder
+                    .as_ref()
+                    .and_then(|e| e.input.as_ref())
+                    .map_or(-1, AsRawFd::as_raw_fd),
+            );
             if let Some(mapped) = self.mapped.clone() {
-                self.writer =
-                    Some(std::thread::spawn(move || writer_loop(&frames, &writer_config, mapped.as_ref(), &mut sink)));
+                self.writer = Some(std::thread::spawn(move || {
+                    writer_loop(&frames, &writer_config, mapped.as_ref(), &mut sink)
+                }));
             } else {
-                let Some(memory) = self.memory.as_ref() else { return false };
+                let Some(memory) = self.memory.as_ref() else {
+                    return false;
+                };
                 let slot_bytes = memory.size / SLOT_COUNT as usize;
                 // SAFETY: the mapping holds SLOT_COUNT slots of `slot_bytes` and stays mapped until
                 // `cleanup`, which joins the writer first.
-                let memory =
-                    unsafe { RawSlotMemory::new(memory.base.cast_const().cast(), slot_bytes, SLOT_COUNT as usize) };
-                self.writer =
-                    Some(std::thread::spawn(move || writer_loop(&frames, &writer_config, &memory, &mut sink)));
+                let memory = unsafe {
+                    RawSlotMemory::new(
+                        memory.base.cast_const().cast(),
+                        slot_bytes,
+                        SLOT_COUNT as usize,
+                    )
+                };
+                self.writer = Some(std::thread::spawn(move || {
+                    writer_loop(&frames, &writer_config, &memory, &mut sink)
+                }));
             }
         }
         write_stderr(&format!(
@@ -806,9 +963,16 @@ impl ScreenCapture {
     /// `captureFrame(&error)`: one turn of the capture loop. False, with `error` set, once the
     /// capture or the encoder has stopped or the connection failed.
     pub fn capture_frame(&mut self, error: &mut String) -> bool {
-        if self.state.stopped || (!self.gpu_encoding && self.encoder_pid() <= 1) || self.frames.writer_failed() {
+        if self.state.stopped
+            || (!self.gpu_encoding && self.encoder_pid() <= 1)
+            || self.frames.writer_failed()
+        {
             let writer_error = self.frames.writer_error();
-            *error = if writer_error.is_empty() { "Capture or encoding stopped unexpectedly".into() } else { writer_error };
+            *error = if writer_error.is_empty() {
+                "Capture or encoding stopped unexpectedly".into()
+            } else {
+                writer_error
+            };
             return false;
         }
         let now = monotonic_us();
@@ -817,7 +981,11 @@ impl ScreenCapture {
             // The protocol allows exactly one frame object per session; requesting another
             // while one is outstanding raises duplicate_frame and kills the connection.
             let frame_in_flight = self.state.slots.iter().any(|slot| slot.frame.is_some());
-            let index = if frame_in_flight { -1 } else { self.frames.acquire() };
+            let index = if frame_in_flight {
+                -1
+            } else {
+                self.frames.acquire()
+            };
             // A copy that outlasts the interval leaves its tick pending, so the next request goes
             // out as soon as the copy completes instead of waiting for the tick after.
             if !frame_in_flight {
@@ -831,7 +999,9 @@ impl ScreenCapture {
                 }
             }
             if index >= 0 {
-                if let (Some(session), Some(registry)) = (self.session.as_ref(), self.registry.as_ref()) {
+                if let (Some(session), Some(registry)) =
+                    (self.session.as_ref(), self.registry.as_ref())
+                {
                     let (width, height) = (self.state.width, self.state.height);
                     let slot = &mut self.state.slots[index as usize];
                     slot.ready = false;
@@ -852,9 +1022,16 @@ impl ScreenCapture {
         // stop request (whose signal may land on another thread) is noticed promptly.
         let in_flight = self.state.slots.iter().any(|slot| slot.frame.is_some());
         let due_in_us = self.last_capture_request_us + interval_us - monotonic_us();
-        let wait_ms = if in_flight { 50 } else { (due_in_us + 999).div_euclid(1000).clamp(0, 50) as i32 };
+        let wait_ms = if in_flight {
+            50
+        } else {
+            (due_in_us + 999).div_euclid(1000).clamp(0, 50) as i32
+        };
         if let Err((code, display_error)) = self.dispatch_once(wait_ms) {
-            *error = format!("Capture connection failed (errno {code}: {}, display error {display_error})", strerror(code));
+            *error = format!(
+                "Capture connection failed (errno {code}: {}, display error {display_error})",
+                strerror(code)
+            );
             return false;
         }
 
@@ -867,7 +1044,9 @@ impl ScreenCapture {
         let slots = &self.state.slots;
         completed.sort_by(|&left, &right| {
             let (left, right) = (&slots[left], &slots[right]);
-            left.failed.cmp(&right.failed).then(left.presentation_us.cmp(&right.presentation_us))
+            left.failed
+                .cmp(&right.failed)
+                .then(left.presentation_us.cmp(&right.presentation_us))
         });
         for index in completed {
             let slot = &mut self.state.slots[index];
@@ -896,7 +1075,8 @@ impl ScreenCapture {
             let total_drops = self.frames.drops() + self.capture_failures;
             let interval_frames = total_frames - self.rate_frames;
             let interval_drops = total_drops - self.rate_drops;
-            self.last_rate = f64::from(interval_frames) * 1000.0 / self.rate_clock.elapsed().as_millis() as f64;
+            self.last_rate =
+                f64::from(interval_frames) * 1000.0 / self.rate_clock.elapsed().as_millis() as f64;
             write_stderr(&format!(
                 "capture frames={interval_frames} fps={} drops={interval_drops}\n",
                 qnumber::number_f64(self.last_rate, 'f', 1)
@@ -963,7 +1143,9 @@ impl ScreenCapture {
     pub fn finish(&mut self, error: &mut String) -> bool {
         self.frames.set_stop_us(monotonic_us());
         for (index, slot) in self.state.slots.iter_mut().enumerate() {
-            let Some(frame) = slot.frame.take() else { continue };
+            let Some(frame) = slot.frame.take() else {
+                continue;
+            };
             frame.destroy();
             self.frames.release(index as i32);
         }
@@ -1056,8 +1238,8 @@ impl Drop for ScreenCapture {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::writer::FrameOutput;
+    use super::*;
 
     #[test]
     fn cpu_conversion_override_disables_in_process_vaapi() {
@@ -1094,6 +1276,9 @@ mod tests {
         }));
         let mut error = String::new();
         assert!(!capture.stop_encoder(true, &mut error));
-        assert_eq!(error, "Could not write the video trailer: no space left on device");
+        assert_eq!(
+            error,
+            "Could not write the video trailer: no space left on device"
+        );
     }
 }

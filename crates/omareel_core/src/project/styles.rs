@@ -18,7 +18,10 @@ pub struct Gradient {
 
 impl Default for Gradient {
     fn default() -> Gradient {
-        Gradient { angle: 135.0, stops: Vec::new() }
+        Gradient {
+            angle: 135.0,
+            stops: Vec::new(),
+        }
     }
 }
 
@@ -56,7 +59,13 @@ pub struct Shadow {
 
 impl Default for Shadow {
     fn default() -> Shadow {
-        Shadow { enabled: true, intensity: 0.25, blur: 40.0, distance: 10.0, angle: 90.0 }
+        Shadow {
+            enabled: true,
+            intensity: 0.25,
+            blur: 40.0,
+            distance: 10.0,
+            angle: 90.0,
+        }
     }
 }
 
@@ -70,7 +79,12 @@ pub struct Border {
 
 impl Default for Border {
     fn default() -> Border {
-        Border { enabled: false, width: 7.0, color: QColor::from_rgb(0, 0, 0), alpha: 1.0 }
+        Border {
+            enabled: false,
+            width: 7.0,
+            color: QColor::from_rgb(0, 0, 0),
+            alpha: 1.0,
+        }
     }
 }
 
@@ -84,7 +98,12 @@ pub struct Frame {
 
 impl Default for Frame {
     fn default() -> Frame {
-        Frame { padding: 0.10, radius: 12.0, shadow: Shadow::default(), border: Border::default() }
+        Frame {
+            padding: 0.10,
+            radius: 12.0,
+            shadow: Shadow::default(),
+            border: Border::default(),
+        }
     }
 }
 
@@ -110,7 +129,11 @@ impl Default for Cursor {
             visible: true,
             size: 1.5,
             smoothing: true,
-            spring: Spring { mass: 3.0, stiffness: 470.0, damping: 70.0 },
+            spring: Spring {
+                mass: 3.0,
+                stiffness: 470.0,
+                damping: 70.0,
+            },
             click_effect: "ripple".into(),
             click_shrink: 0.8,
             rotate_on_x_movement_ratio: 0.5,
@@ -155,8 +178,19 @@ impl Default for Camera {
             radius: 16.0,
             flip_horizontal: false,
             rotation: 0,
-            shadow: Shadow { enabled: true, intensity: 0.28, blur: 23.0, distance: 20.0, angle: 45.0 },
-            border: Border { enabled: true, width: 6.0, color: QColor::from_rgb(255, 255, 255), alpha: 0.7 },
+            shadow: Shadow {
+                enabled: true,
+                intensity: 0.28,
+                blur: 23.0,
+                distance: 20.0,
+                angle: 45.0,
+            },
+            border: Border {
+                enabled: true,
+                width: 6.0,
+                color: QColor::from_rgb(255, 255, 255),
+                alpha: 0.7,
+            },
             scale_during_zoom: 0.7,
             offset: PointF::new(0.035, 0.035),
             full_frame: "fill".into(),

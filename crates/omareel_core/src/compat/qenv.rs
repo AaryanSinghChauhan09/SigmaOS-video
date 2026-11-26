@@ -20,7 +20,10 @@ pub fn parse_int_value(text: &str) -> Option<i32> {
         Some(b'+') => (false, &text[1..]),
         _ => (false, text),
     };
-    let (radix, digits) = if let Some(hex) = digits.strip_prefix("0x").or_else(|| digits.strip_prefix("0X")) {
+    let (radix, digits) = if let Some(hex) = digits
+        .strip_prefix("0x")
+        .or_else(|| digits.strip_prefix("0X"))
+    {
         (16, hex)
     } else if digits.len() > 1 && digits.starts_with('0') {
         (8, &digits[1..])
@@ -33,4 +36,3 @@ pub fn parse_int_value(text: &str) -> Option<i32> {
     let magnitude = i64::from_str_radix(digits, radix).ok()?;
     i32::try_from(if negative { -magnitude } else { magnitude }).ok()
 }
-

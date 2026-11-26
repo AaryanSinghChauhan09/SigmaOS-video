@@ -1,11 +1,13 @@
 //! The document itself: the project, its history and selection, the output position and
 //! playback range, and the operations on them that are not about clips, zooms or presets.
 
-use super::bundle::{aspect_ratio, load_bundle, Bundle, CameraRecording, Probes, ProbeVideo, Recording, VideoInfo};
+use super::Effect;
+use super::bundle::{
+    Bundle, CameraRecording, ProbeVideo, Probes, Recording, VideoInfo, aspect_ratio, load_bundle,
+};
 use super::history::History;
 use super::ids::random_uuid;
 use super::thumbnails::{Thumbnails, WallpaperCache};
-use super::Effect;
 use crate::clip_timeline::ClipTimeline;
 use crate::compat::cpp;
 use crate::compat::qdir;
@@ -77,7 +79,14 @@ pub struct MotionJob {
 
 impl MotionJob {
     pub fn run(&self) -> MotionTrack {
-        MotionTrack::build(self.duration, self.width, self.height, &self.events, &self.project, self.capture_fps)
+        MotionTrack::build(
+            self.duration,
+            self.width,
+            self.height,
+            &self.events,
+            &self.project,
+            self.capture_fps,
+        )
     }
 }
 
@@ -130,8 +139,9 @@ pub struct Document {
 }
 
 /// The recording [`Document::preload`] is opening, and its path.
-static PRELOADED: std::sync::Mutex<Option<(String, std::thread::JoinHandle<Result<Document, String>>)>> =
-    std::sync::Mutex::new(None);
+static PRELOADED: std::sync::Mutex<
+    Option<(String, std::thread::JoinHandle<Result<Document, String>>)>,
+> = std::sync::Mutex::new(None);
 
 impl Document {
     /// `Editor(bundlePath)` up to `m_valid = true`: [`load_bundle`], the document, and the
@@ -164,7 +174,10 @@ impl Document {
     /// [`Document::open`], or the document [`Document::preload`] started for the same bundle.
     pub fn open_preloaded(bundle_path: &str, probes: &Probes) -> Result<Document, String> {
         let path = qdir::absolute_path(bundle_path);
-        let preloaded = PRELOADED.lock().ok().and_then(|mut preloaded| preloaded.take());
+        let preloaded = PRELOADED
+            .lock()
+            .ok()
+            .and_then(|mut preloaded| preloaded.take());
         match preloaded {
             Some((preloaded_path, thread)) if preloaded_path == path => match thread.join() {
                 Ok(opened) => opened,
@@ -175,8 +188,18 @@ impl Document {
     }
 
     /// [`Document::open`] with the standard locations given (for tests).
-    pub fn open_with(bundle_path: &str, probes: &Probes, locations: Locations) -> Result<Document, String> {
-        let Bundle { recording, project, input, inserts, new_project } = load_bundle(bundle_path, probes)?;
+    pub fn open_with(
+        bundle_path: &str,
+        probes: &Probes,
+        locations: Locations,
+    ) -> Result<Document, String> {
+        let Bundle {
+            recording,
+            project,
+            input,
+            inserts,
+            new_project,
+        } = load_bundle(bundle_path, probes)?;
         let mut document = Document::new(recording, project, input, inserts, probes.video.clone());
         document.config_location = locations.config;
         document.cache_location = locations.cache;
@@ -184,7 +207,9 @@ impl Document {
             document.dirty = true;
             document.emit(Effect::StartAutosaveTimer);
         }
-        document.thumbnails.ensure_source(&document.thumbnail_context(), "screen");
+        document
+            .thumbnails
+            .ensure_source(&document.thumbnail_context(), "screen");
         Ok(document)
     }
 
@@ -281,11 +306,15 @@ impl Document {
     }
 
     pub(crate) fn config_location(&self) -> String {
-        self.config_location.clone().unwrap_or_else(|| qstandardpaths::writable_location(Location::Config))
+        self.config_location
+            .clone()
+            .unwrap_or_else(|| qstandardpaths::writable_location(Location::Config))
     }
 
     pub(crate) fn cache_location(&self) -> String {
-        self.cache_location.clone().unwrap_or_else(|| qstandardpaths::writable_location(Location::Cache))
+        self.cache_location
+            .clone()
+            .unwrap_or_else(|| qstandardpaths::writable_location(Location::Cache))
     }
 
     // ---------------------------------------------------------------------------------------
@@ -439,7 +468,14 @@ impl Document {
 
     /// `outputWidth`: 720 px high at the project's aspect, rounded up to even, at least 2.
     pub fn output_width(&self) -> i32 {
-        let width = q_round(720.0 * aspect_ratio(&self.project, self.recording.source_width, self.recording.source_height));
+        let width = q_round(
+            720.0
+                * aspect_ratio(
+                    &self.project,
+                    self.recording.source_width,
+                    self.recording.source_height,
+                ),
+        );
         cpp::max(2, width.wrapping_add(width % 2))
     }
 
@@ -451,15 +487,25 @@ impl Document {
     // Lookups and time mapping.
 
     pub fn clip_index(&self, id: &str) -> i32 {
-        self.project.clips.iter().position(|clip| clip.id == id).map_or(-1, |i| i as i32)
+        self.project
+            .clips
+            .iter()
+            .position(|clip| clip.id == id)
+            .map_or(-1, |i| i as i32)
     }
 
     pub fn zoom_index(&self, id: &str) -> i32 {
-        self.project.zooms.iter().position(|zoom| zoom.id == id).map_or(-1, |i| i as i32)
+        self.project
+            .zooms
+            .iter()
+            .position(|zoom| zoom.id == id)
+            .map_or(-1, |i| i as i32)
     }
 
     pub(crate) fn clip(&self, index: i32) -> Option<&Clip> {
-        usize::try_from(index).ok().and_then(|i| self.project.clips.get(i))
+        usize::try_from(index)
+            .ok()
+            .and_then(|i| self.project.clips.get(i))
     }
 
     /// `clipForOutput(output, &clipOutputStart)`: the clip playing at an output time (the last
@@ -485,7 +531,8 @@ impl Document {
     /// `outputToSource`: the recording time at an output time clamped to the timeline (during an
     /// inserted video, the recording time it interrupts).
     pub fn output_to_source(&self, output_time: f64) -> f64 {
-        self.timeline().recording_source_time(cpp::clamp(output_time, 0.0, self.duration()))
+        self.timeline()
+            .recording_source_time(cpp::clamp(output_time, 0.0, self.duration()))
     }
 
     /// `sourceToOutput(sourceTime, preferredClip)`: through `preferred_clip` when it is a clip
@@ -602,7 +649,11 @@ impl Document {
     /// millisecond); its last frame lasts to the end. Until the frame times are known, every frame
     /// is taken to be the last before a change.
     pub fn next_screen_frame_time(&self, source_time: f64) -> f64 {
-        next_screen_frame_time(&self.screen_frame_times, source_time, self.recording.source_duration)
+        next_screen_frame_time(
+            &self.screen_frame_times,
+            source_time,
+            self.recording.source_duration,
+        )
     }
 
     // ---------------------------------------------------------------------------------------
@@ -657,24 +708,35 @@ impl Document {
                 String::new()
             } else {
                 let at = cpp::min(self.output_position, self.duration());
-                self.project.clips[self.clip_for_output(at).0 as usize].id.clone()
+                self.project.clips[self.clip_for_output(at).0 as usize]
+                    .id
+                    .clone()
             };
         }
-        let retained: Vec<String> =
-            self.selected_zoom_ids.iter().filter(|id| self.zoom_index(id) >= 0).cloned().collect();
+        let retained: Vec<String> = self
+            .selected_zoom_ids
+            .iter()
+            .filter(|id| self.zoom_index(id) >= 0)
+            .cloned()
+            .collect();
         self.selected_zoom_ids = retained;
         if self.zoom_index(&self.selected_zoom_id) < 0 {
             self.selected_zoom_id = self.selected_zoom_ids.first().cloned().unwrap_or_default();
         }
         self.changed(true);
         if !self.project.clips.is_empty() {
-            self.emit(Effect::Seek(cpp::min(self.output_position, self.duration())));
+            self.emit(Effect::Seek(cpp::min(
+                self.output_position,
+                self.duration(),
+            )));
         }
         self.emit(Effect::SelectionChanged);
     }
 
     pub fn undo(&mut self) {
-        let Some(value) = self.history.undo.pop() else { return };
+        let Some(value) = self.history.undo.pop() else {
+            return;
+        };
         self.history.redo.push(self.project.to_json());
         self.end_coalesced_edit();
         self.restore(&value);
@@ -683,7 +745,9 @@ impl Document {
 
     /// Unlike `undo`, leaves a coalesced edit open.
     pub fn redo(&mut self) {
-        let Some(value) = self.history.redo.pop() else { return };
+        let Some(value) = self.history.redo.pop() else {
+            return;
+        };
         self.history.undo.push(self.project.to_json());
         self.restore(&value);
         self.emit(Effect::HistoryChanged);
@@ -723,7 +787,11 @@ impl Document {
         if parsed.to_json() == old {
             return;
         }
-        let key = if coalesce { self.history.key_or(path) } else { String::new() };
+        let key = if coalesce {
+            self.history.key_or(path)
+        } else {
+            String::new()
+        };
         self.snapshot(&key);
         self.project = parsed;
         self.changed(true);
@@ -732,7 +800,12 @@ impl Document {
     /// `applyGradientPreset(index)`: the preset's colours as evenly spaced stops, and the
     /// background switched to the gradient.
     pub fn apply_gradient_preset(&mut self, index: i32) {
-        let Some(preset) = usize::try_from(index).ok().and_then(|i| self.gradients.get(i)) else { return };
+        let Some(preset) = usize::try_from(index)
+            .ok()
+            .and_then(|i| self.gradients.get(i))
+        else {
+            return;
+        };
         let colours = preset.to_array();
         if colours.len() < 2 {
             return;
@@ -741,11 +814,21 @@ impl Document {
         let stops: Vec<Value> = colours
             .iter()
             .enumerate()
-            .map(|(i, colour)| Value::array(vec![variant_to_string(colour).into(), (i as f64 / last).into()]))
+            .map(|(i, colour)| {
+                Value::array(vec![
+                    variant_to_string(colour).into(),
+                    (i as f64 / last).into(),
+                ])
+            })
             .collect();
         let old = self.project.to_json();
         let next = set_nested(old.clone(), &["background", "type"], 0, "gradient".into());
-        let next = set_nested(next, &["background", "gradient", "stops"], 0, Value::array(stops));
+        let next = set_nested(
+            next,
+            &["background", "gradient", "stops"],
+            0,
+            Value::array(stops),
+        );
         let parsed = Project::from_json(&next);
         if parsed.to_json() == old {
             return;
@@ -774,7 +857,11 @@ impl Document {
         if id != self.selected_zoom_id || !self.selected_clip_id.is_empty() {
             self.set_picking_zoom_target(false);
             self.selected_zoom_id = id.to_owned();
-            self.selected_zoom_ids = if id.is_empty() { Vec::new() } else { vec![id.to_owned()] };
+            self.selected_zoom_ids = if id.is_empty() {
+                Vec::new()
+            } else {
+                vec![id.to_owned()]
+            };
             self.selected_clip_id.clear();
             self.emit(Effect::SelectionChanged);
         }

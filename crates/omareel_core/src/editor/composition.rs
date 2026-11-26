@@ -72,21 +72,45 @@ impl Document {
     }
 
     pub fn preview_zoom(&self) -> PreviewZoom {
-        let s = self.motion.as_ref().map_or_else(MotionSample::default, |motion| motion.sample(self.source_position()));
-        PreviewZoom { scale: s.zoom_scale, cx: s.zoom_cx, cy: s.zoom_cy, velocity: s.zoom_center_velocity }
+        let s = self
+            .motion
+            .as_ref()
+            .map_or_else(MotionSample::default, |motion| {
+                motion.sample(self.source_position())
+            });
+        PreviewZoom {
+            scale: s.zoom_scale,
+            cx: s.zoom_cx,
+            cy: s.zoom_cy,
+            velocity: s.zoom_center_velocity,
+        }
     }
 
     pub fn preview_layout(&self) -> PreviewLayout {
         let layout = self.layout_at(self.output_position);
-        PreviewLayout { camera_full: layout.camera_full, bubble: layout.bubble }
+        PreviewLayout {
+            camera_full: layout.camera_full,
+            bubble: layout.bubble,
+        }
     }
 
     /// `previewMedia()`: `ready` needs the media player's frame (`m_playback.mediaFrameReady()`)
     /// and the media player to hold this clip's file (`m_mediaPlayerSource`).
-    pub fn preview_media(&self, media_frame_ready: bool, media_player_source: &str) -> PreviewMedia {
+    pub fn preview_media(
+        &self,
+        media_frame_ready: bool,
+        media_player_source: &str,
+    ) -> PreviewMedia {
         let index = self.clip_for_output(self.output_position).0;
         let Some(clip) = self.clip(index).filter(|clip| clip.is_media()) else {
-            return PreviewMedia { active: false, ready: true, fit: "fit".into(), width: 16, height: 9, missing: false };
+            return PreviewMedia {
+                active: false,
+                ready: true,
+                fit: "fit".into(),
+                width: 16,
+                height: 9,
+                missing: false,
+            };
         };
         let info = self.inserts.get(&clip.media).copied().unwrap_or_default();
         PreviewMedia {
@@ -119,7 +143,9 @@ impl Document {
     pub fn preview_ripples(&self) -> Vec<RippleSample> {
         let effect = self.project.cursor.click_effect.as_str();
         match &self.motion {
-            Some(motion) if !self.showing_insert() && (effect == "ripple" || effect == "circle") => {
+            Some(motion)
+                if !self.showing_insert() && (effect == "ripple" || effect == "circle") =>
+            {
                 motion.ripples(self.source_position())
             }
             _ => Vec::new(),
@@ -136,7 +162,9 @@ impl Document {
     /// `cameraVisible()`: a camera, no inserted clip, and the camera started; a full-frame camera
     /// holds its first frame until it started instead of leaving the frame empty.
     pub fn camera_visible(&self) -> bool {
-        let Some(camera) = self.recording.camera else { return false };
+        let Some(camera) = self.recording.camera else {
+            return false;
+        };
         if self.showing_insert() {
             return false;
         }
@@ -145,7 +173,11 @@ impl Document {
     }
 
     /// All of `comp` at the output position.
-    pub fn preview_composition(&self, media_frame_ready: bool, media_player_source: &str) -> PreviewComposition {
+    pub fn preview_composition(
+        &self,
+        media_frame_ready: bool,
+        media_player_source: &str,
+    ) -> PreviewComposition {
         PreviewComposition {
             time: self.source_position(),
             zoom: self.preview_zoom(),

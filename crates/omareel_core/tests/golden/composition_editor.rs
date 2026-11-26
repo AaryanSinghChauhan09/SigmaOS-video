@@ -13,7 +13,9 @@ use std::sync::Arc;
 /// An insert's `[width, height, duration, fps, audio]`, or a default `VideoInfo` for null, read
 /// with `QJsonArray::at(i).toInt()` and friends.
 fn video_info(value: &Value) -> VideoInfo {
-    let Some(a) = value.as_array() else { return VideoInfo::default() };
+    let Some(a) = value.as_array() else {
+        return VideoInfo::default();
+    };
     let at = |i: usize| a.get(i).cloned().unwrap_or_default();
     VideoInfo {
         width: at(0).to_int(0),
@@ -25,7 +27,12 @@ fn video_info(value: &Value) -> VideoInfo {
 }
 
 fn map(entries: Vec<(&str, Variant)>) -> Variant {
-    Variant::Map(entries.into_iter().map(|(key, value)| (key.to_owned(), value)).collect())
+    Variant::Map(
+        entries
+            .into_iter()
+            .map(|(key, value)| (key.to_owned(), value))
+            .collect(),
+    )
 }
 
 #[test]
@@ -44,8 +51,12 @@ fn editor_txt() {
             duration: camera.value("duration").to_double(0.0),
             ..CameraRecording::default()
         });
-        let inserts: HashMap<std::string::String, VideoInfo> =
-            c.get("inserts").to_object().iter().map(|(path, info)| (path.to_owned(), video_info(info))).collect();
+        let inserts: HashMap<std::string::String, VideoInfo> = c
+            .get("inserts")
+            .to_object()
+            .iter()
+            .map(|(path, info)| (path.to_owned(), video_info(info)))
+            .collect();
         let recording = Recording {
             bundle_path: bundle.to_str().expect("UTF-8 path").to_owned(),
             source_duration,
@@ -55,8 +66,13 @@ fn editor_txt() {
             camera,
             ..Recording::default()
         };
-        let mut document =
-            Document::new(recording, project.clone(), input.clone(), inserts, Arc::new(|_: &str| Ok(VideoInfo::default())));
+        let mut document = Document::new(
+            recording,
+            project.clone(),
+            input.clone(),
+            inserts,
+            Arc::new(|_: &str| Ok(VideoInfo::default())),
+        );
         if c.get("motion").to_bool(false) {
             document.apply_motion(MotionTrack::build(
                 source_duration,
@@ -88,18 +104,38 @@ fn editor_txt() {
             let ripples = document
                 .preview_ripples()
                 .iter()
-                .map(|r| map(vec![("x", Double(r.x)), ("y", Double(r.y)), ("progress", Double(r.progress))]))
+                .map(|r| {
+                    map(vec![
+                        ("x", Double(r.x)),
+                        ("y", Double(r.y)),
+                        ("progress", Double(r.progress)),
+                    ])
+                })
                 .collect();
             let pills = document
                 .preview_keystroke_pills()
                 .into_iter()
-                .map(|p| map(vec![("keys", StringList(p.keys)), ("text", String(p.text)), ("opacity", Double(p.opacity))]))
+                .map(|p| {
+                    map(vec![
+                        ("keys", StringList(p.keys)),
+                        ("text", String(p.text)),
+                        ("opacity", Double(p.opacity)),
+                    ])
+                })
                 .collect();
             out.row([
                 num(position),
                 num(document.source_position()),
-                variant(&map(vec![("scale", Double(z.scale)), ("cx", Double(z.cx)), ("cy", Double(z.cy)), ("velocity", Double(z.velocity))])),
-                variant(&map(vec![("cameraFull", Double(l.camera_full)), ("bubble", Double(l.bubble))])),
+                variant(&map(vec![
+                    ("scale", Double(z.scale)),
+                    ("cx", Double(z.cx)),
+                    ("cy", Double(z.cy)),
+                    ("velocity", Double(z.velocity)),
+                ])),
+                variant(&map(vec![
+                    ("cameraFull", Double(l.camera_full)),
+                    ("bubble", Double(l.bubble)),
+                ])),
                 variant(&map(vec![
                     ("active", Bool(m.active)),
                     ("ready", Bool(m.ready)),

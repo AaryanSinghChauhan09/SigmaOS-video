@@ -35,7 +35,9 @@ impl ClipTimeline {
 
     /// `index` as a position in `clips`, when it is one.
     fn position(&self, index: i32) -> Option<usize> {
-        usize::try_from(index).ok().filter(|&i| i < self.clips.len())
+        usize::try_from(index)
+            .ok()
+            .filter(|&i| i < self.clips.len())
     }
 
     pub fn total_duration(&self) -> f64 {
@@ -66,11 +68,17 @@ impl ClipTimeline {
     /// Recording time at an output time; inside an inserted video, the recording time it
     /// interrupts (the end of the recording clip before it, or the start of the one after).
     pub fn recording_source_time(&self, output_time: f64) -> f64 {
-        let Some(index) = self.position(self.clip_at(output_time, None)) else { return -1.0 };
+        let Some(index) = self.position(self.clip_at(output_time, None)) else {
+            return -1.0;
+        };
         if !self.clips[index].is_media() {
             return self.source_time(output_time);
         }
-        if let Some(clip) = self.clips[..index].iter().rev().find(|clip| !clip.is_media()) {
+        if let Some(clip) = self.clips[..index]
+            .iter()
+            .rev()
+            .find(|clip| !clip.is_media())
+        {
             return clip.out;
         }
         if let Some(clip) = self.clips[index + 1..].iter().find(|clip| !clip.is_media()) {
@@ -88,10 +96,16 @@ impl ClipTimeline {
         let mut lower = 0.0;
         let mut upper = source_duration;
         let before = usize::try_from(index).unwrap_or(0).min(self.clips.len());
-        if let Some(clip) = self.clips[..before].iter().rev().find(|clip| !clip.is_media()) {
+        if let Some(clip) = self.clips[..before]
+            .iter()
+            .rev()
+            .find(|clip| !clip.is_media())
+        {
             lower = clip.out;
         }
-        let after = usize::try_from(i64::from(index) + 1).unwrap_or(0).min(self.clips.len());
+        let after = usize::try_from(i64::from(index) + 1)
+            .unwrap_or(0)
+            .min(self.clips.len());
         if let Some(clip) = self.clips[after..].iter().find(|clip| !clip.is_media()) {
             upper = clip.in_;
         }
@@ -99,12 +113,18 @@ impl ClipTimeline {
     }
 
     pub fn source_time(&self, output_time: f64) -> f64 {
-        let Some(last) = self.clips.last() else { return -1.0 };
+        let Some(last) = self.clips.last() else {
+            return -1.0;
+        };
         let mut cursor = 0.0;
         for (i, clip) in self.clips.iter().enumerate() {
             let length = duration(clip);
             if output_time < cursor + length || i == self.clips.len() - 1 {
-                return cpp::clamp(clip.in_ + (output_time - cursor) * clip.speed, clip.in_, clip.out);
+                return cpp::clamp(
+                    clip.in_ + (output_time - cursor) * clip.speed,
+                    clip.in_,
+                    clip.out,
+                );
             }
             cursor += length;
         }
@@ -112,7 +132,9 @@ impl ClipTimeline {
     }
 
     pub fn output_time(&self, clip_index: i32, source_time: f64) -> f64 {
-        let Some(index) = self.position(clip_index) else { return -1.0 };
+        let Some(index) = self.position(clip_index) else {
+            return -1.0;
+        };
         let mut output = 0.0;
         for clip in &self.clips[..index] {
             output += duration(clip);
@@ -136,7 +158,11 @@ impl ClipTimeline {
             }
             let output_from = self.output_time(i as i32, from);
             let output_to = self.output_time(i as i32, to);
-            range.0 = if range.0 < 0.0 { output_from } else { cpp::min(range.0, output_from) };
+            range.0 = if range.0 < 0.0 {
+                output_from
+            } else {
+                cpp::min(range.0, output_from)
+            };
             range.1 = cpp::max(range.1, output_to);
         }
         range
@@ -168,7 +194,9 @@ impl ClipTimeline {
     }
 
     pub fn trim(&mut self, index: i32, new_in: f64, new_out: f64) -> bool {
-        let Some(index) = self.position(index) else { return false };
+        let Some(index) = self.position(index) else {
+            return false;
+        };
         if new_in < 0.0 || new_out <= new_in {
             return false;
         }
@@ -178,7 +206,9 @@ impl ClipTimeline {
     }
 
     pub fn remove(&mut self, index: i32) -> bool {
-        let Some(index) = self.position(index) else { return false };
+        let Some(index) = self.position(index) else {
+            return false;
+        };
         self.clips.remove(index);
         true
     }
@@ -224,7 +254,12 @@ impl ClipTimeline {
                         return false;
                     }
                     if left_length > 1e-9 {
-                        if remainder_id.is_empty() || self.clips.iter().any(|existing| existing.id == remainder_id) {
+                        if remainder_id.is_empty()
+                            || self
+                                .clips
+                                .iter()
+                                .any(|existing| existing.id == remainder_id)
+                        {
                             return false;
                         }
                         right.id = remainder_id.to_owned();
@@ -261,24 +296,37 @@ mod tests {
     }
 
     fn clip(id: &str, in_: f64, out: f64, speed: f64) -> Clip {
-        Clip { id: id.into(), in_, out, speed, ..Clip::default() }
+        Clip {
+            id: id.into(),
+            in_,
+            out,
+            speed,
+            ..Clip::default()
+        }
     }
 
     // tests/test_cliptimeline.cpp
     #[test]
     fn frame_source_mapping_with_speed_changes() {
-        let timeline = ClipTimeline::new(vec![clip("slow", 1.0, 3.0, 0.5), clip("fast", 10.0, 14.0, 2.0)]);
+        let timeline = ClipTimeline::new(vec![
+            clip("slow", 1.0, 3.0, 0.5),
+            clip("fast", 10.0, 14.0, 2.0),
+        ]);
         let fps = 60.0;
         assert!(qcompare(timeline.source_time(0.0 / fps), 1.0));
         assert!(qcompare(timeline.source_time(120.0 / fps), 2.0));
         assert!(qcompare(timeline.source_time(240.0 / fps), 10.0));
         assert!(qcompare(timeline.source_time(270.0 / fps), 11.0));
-        assert!(qcompare(timeline.source_time(359.0 / fps), 13.966666666666667));
+        assert!(qcompare(
+            timeline.source_time(359.0 / fps),
+            13.966666666666667
+        ));
     }
 
     #[test]
     fn mapping_and_operations() {
-        let mut timeline = ClipTimeline::new(vec![clip("a", 2.0, 6.0, 1.0), clip("b", 10.0, 14.0, 2.0)]);
+        let mut timeline =
+            ClipTimeline::new(vec![clip("a", 2.0, 6.0, 1.0), clip("b", 10.0, 14.0, 2.0)]);
         assert!(qcompare(timeline.total_duration(), 6.0));
         assert!(qcompare(timeline.source_time(1.5), 3.5));
         assert!(qcompare(timeline.source_time(5.0), 12.0));
@@ -298,7 +346,11 @@ mod tests {
         let mut insert = clip("m", 2.0, 4.5, 1.0);
         insert.media = "media/demo.mp4".into();
         // Recording 0-3, a 2.5 s insert from 2 s into the video, recording 5-7 at 2x.
-        let timeline = ClipTimeline::new(vec![clip("a", 0.0, 3.0, 1.0), insert.clone(), clip("b", 5.0, 7.0, 2.0)]);
+        let timeline = ClipTimeline::new(vec![
+            clip("a", 0.0, 3.0, 1.0),
+            insert.clone(),
+            clip("b", 5.0, 7.0, 2.0),
+        ]);
         assert!(qcompare(timeline.total_duration(), 6.5));
         let mut start = -1.0;
         assert_eq!(timeline.clip_at(1.0, Some(&mut start)), 0);
@@ -328,7 +380,10 @@ mod tests {
     #[test]
     fn source_span_covers_what_survives_the_cuts() {
         // Source 1.438–1.903 and everything after 2.245 were cut.
-        let timeline = ClipTimeline::new(vec![clip("a", 0.0, 1.438, 1.0), clip("b", 1.903, 2.245, 1.0)]);
+        let timeline = ClipTimeline::new(vec![
+            clip("a", 0.0, 1.438, 1.0),
+            clip("b", 1.903, 2.245, 1.0),
+        ]);
         let across = timeline.output_range(0.376, 2.583);
         assert!(qcompare(across.0, 0.376));
         assert!((across.1 - (1.438 + 2.245 - 1.903)).abs() < 1e-9);
@@ -364,7 +419,10 @@ mod tests {
 
     #[test]
     fn deletes_across_clips_with_different_speeds() {
-        let mut timeline = ClipTimeline::new(vec![clip("normal", 0.0, 2.0, 1.0), clip("fast", 4.0, 8.0, 2.0)]);
+        let mut timeline = ClipTimeline::new(vec![
+            clip("normal", 0.0, 2.0, 1.0),
+            clip("fast", 4.0, 8.0, 2.0),
+        ]);
         assert!(timeline.delete_range(1.5, 2.5, "unused"));
         assert_eq!(timeline.clips().len(), 2);
         assert!(qcompare(timeline.clips()[0].out, 1.5));
@@ -388,11 +446,16 @@ mod tests {
     // Not in the C++ tests: split ids count up per timeline, and go through QString::arg.
     #[test]
     fn split_ids_count_up_through_qstring_arg() {
-        let mut timeline = ClipTimeline::new(vec![clip("c1", 0.0, 3.0, 1.0), clip("a%1", 3.0, 6.0, 1.0)]);
+        let mut timeline =
+            ClipTimeline::new(vec![clip("c1", 0.0, 3.0, 1.0), clip("a%1", 3.0, 6.0, 1.0)]);
         assert!(timeline.split(1.0));
         assert!(timeline.split(2.0));
         assert!(timeline.split(4.0));
-        let ids: Vec<&str> = timeline.clips().iter().map(|clip| clip.id.as_str()).collect();
+        let ids: Vec<&str> = timeline
+            .clips()
+            .iter()
+            .map(|clip| clip.id.as_str())
+            .collect();
         assert_eq!(ids, ["c1", "c1-s1", "c1-s1-s2", "a%1", "a3-s%2"]);
         assert!(!timeline.split(4.0));
         assert!(!timeline.split(6.0));
@@ -400,7 +463,8 @@ mod tests {
 
     #[test]
     fn indices_out_of_range() {
-        let mut timeline = ClipTimeline::new(vec![clip("a", 0.0, 1.0, 1.0), clip("b", 2.0, 3.0, 1.0)]);
+        let mut timeline =
+            ClipTimeline::new(vec![clip("a", 0.0, 1.0, 1.0), clip("b", 2.0, 3.0, 1.0)]);
         assert_eq!(timeline.output_time(-1, 0.5), -1.0);
         assert_eq!(timeline.output_time(2, 0.5), -1.0);
         assert_eq!(timeline.recording_bounds(-1, 9.0), (0.0, 0.0));

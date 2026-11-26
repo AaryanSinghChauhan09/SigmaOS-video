@@ -21,7 +21,10 @@ use omareel_core::theme::Theme;
 fn map_text(entries: &[(&str, i32)]) -> String {
     let mut entries = entries.to_vec();
     entries.sort_by(|a, b| a.0.encode_utf16().cmp(b.0.encode_utf16()));
-    let items: Vec<String> = entries.iter().map(|(key, value)| format!("{key}={value}")).collect();
+    let items: Vec<String> = entries
+        .iter()
+        .map(|(key, value)| format!("{key}={value}"))
+        .collect();
     format!("{{{}}}", items.join(","))
 }
 
@@ -106,9 +109,20 @@ fn dump_theme(out: &mut Text, theme: &Theme) {
     for focused in [false, true] {
         for hot in [false, true] {
             for selected in [false, true] {
-                let arguments = format!("({},{},{})", boolean(focused), boolean(hot), boolean(selected));
-                out.row([format!("controlFill{arguments}"), color(&p.control_fill(focused, hot, selected))]);
-                out.row([format!("controlBorder{arguments}"), color(&p.control_border(focused, hot, selected))]);
+                let arguments = format!(
+                    "({},{},{})",
+                    boolean(focused),
+                    boolean(hot),
+                    boolean(selected)
+                );
+                out.row([
+                    format!("controlFill{arguments}"),
+                    color(&p.control_fill(focused, hot, selected)),
+                ]);
+                out.row([
+                    format!("controlBorder{arguments}"),
+                    color(&p.control_border(focused, hot, selected)),
+                ]);
                 out.row([
                     format!("controlBorderWidth{arguments}"),
                     p.control_border_width(focused, hot, selected).to_string(),
@@ -124,9 +138,11 @@ fn make_state(h: &Hermetic, group: &str, name: &str, source: &str) -> String {
     let state = format!("{}/{group}/{name}", h.scratch());
     remove_path(&state);
     std::fs::create_dir_all(&state).expect("mkpath state");
-    for (from, to) in
-        [("colors.toml", "theme/colors.toml"), ("shell.toml", "theme/shell.toml"), ("theme.name", "theme.name")]
-    {
+    for (from, to) in [
+        ("colors.toml", "theme/colors.toml"),
+        ("shell.toml", "theme/shell.toml"),
+        ("theme.name", "theme.name"),
+    ] {
         if let Ok(data) = std::fs::read(format!("{source}/{from}")) {
             write_file(&format!("{state}/{to}"), data);
         }
@@ -159,47 +175,103 @@ const HYPRCTL_ROUNDING_PREFIX: &str = r#"{"option": "decoration:rounding", "int"
 fn variants() -> Vec<(String, Vec<(&'static str, String)>)> {
     let mut variants: Vec<(String, Vec<(&'static str, String)>)> = Vec::new();
     for value in ["0", "1", "4", "7", "8", "13", "24", "-3", "0x10", "010"] {
-        variants.push((format!("OMAREEL_THEME_RADIUS={value}"), vec![("OMAREEL_THEME_RADIUS", value.into())]));
+        variants.push((
+            format!("OMAREEL_THEME_RADIUS={value}"),
+            vec![("OMAREEL_THEME_RADIUS", value.into())],
+        ));
     }
     for value in [" 12", "12 "] {
-        variants.push((format!("OMAREEL_THEME_RADIUS='{value}'"), vec![("OMAREEL_THEME_RADIUS", value.into())]));
+        variants.push((
+            format!("OMAREEL_THEME_RADIUS='{value}'"),
+            vec![("OMAREEL_THEME_RADIUS", value.into())],
+        ));
     }
     for value in ["+5", "abc"] {
-        variants.push((format!("OMAREEL_THEME_RADIUS={value}"), vec![("OMAREEL_THEME_RADIUS", value.into())]));
+        variants.push((
+            format!("OMAREEL_THEME_RADIUS={value}"),
+            vec![("OMAREEL_THEME_RADIUS", value.into())],
+        ));
     }
-    variants.push(("OMAREEL_THEME_RADIUS=''".into(), vec![("OMAREEL_THEME_RADIUS", String::new())]));
+    variants.push((
+        "OMAREEL_THEME_RADIUS=''".into(),
+        vec![("OMAREEL_THEME_RADIUS", String::new())],
+    ));
     for value in ["4.5", "99999999999"] {
-        variants.push((format!("OMAREEL_THEME_RADIUS={value}"), vec![("OMAREEL_THEME_RADIUS", value.into())]));
+        variants.push((
+            format!("OMAREEL_THEME_RADIUS={value}"),
+            vec![("OMAREEL_THEME_RADIUS", value.into())],
+        ));
     }
     for value in ["0", "2", "5", "13", "20", "-4"] {
         variants.push((
             format!("hyprctl int {value}"),
-            vec![("OMAREEL_ORACLE_HYPRCTL_OUTPUT", format!("{HYPRCTL_ROUNDING_PREFIX}{value}, \"set\": true }}"))],
+            vec![(
+                "OMAREEL_ORACLE_HYPRCTL_OUTPUT",
+                format!("{HYPRCTL_ROUNDING_PREFIX}{value}, \"set\": true }}"),
+            )],
         ));
     }
-    let hyprctl =
-        |label: &str, output: &str| (label.to_owned(), vec![("OMAREEL_ORACLE_HYPRCTL_OUTPUT", output.to_owned())]);
+    let hyprctl = |label: &str, output: &str| {
+        (
+            label.to_owned(),
+            vec![("OMAREEL_ORACLE_HYPRCTL_OUTPUT", output.to_owned())],
+        )
+    };
     variants.push(hyprctl("hyprctl int 12.5", r#"{"int":12.5}"#));
     variants.push(hyprctl("hyprctl compact int 6", r#"{"int":6}"#));
-    variants.push(hyprctl("hyprctl int 99999999999", r#"{"int": 99999999999}"#));
+    variants.push(hyprctl(
+        "hyprctl int 99999999999",
+        r#"{"int": 99999999999}"#,
+    ));
     variants.push(hyprctl("hyprctl two ints", r#"{"int": 3, "int": 9}"#));
-    variants.push(hyprctl("hyprctl no int", r#"{"option": "decoration:rounding", "float": 4.0}"#));
+    variants.push(hyprctl(
+        "hyprctl no int",
+        r#"{"option": "decoration:rounding", "float": 4.0}"#,
+    ));
     variants.push(hyprctl("hyprctl not JSON", "no such option"));
     variants.push(hyprctl("hyprctl empty output", ""));
     variants.push((
         "hyprctl exits 1 after printing int 7".into(),
-        vec![("OMAREEL_ORACLE_HYPRCTL_OUTPUT", r#"{"int": 7}"#.into()), ("OMAREEL_ORACLE_HYPRCTL_EXIT", "1".into())],
+        vec![
+            ("OMAREEL_ORACLE_HYPRCTL_OUTPUT", r#"{"int": 7}"#.into()),
+            ("OMAREEL_ORACLE_HYPRCTL_EXIT", "1".into()),
+        ],
     ));
     variants.push((
         "hyprctl int 7 and OMAREEL_THEME_RADIUS=3".into(),
-        vec![("OMAREEL_ORACLE_HYPRCTL_OUTPUT", r#"{"int": 7}"#.into()), ("OMAREEL_THEME_RADIUS", "3".into())],
+        vec![
+            ("OMAREEL_ORACLE_HYPRCTL_OUTPUT", r#"{"int": 7}"#.into()),
+            ("OMAREEL_THEME_RADIUS", "3".into()),
+        ],
     ));
-    let fc_match = |label: &str, name: &'static str, value: &str| (label.to_owned(), vec![(name, value.to_owned())]);
-    variants.push(fc_match("fc-match JetBrainsMono Nerd Font", "OMAREEL_ORACLE_FC_MATCH", "JetBrainsMono Nerd Font"));
-    variants.push(fc_match("fc-match with surrounding whitespace", "OMAREEL_ORACLE_FC_MATCH", "  Spaced Mono \n"));
-    variants.push(fc_match("fc-match empty output", "OMAREEL_ORACLE_FC_MATCH", ""));
-    variants.push(fc_match("fc-match exits 1", "OMAREEL_ORACLE_FC_MATCH_EXIT", "1"));
-    variants.push(fc_match("fc-match non-ASCII", "OMAREEL_ORACLE_FC_MATCH", "M\u{f6}no \u{2116}1"));
+    let fc_match = |label: &str, name: &'static str, value: &str| {
+        (label.to_owned(), vec![(name, value.to_owned())])
+    };
+    variants.push(fc_match(
+        "fc-match JetBrainsMono Nerd Font",
+        "OMAREEL_ORACLE_FC_MATCH",
+        "JetBrainsMono Nerd Font",
+    ));
+    variants.push(fc_match(
+        "fc-match with surrounding whitespace",
+        "OMAREEL_ORACLE_FC_MATCH",
+        "  Spaced Mono \n",
+    ));
+    variants.push(fc_match(
+        "fc-match empty output",
+        "OMAREEL_ORACLE_FC_MATCH",
+        "",
+    ));
+    variants.push(fc_match(
+        "fc-match exits 1",
+        "OMAREEL_ORACLE_FC_MATCH_EXIT",
+        "1",
+    ));
+    variants.push(fc_match(
+        "fc-match non-ASCII",
+        "OMAREEL_ORACLE_FC_MATCH",
+        "M\u{f6}no \u{2116}1",
+    ));
     variants
 }
 
@@ -228,7 +300,12 @@ fn cases_txt() -> String {
         let root = corpus_path(group);
         for name in sorted_entries(&root, true) {
             let source = root.join(&name);
-            let state = make_state(&h, group, &name, source.to_str().expect("UTF-8 corpus path"));
+            let state = make_state(
+                &h,
+                group,
+                &name,
+                source.to_str().expect("UTF-8 corpus path"),
+            );
             run_case(&mut out, &format!("{group}/{name}"), &state, "", &[], None);
         }
     }
@@ -236,8 +313,18 @@ fn cases_txt() -> String {
     let tokyo_night = tokyo_night.to_str().expect("UTF-8 corpus path");
     let base = make_state(&h, "variants", "tokyo-night", tokyo_night);
     for (label, set) in variants() {
-        let set: Vec<(&str, &str)> = set.iter().map(|(name, value)| (*name, value.as_str())).collect();
-        run_case(&mut out, &format!("variant tokyo-night {label}"), &base, &label, &set, None);
+        let set: Vec<(&str, &str)> = set
+            .iter()
+            .map(|(name, value)| (*name, value.as_str()))
+            .collect();
+        run_case(
+            &mut out,
+            &format!("variant tokyo-night {label}"),
+            &base,
+            &label,
+            &set,
+            None,
+        );
     }
 
     // setFontFamilies() set the interface family for later Themes; an empty one restores the
@@ -250,7 +337,14 @@ fn cases_txt() -> String {
         &[],
         Some("Configured Sans"),
     );
-    run_case(&mut out, "variant tokyo-night setFontFamilies(\"\", \"\")", &base, "", &[], Some(""));
+    run_case(
+        &mut out,
+        "variant tokyo-night setFontFamilies(\"\", \"\")",
+        &base,
+        "",
+        &[],
+        Some(""),
+    );
 
     // reload() re-reads the files but keeps the radius when hyprctl stops answering.
     let state = make_state(&h, "reload", "tokyo-night", tokyo_night);
@@ -260,10 +354,22 @@ fn cases_txt() -> String {
     out.section("reload: constructed with tokyo-night and hyprctl int 14");
     dump_theme(&mut out, &theme);
     let other = corpus_path("themes/catppuccin-latte");
-    write_file(&format!("{state}/theme/colors.toml"), read_file(other.join("colors.toml").to_str().expect("UTF-8")));
-    write_file(&format!("{state}/theme/shell.toml"), read_file(other.join("shell.toml").to_str().expect("UTF-8")));
+    write_file(
+        &format!("{state}/theme/colors.toml"),
+        read_file(other.join("colors.toml").to_str().expect("UTF-8")),
+    );
+    write_file(
+        &format!("{state}/theme/shell.toml"),
+        read_file(other.join("shell.toml").to_str().expect("UTF-8")),
+    );
     write_file(&format!("{state}/theme.name"), "catppuccin-latte\n");
-    apply_environment(&h, &[("OMAREEL_ORACLE_HYPRCTL_EXIT", "1"), ("OMAREEL_ORACLE_HYPRCTL_OUTPUT", "")]);
+    apply_environment(
+        &h,
+        &[
+            ("OMAREEL_ORACLE_HYPRCTL_EXIT", "1"),
+            ("OMAREEL_ORACLE_HYPRCTL_OUTPUT", ""),
+        ],
+    );
     theme.reload();
     out.section("reload: files replaced by catppuccin-latte, hyprctl fails");
     dump_theme(&mut out, &theme);
@@ -282,6 +388,12 @@ fn cases_txt() -> String {
 #[cfg(target_arch = "x86_64")]
 #[test]
 fn cases_txt_without_bundled_ui_family() {
-    let expected = keep_lines(&read_expected("theme/cases.txt"), |line| !line.starts_with(b"bundledUiFamily()\t"));
-    assert_same("theme/cases.txt (without the bundledUiFamily() row)", &expected, cases_txt().as_bytes());
+    let expected = keep_lines(&read_expected("theme/cases.txt"), |line| {
+        !line.starts_with(b"bundledUiFamily()\t")
+    });
+    assert_same(
+        "theme/cases.txt (without the bundledUiFamily() row)",
+        &expected,
+        cases_txt().as_bytes(),
+    );
 }

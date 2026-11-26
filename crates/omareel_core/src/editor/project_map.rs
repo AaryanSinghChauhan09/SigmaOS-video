@@ -27,11 +27,20 @@ impl Document {
         let mut background = result.value("background").to_object();
         let image = match self.project.background.type_.as_str() {
             "image" => self.project.background.image.clone(),
-            "wallpaper" if self.project.background.wallpaper == "omarchy:current" => omarchy_paths::current_background(),
+            "wallpaper" if self.project.background.wallpaper == "omarchy:current" => {
+                omarchy_paths::current_background()
+            }
             "wallpaper" => self.project.background.wallpaper.clone(),
             _ => String::new(),
         };
-        background.insert("resolvedImage", if image.is_empty() { String::new() } else { qurl::from_local_file(&image) });
+        background.insert(
+            "resolvedImage",
+            if image.is_empty() {
+                String::new()
+            } else {
+                qurl::from_local_file(&image)
+            },
+        );
         result.insert("background", background);
         let mut clips = result.value("clips").to_array();
         let timeline = self.timeline();
@@ -45,11 +54,22 @@ impl Document {
                 let info = self.inserts.get(&source.media).copied().unwrap_or_default();
                 clip.insert("kind", "media");
                 clip.insert("lower", Value::Double(0.0));
-                clip.insert("upper", Value::Double(if info.is_valid() { info.duration } else { source.out }));
-                clip.insert("mediaName", FileInfo::new(source.media.as_str()).file_name());
+                clip.insert(
+                    "upper",
+                    Value::Double(if info.is_valid() {
+                        info.duration
+                    } else {
+                        source.out
+                    }),
+                );
+                clip.insert(
+                    "mediaName",
+                    FileInfo::new(source.media.as_str()).file_name(),
+                );
                 clip.insert("missing", !info.is_valid());
             } else {
-                let (lower, upper) = timeline.recording_bounds(i as i32, self.recording.source_duration);
+                let (lower, upper) =
+                    timeline.recording_bounds(i as i32, self.recording.source_duration);
                 clip.insert("kind", "recording");
                 clip.insert("lower", Value::Double(lower));
                 clip.insert("upper", Value::Double(upper));

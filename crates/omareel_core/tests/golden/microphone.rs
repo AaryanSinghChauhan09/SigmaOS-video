@@ -22,7 +22,9 @@ fn from_hex(text: &str) -> Vec<u8> {
     let mut result = Vec::new();
     let mut low: Option<u8> = None;
     for c in text.bytes().rev() {
-        let Some(digit) = (c as char).to_digit(16) else { continue };
+        let Some(digit) = (c as char).to_digit(16) else {
+            continue;
+        };
         match low.take() {
             None => low = Some(digit as u8),
             Some(l) => result.push(((digit as u8) << 4) | l),
@@ -39,7 +41,12 @@ fn from_hex(text: &str) -> Vec<u8> {
 fn peak_level_and_meter_txt() {
     let cases = read_json("microphone/cases.json");
     let buffers = cases.get("buffers").to_object();
-    let channels: Vec<i32> = cases.get("channels").to_array().iter().map(|c| c.to_int(0)).collect();
+    let channels: Vec<i32> = cases
+        .get("channels")
+        .to_array()
+        .iter()
+        .map(|c| c.to_int(0))
+        .collect();
     let hex_of = |value: &Value| value.to_string_or("");
     let mut out = Text::new();
     for format_name in ["UInt8", "Int16", "Int32", "Float"] {
@@ -88,8 +95,16 @@ fn peak_level_and_meter_txt() {
         let mut state = MicrophoneLevel::default();
         for name in sequence[1].to_array() {
             let name = name.to_string_or("");
-            let changed = state.read(sample_format(&format_name), &from_hex(&hex_of(set.value(&name))));
-            meter.row([name, num(state.level()), hex(state.level()), boolean(changed).to_owned()]);
+            let changed = state.read(
+                sample_format(&format_name),
+                &from_hex(&hex_of(set.value(&name))),
+            );
+            meter.row([
+                name,
+                num(state.level()),
+                hex(state.level()),
+                boolean(changed).to_owned(),
+            ]);
         }
     }
     assert_no_differences(
@@ -99,7 +114,11 @@ fn peak_level_and_meter_txt() {
                 &read_expected("microphone/peak-level.txt"),
                 out.into_string().as_bytes(),
             ),
-            difference("microphone/meter.txt", &read_expected("microphone/meter.txt"), meter.into_string().as_bytes()),
+            difference(
+                "microphone/meter.txt",
+                &read_expected("microphone/meter.txt"),
+                meter.into_string().as_bytes(),
+            ),
         ]
         .into_iter()
         .flatten()

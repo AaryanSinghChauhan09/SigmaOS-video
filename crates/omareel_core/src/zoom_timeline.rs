@@ -14,7 +14,10 @@ pub struct ZoomFrame {
 
 impl Default for ZoomFrame {
     fn default() -> ZoomFrame {
-        ZoomFrame { scale: 1.0, center: PointF::new(0.5, 0.5) }
+        ZoomFrame {
+            scale: 1.0,
+            center: PointF::new(0.5, 0.5),
+        }
     }
 }
 
@@ -34,7 +37,14 @@ pub fn generate(click_down_times: &[f64], duration: f64) -> Vec<ZoomSegment> {
             Some(last) if start - last.end <= 2.5 => last.end = cpp::max(last.end, end),
             _ => {
                 let id = format!("z{}", result.len() + 1);
-                result.push(ZoomSegment { id, start, end, level: 2.0, automatic_target: true, target: PointF::new(0.5, 0.5) });
+                result.push(ZoomSegment {
+                    id,
+                    start,
+                    end,
+                    level: 2.0,
+                    automatic_target: true,
+                    target: PointF::new(0.5, 0.5),
+                });
             }
         }
     }
@@ -44,7 +54,10 @@ pub fn generate(click_down_times: &[f64], duration: f64) -> Vec<ZoomSegment> {
 /// Keeps a zoom's centre far enough from the edges that the zoomed view stays inside.
 pub fn clamp_center(center: PointF, level: f64) -> PointF {
     let half = 0.5 / cpp::max(1.0, level);
-    PointF::new(cpp::clamp(center.x, half, 1.0 - half), cpp::clamp(center.y, half, 1.0 - half))
+    PointF::new(
+        cpp::clamp(center.x, half, 1.0 - half),
+        cpp::clamp(center.y, half, 1.0 - half),
+    )
 }
 
 fn snap_edges(target: PointF, level: f64, ratio: f64) -> PointF {
@@ -60,20 +73,36 @@ fn snap_edges(target: PointF, level: f64, ratio: f64) -> PointF {
 
 /// The zoom at `time`: the latest-starting segment covering it, aimed at a fixed target or
 /// at the group of cursor positions the view can hold.
-pub fn target_at(segments: &[ZoomSegment], samples: &[CursorSample], time: f64, style: &ZoomStyle) -> ZoomFrame {
+pub fn target_at(
+    segments: &[ZoomSegment],
+    samples: &[CursorSample],
+    time: f64,
+    style: &ZoomStyle,
+) -> ZoomFrame {
     let mut active: Option<&ZoomSegment> = None;
     for segment in segments {
-        if time >= segment.start && time <= segment.end && active.is_none_or(|a| segment.start > a.start) {
+        if time >= segment.start
+            && time <= segment.end
+            && active.is_none_or(|a| segment.start > a.start)
+        {
             active = Some(segment);
         }
     }
-    let Some(active) = active else { return ZoomFrame::default() };
+    let Some(active) = active else {
+        return ZoomFrame::default();
+    };
     if !active.automatic_target {
-        return ZoomFrame { scale: active.level, center: clamp_center(active.target, active.level) };
+        return ZoomFrame {
+            scale: active.level,
+            center: clamp_center(active.target, active.level),
+        };
     }
 
-    let mut relevant: Vec<CursorSample> =
-        samples.iter().filter(|s| s.time >= active.start && s.time <= active.end).copied().collect();
+    let mut relevant: Vec<CursorSample> = samples
+        .iter()
+        .filter(|s| s.time >= active.start && s.time <= active.end)
+        .copied()
+        .collect();
     if relevant.is_empty() && !samples.is_empty() {
         // std::lower_bound: the first sample at or after the segment's start.
         let it = samples.partition_point(|s| s.time < active.start);
@@ -88,7 +117,10 @@ pub fn target_at(segments: &[ZoomSegment], samples: &[CursorSample], time: f64, 
         }
     }
     let Some(first) = relevant.first() else {
-        return ZoomFrame { scale: active.level, center: PointF::new(0.5, 0.5) };
+        return ZoomFrame {
+            scale: active.level,
+            center: PointF::new(0.5, 0.5),
+        };
     };
 
     let max_width = 0.5 / active.level;
@@ -98,17 +130,31 @@ pub fn target_at(segments: &[ZoomSegment], samples: &[CursorSample], time: f64, 
         minimum: PointF,
         maximum: PointF,
     }
-    let mut groups = vec![Group { start: first.time, minimum: first.position, maximum: first.position }];
+    let mut groups = vec![Group {
+        start: first.time,
+        minimum: first.position,
+        maximum: first.position,
+    }];
     for sample in &relevant[1..] {
         let group = groups.last_mut().expect("starts with one group");
         let p = sample.position;
-        let next_min = PointF::new(cpp::min(group.minimum.x, p.x), cpp::min(group.minimum.y, p.y));
-        let next_max = PointF::new(cpp::max(group.maximum.x, p.x), cpp::max(group.maximum.y, p.y));
+        let next_min = PointF::new(
+            cpp::min(group.minimum.x, p.x),
+            cpp::min(group.minimum.y, p.y),
+        );
+        let next_max = PointF::new(
+            cpp::max(group.maximum.x, p.x),
+            cpp::max(group.maximum.y, p.y),
+        );
         if next_max.x - next_min.x <= max_width && next_max.y - next_min.y <= max_height {
             group.minimum = next_min;
             group.maximum = next_max;
         } else {
-            groups.push(Group { start: sample.time, minimum: p, maximum: p });
+            groups.push(Group {
+                start: sample.time,
+                minimum: p,
+                maximum: p,
+            });
         }
     }
     let mut active_group: Option<&Group> = None;
@@ -120,10 +166,16 @@ pub fn target_at(segments: &[ZoomSegment], samples: &[CursorSample], time: f64, 
         }
     }
     let Some(group) = active_group else {
-        return ZoomFrame { scale: active.level, center: PointF::new(0.5, 0.5) };
+        return ZoomFrame {
+            scale: active.level,
+            center: PointF::new(0.5, 0.5),
+        };
     };
     let center = (group.minimum + group.maximum) / 2.0;
-    ZoomFrame { scale: active.level, center: snap_edges(center, active.level, style.snap_to_edges_ratio) }
+    ZoomFrame {
+        scale: active.level,
+        center: snap_edges(center, active.level, style.snap_to_edges_ratio),
+    }
 }
 
 /// `"auto"`, or the fixed target as `{"x", "y"}`.
@@ -131,7 +183,10 @@ pub fn target_to_json(segment: &ZoomSegment) -> Value {
     if segment.automatic_target {
         return Value::from("auto");
     }
-    Value::Object(Object::from_iter([("x", segment.target.x), ("y", segment.target.y)]))
+    Value::Object(Object::from_iter([
+        ("x", segment.target.x),
+        ("y", segment.target.y),
+    ]))
 }
 
 #[cfg(test)]
@@ -143,11 +198,21 @@ mod tests {
     }
 
     fn sample(time: f64, x: f64, y: f64) -> CursorSample {
-        CursorSample { time, position: PointF::new(x, y) }
+        CursorSample {
+            time,
+            position: PointF::new(x, y),
+        }
     }
 
     fn zoom(start: f64, end: f64) -> ZoomSegment {
-        ZoomSegment { id: "z".into(), start, end, level: 2.0, automatic_target: true, target: PointF::default() }
+        ZoomSegment {
+            id: "z".into(),
+            start,
+            end,
+            level: 2.0,
+            automatic_target: true,
+            target: PointF::default(),
+        }
     }
 
     // tests/test_zoomtimeline.cpp
@@ -165,9 +230,17 @@ mod tests {
 
     #[test]
     fn auto_groups_hold_and_retarget() {
-        let style = ZoomStyle { snap_to_edges_ratio: 0.0, ..ZoomStyle::default() };
+        let style = ZoomStyle {
+            snap_to_edges_ratio: 0.0,
+            ..ZoomStyle::default()
+        };
         let zooms = [zoom(0.0, 4.0)];
-        let samples = [sample(0.0, 0.20, 0.30), sample(1.0, 0.30, 0.40), sample(2.0, 0.70, 0.65), sample(3.0, 0.75, 0.70)];
+        let samples = [
+            sample(0.0, 0.20, 0.30),
+            sample(1.0, 0.30, 0.40),
+            sample(2.0, 0.70, 0.65),
+            sample(3.0, 0.75, 0.70),
+        ];
         let first = target_at(&zooms, &samples, 0.5, &style);
         let held = target_at(&zooms, &samples, 1.5, &style);
         assert_eq!(first.center, held.center);
@@ -180,7 +253,12 @@ mod tests {
 
     #[test]
     fn edge_snap_keeps_viewport_inside_frame() {
-        let frame = target_at(&[zoom(0.0, 2.0)], &[sample(0.0, 0.02, 0.98)], 1.0, &ZoomStyle::default());
+        let frame = target_at(
+            &[zoom(0.0, 2.0)],
+            &[sample(0.0, 0.02, 0.98)],
+            1.0,
+            &ZoomStyle::default(),
+        );
         assert!(fuzzy(frame.center.x, 0.25) && fuzzy(frame.center.y, 0.75));
         let half = 0.5 / frame.scale;
         assert!(frame.center.x - half >= 0.0);
@@ -193,6 +271,9 @@ mod tests {
         assert_eq!(target_to_json(&segment), Value::from("auto"));
         segment.automatic_target = false;
         segment.target = PointF::new(0.25, 1.0);
-        assert_eq!(target_to_json(&segment).to_json(crate::compat::qjson::Format::Compact), r#"{"x":0.25,"y":1}"#);
+        assert_eq!(
+            target_to_json(&segment).to_json(crate::compat::qjson::Format::Compact),
+            r#"{"x":0.25,"y":1}"#
+        );
     }
 }

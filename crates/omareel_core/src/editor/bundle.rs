@@ -9,7 +9,7 @@ use crate::compat::qnumber;
 use crate::compat::qprocess;
 use crate::compat::qstring;
 use crate::input_log::InputLog;
-use crate::project::{sanitized_media_path, Clip, Project};
+use crate::project::{Clip, Project, sanitized_media_path};
 use crate::zoom_timeline;
 use std::collections::HashMap;
 use std::ffi::CString;
@@ -35,7 +35,13 @@ pub struct MediaInfo {
 
 impl Default for MediaInfo {
     fn default() -> MediaInfo {
-        MediaInfo { width: 0, height: 0, duration: 0.0, fps: 60.0, audio: false }
+        MediaInfo {
+            width: 0,
+            height: 0,
+            duration: 0.0,
+            fps: 60.0,
+            audio: false,
+        }
     }
 }
 
@@ -53,7 +59,10 @@ pub struct Probes {
 impl Probes {
     /// Editor.cpp's ffprobe [`probe`] for the recording, and `video` for inserted videos.
     pub fn new(video: ProbeVideo) -> Probes {
-        Probes { media: Arc::new(probe), video }
+        Probes {
+            media: Arc::new(probe),
+            video,
+        }
     }
 }
 
@@ -70,8 +79,14 @@ pub fn fraction(text: &str) -> f64 {
 }
 
 /// The `ffprobe` arguments Editor.cpp's `probe` runs with (before the path).
-pub const PROBE_ARGS: [&str; 6] =
-    ["-v", "error", "-show_entries", "stream=codec_type,width,height,r_frame_rate:format=duration", "-of", "json"];
+pub const PROBE_ARGS: [&str; 6] = [
+    "-v",
+    "error",
+    "-show_entries",
+    "stream=codec_type,width,height,r_frame_rate:format=duration",
+    "-of",
+    "json",
+];
 
 /// Editor.cpp's `probe(path, &error)`: runs ffprobe for up to 15 s. A failure gives ffprobe's
 /// trimmed stderr, which is empty when it could not start or timed out.
@@ -104,7 +119,9 @@ pub fn probe(path: &str) -> Result<MediaInfo, String> {
 
 /// `QString::fromUtf8(bytes).trimmed()` (`QChar::isSpace` is Unicode's White_Space).
 fn trimmed_utf8(bytes: &[u8]) -> String {
-    qdir::decode_utf8_lossy(bytes).trim_matches(char::is_whitespace).to_owned()
+    qdir::decode_utf8_lossy(bytes)
+        .trim_matches(char::is_whitespace)
+        .to_owned()
 }
 
 /// What `probe` makes of ffprobe's JSON: the first video stream with a width gives the size and
@@ -113,7 +130,14 @@ fn trimmed_utf8(bytes: &[u8]) -> String {
 pub fn parse_probe(stdout: &[u8]) -> Result<MediaInfo, String> {
     let root = qjson::object_from_json(stdout).unwrap_or_default();
     let mut info = MediaInfo {
-        duration: qnumber::to_double_with_ok(&root.value("format").to_object().value("duration").to_string_or("")).0,
+        duration: qnumber::to_double_with_ok(
+            &root
+                .value("format")
+                .to_object()
+                .value("duration")
+                .to_string_or(""),
+        )
+        .0,
         ..MediaInfo::default()
     };
     for entry in root.value("streams").to_array() {
@@ -143,7 +167,10 @@ pub fn aspect_ratio(project: &Project, width: i32, height: i32) -> f64 {
         "9:16" => 9.0 / 16.0,
         "3:4" => 3.0 / 4.0,
         "4:5" => 4.0 / 5.0,
-        _ => f64::from(width) * project.crop.width / cpp::max(1.0, f64::from(height) * project.crop.height),
+        _ => {
+            f64::from(width) * project.crop.width
+                / cpp::max(1.0, f64::from(height) * project.crop.height)
+        }
     }
 }
 
@@ -229,7 +256,12 @@ pub fn bundle_project_name(bundle_path: &str) -> String {
 /// The project a bundle without `project.json` starts with: [`Project::defaults`], the camera
 /// on when there is one, and its rotation, flip, shape and corner radius as `capture.json`'s
 /// `camera` recorded them.
-pub fn new_project(name: &str, source_duration: f64, has_camera: bool, camera_capture: &Object) -> Project {
+pub fn new_project(
+    name: &str,
+    source_duration: f64,
+    has_camera: bool,
+    camera_capture: &Object,
+) -> Project {
     let mut project = Project::defaults(name, source_duration);
     project.camera.enabled = has_camera;
     let rotation = camera_capture.value("rotation").to_int(0);
@@ -249,7 +281,11 @@ pub fn new_project(name: &str, source_duration: f64, has_camera: bool, camera_ca
 /// `camera.first_frame_us` (`toVariant().toLongLong()`); 0 unless both are positive.
 pub fn camera_offset(capture: &Object) -> f64 {
     let screen_first = capture.value("first_frame_us").to_variant_long_long();
-    let camera_first = capture.value("camera").to_object().value("first_frame_us").to_variant_long_long();
+    let camera_first = capture
+        .value("camera")
+        .to_object()
+        .value("first_frame_us")
+        .to_variant_long_long();
     if screen_first > 0 && camera_first > 0 {
         camera_first.wrapping_sub(screen_first) as f64 / 1_000_000.0
     } else {
@@ -272,7 +308,10 @@ pub fn load_bundle(bundle_path: &str, probes: &Probes) -> Result<Bundle, String>
     let (info, camera_probe) = std::thread::scope(|scope| {
         let camera = has_camera_file.then(|| scope.spawn(|| (probes.media)(&camera_video_path)));
         let info = (probes.media)(&video_path);
-        (info, camera.map(|probe| probe.join().unwrap_or_else(|_| Err(String::new()))))
+        (
+            info,
+            camera.map(|probe| probe.join().unwrap_or_else(|_| Err(String::new()))),
+        )
     });
     let info = info?;
     if info.width <= 0 {
@@ -328,14 +367,21 @@ pub fn load_bundle(bundle_path: &str, probes: &Probes) -> Result<Bundle, String>
     if project.clips.iter().all(Clip::is_media) {
         project.clips.insert(
             0,
-            Clip { id: "c1".into(), in_: 0.0, out: recording.source_duration, speed: 1.0, ..Clip::default() },
+            Clip {
+                id: "c1".into(),
+                in_: 0.0,
+                out: recording.source_duration,
+                speed: 1.0,
+                ..Clip::default()
+            },
         );
     }
     // A missing inserted video keeps its clip; it shows as missing and blocks export.
     let mut inserts = HashMap::new();
     for clip in &project.clips {
         if clip.is_media() && !inserts.contains_key(&clip.media) {
-            let info = (probes.video)(&qdir::file_path(&bundle_path, &clip.media)).unwrap_or_default();
+            let info =
+                (probes.video)(&qdir::file_path(&bundle_path, &clip.media)).unwrap_or_default();
             inserts.insert(clip.media.clone(), info);
         }
     }
@@ -343,10 +389,20 @@ pub fn load_bundle(bundle_path: &str, probes: &Probes) -> Result<Bundle, String>
     project.audio.mic = project.audio.mic && recording.has_microphone_audio;
     let input = InputLog::load_bundle(&bundle_path, recording.source_duration)?;
     if new {
-        let clicks: Vec<f64> = input.click_downs(true).iter().map(|click| click.time).collect();
+        let clicks: Vec<f64> = input
+            .click_downs(true)
+            .iter()
+            .map(|click| click.time)
+            .collect();
         project.zooms = zoom_timeline::generate(&clicks, recording.source_duration);
     }
-    Ok(Bundle { recording, project, input, inserts, new_project: new })
+    Ok(Bundle {
+        recording,
+        project,
+        input,
+        inserts,
+        new_project: new,
+    })
 }
 
 /// What `importInsert` brought into the bundle (`Editor::ImportedInsert`): the clip's media
@@ -362,7 +418,13 @@ pub struct ImportedInsert {
 /// does it.
 pub(crate) fn replace_unsafe_name_characters(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_ascii_alphanumeric() || matches!(c, ' ' | '_' | '.' | '-') { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, ' ' | '_' | '.' | '-') {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
@@ -380,7 +442,11 @@ fn same_file_info(a: &str, b: &str) -> bool {
 /// leading dots dropped, "clip" if nothing is left, the suffix lower-cased, then `-2`, `-3`...),
 /// copied through a hidden `.part` file. A video already in this bundle's `media/` is used where
 /// it is.
-pub fn import_insert(source: &str, bundle_path: &str, probe_video: &dyn Fn(&str) -> Result<VideoInfo, String>) -> ImportedInsert {
+pub fn import_insert(
+    source: &str,
+    bundle_path: &str,
+    probe_video: &dyn Fn(&str) -> Result<VideoInfo, String>,
+) -> ImportedInsert {
     let mut result = ImportedInsert::default();
     match probe_video(source) {
         Ok(info) => result.info = info,
@@ -396,7 +462,10 @@ pub fn import_insert(source: &str, bundle_path: &str, probe_video: &dyn Fn(&str)
     let file = FileInfo::new(source);
     let media_exists = qdir::dir_exists(&media);
     if media_exists
-        && same_file_info(&file.canonical_path(), &FileInfo::new(media.as_str()).canonical_file_path())
+        && same_file_info(
+            &file.canonical_path(),
+            &FileInfo::new(media.as_str()).canonical_file_path(),
+        )
         && !sanitized_media_path(&format!("media/{}", file.file_name())).is_empty()
     {
         result.path = format!("media/{}", file.file_name());
@@ -412,7 +481,11 @@ pub fn import_insert(source: &str, bundle_path: &str, probe_video: &dyn Fn(&str)
         base = "clip".into();
     }
     let suffix = file.suffix();
-    let suffix = if suffix.is_empty() { String::new() } else { format!(".{}", qstring::to_lower(&suffix)) };
+    let suffix = if suffix.is_empty() {
+        String::new()
+    } else {
+        format!(".{}", qstring::to_lower(&suffix))
+    };
     let mut name = format!("{base}{suffix}");
     // `base` holds no '%', so the C++'s chained QString::arg is plain formatting.
     let mut n: i32 = 2;
@@ -466,7 +539,10 @@ pub fn clone_or_copy(from: &str, to: &str) -> Result<(), String> {
     if qfile_copy(from, to) {
         return Ok(());
     }
-    Err(qstring::arg("Could not copy %1 into the recording", &FileInfo::new(from).file_name()))
+    Err(qstring::arg(
+        "Could not copy %1 into the recording",
+        &FileInfo::new(from).file_name(),
+    ))
 }
 
 /// `FICLONE`, `_IOW(0x94, 9, int)`, the same on x86_64 and aarch64.
@@ -477,14 +553,23 @@ const FICLONE: libc::c_ulong = 0x4004_9409;
 /// system does not support it, a hard link and unlink, as `QFileSystemEngine::renameFile` does.
 /// Qt's copy-and-delete fallback for renames across file systems is not needed here.
 pub(crate) fn rename_no_replace(from: &str, to: &str) -> bool {
-    let (Some(source), Some(target)) = (c_path(from), c_path(to)) else { return false };
+    let (Some(source), Some(target)) = (c_path(from), c_path(to)) else {
+        return false;
+    };
     // "Source file does not exist" and "Destination file exists" (both follow symlinks).
     if !FileInfo::new(from).exists() || FileInfo::new(to).exists() {
         return false;
     }
     // SAFETY: system calls on NUL-terminated paths.
     unsafe {
-        if libc::renameat2(libc::AT_FDCWD, source.as_ptr(), libc::AT_FDCWD, target.as_ptr(), libc::RENAME_NOREPLACE) == 0 {
+        if libc::renameat2(
+            libc::AT_FDCWD,
+            source.as_ptr(),
+            libc::AT_FDCWD,
+            target.as_ptr(),
+            libc::RENAME_NOREPLACE,
+        ) == 0
+        {
             return true;
         }
         if std::io::Error::last_os_error().raw_os_error() != Some(libc::EINVAL) {
@@ -498,8 +583,16 @@ pub(crate) fn rename_no_replace(from: &str, to: &str) -> bool {
             return false;
         }
         let link_error = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
-        if [libc::EACCES, libc::EEXIST, libc::ENAMETOOLONG, libc::ENOENT, libc::ENOTDIR, libc::EROFS, libc::EXDEV]
-            .contains(&link_error)
+        if [
+            libc::EACCES,
+            libc::EEXIST,
+            libc::ENAMETOOLONG,
+            libc::ENOENT,
+            libc::ENOTDIR,
+            libc::EROFS,
+            libc::EXDEV,
+        ]
+        .contains(&link_error)
         {
             return false;
         }
@@ -517,9 +610,13 @@ pub(crate) fn qfile_copy(from: &str, to: &str) -> bool {
     if FileInfo::new(to).exists() {
         return false;
     }
-    let Ok(mut source) = qfile::open_read(from) else { return false };
+    let Ok(mut source) = qfile::open_read(from) else {
+        return false;
+    };
     let template = format!("{}/qt_temp.XXXXXX", FileInfo::new(to).path());
-    let Ok(template) = CString::new(template) else { return false };
+    let Ok(template) = CString::new(template) else {
+        return false;
+    };
     let mut template = template.into_bytes_with_nul();
     // SAFETY: mkstemp fills in the template it is given, which is NUL-terminated.
     let fd = unsafe { libc::mkstemp(template.as_mut_ptr().cast()) };
@@ -592,19 +689,35 @@ mod tests {
 
     #[test]
     fn probe_output_is_read_like_editor_cpp() {
-        let json = br#"{"streams":[{"codec_type":"audio"},{"codec_type":"video","width":0,"height":5},
+        let json =
+            br#"{"streams":[{"codec_type":"audio"},{"codec_type":"video","width":0,"height":5},
             {"codec_type":"video","width":320,"height":180,"r_frame_rate":"30/1"},
             {"codec_type":"video","width":640,"height":360,"r_frame_rate":"60/1"}],
             "format":{"duration":"2.000000"}}"#;
         let info = parse_probe(json).unwrap();
-        assert_eq!(info, MediaInfo { width: 320, height: 180, duration: 2.0, fps: 30.0, audio: true });
+        assert_eq!(
+            info,
+            MediaInfo {
+                width: 320,
+                height: 180,
+                duration: 2.0,
+                fps: 30.0,
+                audio: true
+            }
+        );
         // No frame rate: 0, which loadBundle turns into 60.
         let info = parse_probe(br#"{"streams":[{"codec_type":"video","width":2,"height":2}],"format":{"duration":"1"}}"#).unwrap();
         assert_eq!(info.fps, 0.0);
-        for bad in [&b"not json"[..], br#"{"streams":[{"codec_type":"video","width":2,"height":2}]}"#,
-                    br#"{"streams":[],"format":{"duration":"3"}}"#,
-                    br#"{"streams":[{"codec_type":"video","width":2,"height":2}],"format":{"duration":3}}"#] {
-            assert_eq!(parse_probe(bad).unwrap_err(), "screen.mp4 has invalid metadata");
+        for bad in [
+            &b"not json"[..],
+            br#"{"streams":[{"codec_type":"video","width":2,"height":2}]}"#,
+            br#"{"streams":[],"format":{"duration":"3"}}"#,
+            br#"{"streams":[{"codec_type":"video","width":2,"height":2}],"format":{"duration":3}}"#,
+        ] {
+            assert_eq!(
+                parse_probe(bad).unwrap_err(),
+                "screen.mp4 has invalid metadata"
+            );
         }
         // Qt reads "nan" as a number, and a NaN duration is not <= 0.
         assert!(parse_probe(br#"{"streams":[{"codec_type":"video","width":2,"height":2}],"format":{"duration":"nan"}}"#)
@@ -620,7 +733,14 @@ mod tests {
         project.crop.width = 0.5;
         assert_eq!(aspect_ratio(&project, 1920, 1080), 960.0 / 1080.0);
         assert_eq!(aspect_ratio(&project, 100, 0), 50.0);
-        for (aspect, ratio) in [("16:9", 16.0 / 9.0), ("1:1", 1.0), ("4:3", 4.0 / 3.0), ("9:16", 9.0 / 16.0), ("3:4", 0.75), ("4:5", 0.8)] {
+        for (aspect, ratio) in [
+            ("16:9", 16.0 / 9.0),
+            ("1:1", 1.0),
+            ("4:3", 4.0 / 3.0),
+            ("9:16", 9.0 / 16.0),
+            ("3:4", 0.75),
+            ("4:5", 0.8),
+        ] {
             project.aspect = aspect.into();
             assert_eq!(aspect_ratio(&project, 1, 1), ratio);
         }
@@ -633,7 +753,10 @@ mod tests {
         assert_eq!(bundle_project_name("/x/plain"), "plain");
         assert_eq!(bundle_project_name("/x/.omareel"), "");
 
-        let capture = qjson::object_from_json(br#"{"rotation":270,"flipHorizontal":true,"shape":"square","radius":4}"#).unwrap();
+        let capture = qjson::object_from_json(
+            br#"{"rotation":270,"flipHorizontal":true,"shape":"square","radius":4}"#,
+        )
+        .unwrap();
         let project = new_project("n", 3.0, true, &capture);
         assert!(project.camera.enabled);
         assert_eq!(project.camera.rotation, 270);
@@ -643,11 +766,24 @@ mod tests {
         assert_eq!(project.clips[0].out, 3.0);
         let capture = qjson::object_from_json(br#"{"rotation":45,"shape":"blob"}"#).unwrap();
         let project = new_project("n", 3.0, false, &capture);
-        assert_eq!((project.camera.rotation, project.camera.shape.as_str(), project.camera.radius), (0, "round", 16.0));
+        assert_eq!(
+            (
+                project.camera.rotation,
+                project.camera.shape.as_str(),
+                project.camera.radius
+            ),
+            (0, "round", 16.0)
+        );
 
-        let both = qjson::object_from_json(br#"{"first_frame_us":1000000,"camera":{"first_frame_us":1250000}}"#).unwrap();
+        let both = qjson::object_from_json(
+            br#"{"first_frame_us":1000000,"camera":{"first_frame_us":1250000}}"#,
+        )
+        .unwrap();
         assert_eq!(camera_offset(&both), 0.25);
-        let strings = qjson::object_from_json(br#"{"first_frame_us":"2000000","camera":{"first_frame_us":1500000.4}}"#).unwrap();
+        let strings = qjson::object_from_json(
+            br#"{"first_frame_us":"2000000","camera":{"first_frame_us":1500000.4}}"#,
+        )
+        .unwrap();
         assert_eq!(camera_offset(&strings), -0.5);
         let missing = qjson::object_from_json(br#"{"first_frame_us":1000000}"#).unwrap();
         assert_eq!(camera_offset(&missing), 0.0);
@@ -658,7 +794,13 @@ mod tests {
     }
 
     fn video() -> VideoInfo {
-        VideoInfo { width: 320, height: 240, duration: 0.7, fps: 30.0, audio: false }
+        VideoInfo {
+            width: 320,
+            height: 240,
+            duration: 0.7,
+            fps: 30.0,
+            audio: false,
+        }
     }
 
     #[test]
@@ -671,14 +813,23 @@ mod tests {
         std::fs::set_permissions(&demo, std::fs::Permissions::from_mode(0o640)).unwrap();
 
         let first = import_insert(&demo, &bundle, &fixed_probe(video()));
-        assert_eq!(first, ImportedInsert { path: "media/My Demo.mp4".into(), info: video(), error: String::new() });
+        assert_eq!(
+            first,
+            ImportedInsert {
+                path: "media/My Demo.mp4".into(),
+                info: video(),
+                error: String::new()
+            }
+        );
         let copied = format!("{bundle}/media/My Demo.mp4");
         assert_eq!(std::fs::read(&copied).unwrap(), b"video bytes");
         let second = import_insert(&demo, &bundle, &fixed_probe(video()));
         assert_eq!(second.path, "media/My Demo-2.mp4");
         // Nothing is left behind but the two copies.
-        let mut names: Vec<String> =
-            std::fs::read_dir(format!("{bundle}/media")).unwrap().map(|e| e.unwrap().file_name().into_string().unwrap()).collect();
+        let mut names: Vec<String> = std::fs::read_dir(format!("{bundle}/media"))
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
         names.sort();
         assert_eq!(names, ["My Demo-2.mp4", "My Demo.mp4"]);
 
@@ -689,14 +840,28 @@ mod tests {
         // Unsafe characters, leading dots and an empty name.
         let odd = dir.join("..wé!rd.Name.WebM");
         std::fs::write(&odd, b"x").unwrap();
-        assert_eq!(import_insert(&odd, &bundle, &fixed_probe(video())).path, "media/w__rd.Name.webm");
+        assert_eq!(
+            import_insert(&odd, &bundle, &fixed_probe(video())).path,
+            "media/w__rd.Name.webm"
+        );
         let hidden = dir.join(".hidden");
         std::fs::write(&hidden, b"x").unwrap();
-        assert_eq!(import_insert(&hidden, &bundle, &fixed_probe(video())).path, "media/clip.hidden");
+        assert_eq!(
+            import_insert(&hidden, &bundle, &fixed_probe(video())).path,
+            "media/clip.hidden"
+        );
 
         // Probe errors pass through; a video that probes as invalid gives no error and no path.
-        let failed = import_insert(&demo, &bundle, &|_: &str| Err("notes.txt is not a video".to_owned()));
-        assert_eq!(failed, ImportedInsert { error: "notes.txt is not a video".into(), ..ImportedInsert::default() });
+        let failed = import_insert(&demo, &bundle, &|_: &str| {
+            Err("notes.txt is not a video".to_owned())
+        });
+        assert_eq!(
+            failed,
+            ImportedInsert {
+                error: "notes.txt is not a video".into(),
+                ..ImportedInsert::default()
+            }
+        );
         let invalid = import_insert(&demo, &bundle, &fixed_probe(VideoInfo::default()));
         assert_eq!(invalid, ImportedInsert::default());
     }
@@ -729,7 +894,10 @@ mod tests {
         assert!(qfile_copy(&from, &to));
         assert_eq!(std::fs::read(&to).unwrap(), vec![7u8; 10_000]);
         // The temporary file was 0600; the copy takes the source's mode.
-        assert_eq!(std::fs::metadata(&to).unwrap().permissions().mode() & 0o7777, 0o640);
+        assert_eq!(
+            std::fs::metadata(&to).unwrap().permissions().mode() & 0o7777,
+            0o640
+        );
         assert!(!qfile_copy(&from, &to));
         assert!(clone_or_copy(&from, &to).is_ok());
         assert_eq!(std::fs::read(&to).unwrap().len(), 10_000);

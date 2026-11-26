@@ -57,17 +57,27 @@ fn probe_video_and_frame_times_txt() {
     both("<directory>", &format!("{files}/directory.mp4"));
     both("<empty path>", "");
     // Relative to the working directory ($HOME): ffprobe gets the path as it was given.
-    both("<relative path>", "oracle-scratch/mediaprobe/files/testsrc-320x240-30.mp4");
+    both(
+        "<relative path>",
+        "oracle-scratch/mediaprobe/files/testsrc-320x240-30.mp4",
+    );
     let path = std::env::var_os("PATH").expect("PATH");
     let empty_bin = format!("{}/empty-bin", h.scratch());
     std::fs::create_dir_all(&empty_bin).expect("mkpath empty-bin");
     h.set_env("PATH", &empty_bin);
-    both("<ffprobe not on PATH>", &format!("{files}/testsrc-320x240-30.mp4"));
+    both(
+        "<ffprobe not on PATH>",
+        &format!("{files}/testsrc-320x240-30.mp4"),
+    );
     h.set_env("PATH", path);
     h.unset_env("OMAREEL_ORACLE_FFPROBE_DIR");
     assert_no_differences(
         [
-            difference("mediaprobe/probe-video.txt", &read_expected("mediaprobe/probe-video.txt"), probe.as_bytes()),
+            difference(
+                "mediaprobe/probe-video.txt",
+                &read_expected("mediaprobe/probe-video.txt"),
+                probe.as_bytes(),
+            ),
             difference(
                 "mediaprobe/probe-frame-times.txt",
                 &read_expected("mediaprobe/probe-frame-times.txt"),

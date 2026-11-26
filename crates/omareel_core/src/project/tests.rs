@@ -24,7 +24,13 @@ fn qcompare(actual: f64, expected: f64) -> bool {
 /// `QCOMPARE` on `QPointF`s, which is `QPointF::operator==`: each coordinate fuzzily, and one
 /// that is zero only against a (fuzzy) zero.
 fn qcompare_point(actual: PointF, expected: PointF) -> bool {
-    let coordinate = |a: f64, b: f64| if a == 0.0 || b == 0.0 { q_fuzzy_is_null(a - b) } else { q_fuzzy_compare(a, b) };
+    let coordinate = |a: f64, b: f64| {
+        if a == 0.0 || b == 0.0 {
+            q_fuzzy_is_null(a - b)
+        } else {
+            q_fuzzy_compare(a, b)
+        }
+    };
     coordinate(actual.x, expected.x) && coordinate(actual.y, expected.y)
 }
 
@@ -34,7 +40,14 @@ fn object(json: &str) -> Object {
 }
 
 fn clip(id: &str, in_: f64, out: f64, speed: f64, layout: &str) -> Clip {
-    Clip { id: id.into(), in_, out, speed, layout: layout.into(), ..Clip::default() }
+    Clip {
+        id: id.into(),
+        in_,
+        out,
+        speed,
+        layout: layout.into(),
+        ..Clip::default()
+    }
 }
 
 #[test]
@@ -42,9 +55,18 @@ fn defaults_and_round_trip() {
     let original = Project::defaults("Demo", 12.5);
     let json = original.to_json();
     assert_eq!(json.value("version").to_int(0), 1);
-    assert_eq!(json.value("defaultsVersion").to_int(0), Project::CURRENT_DEFAULTS_VERSION);
+    assert_eq!(
+        json.value("defaultsVersion").to_int(0),
+        Project::CURRENT_DEFAULTS_VERSION
+    );
     assert!(json.value("aspect").is_null());
-    assert!(qcompare(json.value("clips").to_array()[0].to_object().value("out").to_double(0.0), 12.5));
+    assert!(qcompare(
+        json.value("clips").to_array()[0]
+            .to_object()
+            .value("out")
+            .to_double(0.0),
+        12.5
+    ));
     assert!(qcompare(original.frame.padding, 0.10));
     assert!(qcompare(original.frame.shadow.intensity, 0.25));
     assert!(qcompare(original.frame.shadow.blur, 40.0));
@@ -80,12 +102,21 @@ fn defaults_and_round_trip() {
     assert!(qcompare(original.camera.shadow.angle, 45.0));
     assert!(original.camera.border.enabled);
     assert!(qcompare(original.camera.border.width, 6.0));
-    assert_eq!(original.camera.border.color, QColor::from_rgb(255, 255, 255));
+    assert_eq!(
+        original.camera.border.color,
+        QColor::from_rgb(255, 255, 255)
+    );
     assert!(qcompare(original.camera.border.alpha, 0.7));
     assert!(qcompare(original.camera.scale_during_zoom, 0.7));
-    assert!(qcompare_point(original.camera.offset, PointF::new(0.035, 0.035)));
+    assert!(qcompare_point(
+        original.camera.offset,
+        PointF::new(0.035, 0.035)
+    ));
     assert!(allowed_aspects().contains(&"3:4"));
-    assert!(qcompare(*allowed_clip_speeds().last().expect("speeds"), 24.0));
+    assert!(qcompare(
+        *allowed_clip_speeds().last().expect("speeds"),
+        24.0
+    ));
     let directory = TempDir::new("project-round-trip");
     let path = directory.join("project.json");
     original.save(&path).expect("save");
@@ -105,7 +136,10 @@ fn clip_layouts_and_full_frame_camera() {
     // A clip that keeps the default layout is written exactly as before layouts existed.
     let plain = project.to_json().value("clips").to_array()[0].to_object();
     assert!(!plain.contains("layout"));
-    assert_eq!(plain.keys().collect::<Vec<_>>(), ["id", "in", "out", "speed"]);
+    assert_eq!(
+        plain.keys().collect::<Vec<_>>(),
+        ["id", "in", "out", "speed"]
+    );
 
     project.clips = vec![
         clip("intro", 0.0, 2.0, 1.0, "camera"),
@@ -138,7 +172,10 @@ fn clip_layouts_and_full_frame_camera() {
 fn inserted_videos_stay_inside_the_bundle() {
     assert_eq!(sanitized_media_path("media/demo.mp4"), "media/demo.mp4");
     assert_eq!(sanitized_media_path("media/./demo.mp4"), "media/demo.mp4");
-    assert_eq!(sanitized_media_path("media/talk..final.mp4"), "media/talk..final.mp4");
+    assert_eq!(
+        sanitized_media_path("media/talk..final.mp4"),
+        "media/talk..final.mp4"
+    );
     assert_eq!(sanitized_media_path("/home/demo.mp4"), "");
     assert_eq!(sanitized_media_path("media/../screen.mp4"), "");
     assert_eq!(sanitized_media_path("media/../../etc/passwd"), "");
@@ -147,12 +184,26 @@ fn inserted_videos_stay_inside_the_bundle() {
     assert_eq!(sanitized_media_path(""), "");
 
     let mut project = Project::defaults("Inserts", 4.0);
-    let insert = Clip { media: "media/demo.mp4".into(), fit: "framed".into(), ..clip("m", 0.5, 2.0, 1.0, "default") };
+    let insert = Clip {
+        media: "media/demo.mp4".into(),
+        fit: "framed".into(),
+        ..clip("m", 0.5, 2.0, 1.0, "default")
+    };
     project.clips.push(insert);
-    let written = project.to_json().value("clips").to_array().last().expect("clips").to_object();
+    let written = project
+        .to_json()
+        .value("clips")
+        .to_array()
+        .last()
+        .expect("clips")
+        .to_object();
     assert_eq!(written.value("media").to_string_or(""), "media/demo.mp4");
     assert_eq!(written.value("fit").to_string_or(""), "framed");
-    assert!(!project.to_json().value("clips").to_array()[0].to_object().contains("media"));
+    assert!(
+        !project.to_json().value("clips").to_array()[0]
+            .to_object()
+            .contains("media")
+    );
     let loaded = Project::from_json(&project.to_json());
     assert_eq!(loaded.clips.len(), 2);
     assert!(!loaded.clips[0].is_media());
@@ -234,7 +285,10 @@ fn migrates_only_untouched_old_frame_defaults() {
             "inset": {"enabled": false, "width": 0.0, "color": "#000000", "alpha": 0.5}
         }"##,
     );
-    assert_eq!(untouched.defaults_version, Project::CURRENT_DEFAULTS_VERSION);
+    assert_eq!(
+        untouched.defaults_version,
+        Project::CURRENT_DEFAULTS_VERSION
+    );
     assert!(qcompare(untouched.frame.shadow.intensity, 0.25));
     assert!(qcompare(untouched.frame.shadow.blur, 40.0));
     assert!(qcompare(untouched.frame.shadow.distance, 10.0));
@@ -248,7 +302,10 @@ fn migrates_only_untouched_old_frame_defaults() {
             "inset": {"enabled": true, "width": 3.0, "color": "#123456", "alpha": 0.5}
         }"##,
     );
-    assert_eq!(customised.defaults_version, Project::CURRENT_DEFAULTS_VERSION);
+    assert_eq!(
+        customised.defaults_version,
+        Project::CURRENT_DEFAULTS_VERSION
+    );
     assert!(qcompare(customised.frame.shadow.intensity, 0.61));
     assert!(qcompare(customised.frame.shadow.blur, 20.0));
     assert!(qcompare(customised.frame.shadow.distance, 25.0));
@@ -277,8 +334,15 @@ fn migrates_only_untouched_old_frame_defaults() {
 #[test]
 fn migrates_only_untouched_old_camera_defaults() {
     let load = |shadow: &str, border: &str, offset: &str| {
-        let camera = Object::from_iter([("shadow", object(shadow)), ("border", object(border)), ("offset", object(offset))]);
-        Project::from_json(&Object::from_iter([("defaultsVersion", Value::from(3)), ("camera", camera.into())]))
+        let camera = Object::from_iter([
+            ("shadow", object(shadow)),
+            ("border", object(border)),
+            ("offset", object(offset)),
+        ]);
+        Project::from_json(&Object::from_iter([
+            ("defaultsVersion", Value::from(3)),
+            ("camera", camera.into()),
+        ]))
     };
     let old_offset = r#"{"x": 0.02, "y": 0.02}"#;
 
@@ -287,7 +351,10 @@ fn migrates_only_untouched_old_camera_defaults() {
         r##"{"enabled": false, "width": 2, "color": "#ffffff", "alpha": 0.7}"##,
         old_offset,
     );
-    assert_eq!(untouched.defaults_version, Project::CURRENT_DEFAULTS_VERSION);
+    assert_eq!(
+        untouched.defaults_version,
+        Project::CURRENT_DEFAULTS_VERSION
+    );
     // The values move to the new defaults, but a switched-off shadow or border stays off.
     assert!(!untouched.camera.shadow.enabled);
     assert!(qcompare(untouched.camera.shadow.intensity, 0.28));
@@ -296,7 +363,10 @@ fn migrates_only_untouched_old_camera_defaults() {
     assert!(qcompare(untouched.camera.shadow.angle, 45.0));
     assert!(!untouched.camera.border.enabled);
     assert!(qcompare(untouched.camera.border.width, 6.0));
-    assert!(qcompare_point(untouched.camera.offset, PointF::new(0.035, 0.035)));
+    assert!(qcompare_point(
+        untouched.camera.offset,
+        PointF::new(0.035, 0.035)
+    ));
 
     let customised = load(
         r#"{"enabled": true, "intensity": 0.4, "blur": 18, "distance": 18}"#,
@@ -308,17 +378,32 @@ fn migrates_only_untouched_old_camera_defaults() {
     assert!(qcompare(customised.camera.shadow.distance, 18.0));
     assert!(customised.camera.border.enabled);
     assert!(qcompare(customised.camera.border.width, 4.0));
-    assert!(qcompare_point(customised.camera.offset, PointF::new(0.05, 0.02)));
+    assert!(qcompare_point(
+        customised.camera.offset,
+        PointF::new(0.05, 0.02)
+    ));
 
     // A current project keeps a width of 2 that was chosen on purpose.
-    let camera = Object::from_iter([("border", object(r#"{"enabled": true, "width": 2}"#)), ("offset", object(old_offset))]);
+    let camera = Object::from_iter([
+        ("border", object(r#"{"enabled": true, "width": 2}"#)),
+        ("offset", object(old_offset)),
+    ]);
     let current = Project::from_json(&Object::from_iter([
-        ("defaultsVersion", Value::from(Project::CURRENT_DEFAULTS_VERSION)),
+        (
+            "defaultsVersion",
+            Value::from(Project::CURRENT_DEFAULTS_VERSION),
+        ),
         ("camera", camera.into()),
     ]));
     assert!(qcompare(current.camera.border.width, 2.0));
-    assert!(qcompare_point(current.camera.offset, PointF::new(0.02, 0.02)));
-    assert!(qcompare(Project::from_json(&current.to_json()).camera.shadow.angle, 45.0));
+    assert!(qcompare_point(
+        current.camera.offset,
+        PointF::new(0.02, 0.02)
+    ));
+    assert!(qcompare(
+        Project::from_json(&current.to_json()).camera.shadow.angle,
+        45.0
+    ));
 }
 
 #[test]
@@ -327,15 +412,37 @@ fn camera_crop_folds_into_shape() {
     let rows: [(&str, i32, &str, &str, &str, f64); 8] = [
         ("round", 2, "round", "original", "round", 12.0),
         ("rounded square", 2, "rounded", "square", "square", 12.0),
-        ("rounded original", 2, "rounded", "original", "rectangle", 12.0),
+        (
+            "rounded original",
+            2,
+            "rounded",
+            "original",
+            "rectangle",
+            12.0,
+        ),
         ("sharp square", 2, "square", "square", "square", 0.0),
         ("sharp original", 2, "square", "original", "rectangle", 0.0),
-        ("no defaults version", 0, "rounded", "original", "rectangle", 12.0),
-        ("current square keeps its corners", 3, "square", "", "square", 12.0),
+        (
+            "no defaults version",
+            0,
+            "rounded",
+            "original",
+            "rectangle",
+            12.0,
+        ),
+        (
+            "current square keeps its corners",
+            3,
+            "square",
+            "",
+            "square",
+            12.0,
+        ),
         ("current rectangle", 3, "rectangle", "", "rectangle", 12.0),
     ];
     for (row, defaults_version, shape, crop, expected_shape, expected_radius) in rows {
-        let mut camera = Object::from_iter([("shape", Value::from(shape)), ("radius", Value::from(12.0))]);
+        let mut camera =
+            Object::from_iter([("shape", Value::from(shape)), ("radius", Value::from(12.0))]);
         if !crop.is_empty() {
             camera.insert("crop", crop);
         }
@@ -345,9 +452,17 @@ fn camera_crop_folds_into_shape() {
         }
         let loaded = Project::from_json(&root);
         assert_eq!(loaded.camera.shape, expected_shape, "{row}");
-        assert!(qcompare(loaded.camera.radius, expected_radius), "{row}: radius {}", loaded.camera.radius);
+        assert!(
+            qcompare(loaded.camera.radius, expected_radius),
+            "{row}: radius {}",
+            loaded.camera.radius
+        );
         let saved = loaded.to_json().value("camera").to_object();
         assert!(!saved.contains("crop"), "{row}");
-        assert_eq!(Project::from_json(&loaded.to_json()).camera.shape, expected_shape, "{row}");
+        assert_eq!(
+            Project::from_json(&loaded.to_json()).camera.shape,
+            expected_shape,
+            "{row}"
+        );
     }
 }

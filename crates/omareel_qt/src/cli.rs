@@ -31,7 +31,10 @@ pub mod ffi {
 
 fn preload_editor(bundle: &str) {
     use omareel_core::editor::{Document, Probes};
-    Document::preload(bundle, Probes::new(std::sync::Arc::new(omareel_core::media_probe::probe_video)));
+    Document::preload(
+        bundle,
+        Probes::new(std::sync::Arc::new(omareel_core::media_probe::probe_video)),
+    );
 }
 
 fn prefetch_theme() {

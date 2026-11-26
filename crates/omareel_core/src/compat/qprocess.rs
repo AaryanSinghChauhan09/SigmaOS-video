@@ -49,7 +49,11 @@ impl Finished {
 /// up with `QStandardPaths::findExecutable` and started with the path found as `argv[0]`; one
 /// not found does not start.
 pub fn run(program: &str, args: &[&str], timeout_ms: i64) -> Option<Finished> {
-    let resolved = if program.contains('/') { program.to_string() } else { qstandardpaths::find_executable(program) };
+    let resolved = if program.contains('/') {
+        program.to_string()
+    } else {
+        qstandardpaths::find_executable(program)
+    };
     if resolved.is_empty() {
         return None;
     }
@@ -73,7 +77,8 @@ pub fn run(program: &str, args: &[&str], timeout_ms: i64) -> Option<Finished> {
         let _ = err.read_to_end(&mut bytes);
         bytes
     });
-    let deadline = (timeout_ms >= 0).then(|| Instant::now() + Duration::from_millis(timeout_ms as u64));
+    let deadline =
+        (timeout_ms >= 0).then(|| Instant::now() + Duration::from_millis(timeout_ms as u64));
     let status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break Some(status),
@@ -153,7 +158,8 @@ impl Deadline {
     }
 
     fn remaining(&self) -> Option<Duration> {
-        self.0.map(|deadline| deadline.saturating_duration_since(Instant::now()))
+        self.0
+            .map(|deadline| deadline.saturating_duration_since(Instant::now()))
     }
 }
 
@@ -234,7 +240,13 @@ fn pipe() -> Option<(OwnedFd, OwnedFd)> {
 fn open_output_file(path: &str) -> Option<OwnedFd> {
     let c = std::ffi::CString::new(path).ok()?;
     // SAFETY: a valid NUL-terminated path.
-    let fd = unsafe { libc::open(c.as_ptr(), libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC | libc::O_CLOEXEC, 0o666) };
+    let fd = unsafe {
+        libc::open(
+            c.as_ptr(),
+            libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC | libc::O_CLOEXEC,
+            0o666,
+        )
+    };
     // SAFETY: a non-negative result is a descriptor nothing else owns.
     (fd >= 0).then(|| unsafe { OwnedFd::from_raw_fd(fd) })
 }
@@ -327,14 +339,19 @@ impl Process {
         }
         // QChildProcess::resolveExecutable: a name without "/" goes through findExecutable, and
         // one it does not find is exec'd as "", which fails with ENOENT.
-        let resolved =
-            if program.contains('/') { program.to_string() } else { qstandardpaths::find_executable(program) };
+        let resolved = if program.contains('/') {
+            program.to_string()
+        } else {
+            qstandardpaths::find_executable(program)
+        };
         if resolved.is_empty() {
             self.fail_to_start(libc::ENOENT);
             return;
         }
         let mut command = Command::new(&resolved);
-        command.args(arguments.iter().map(AsRef::as_ref)).stdin(Stdio::piped());
+        command
+            .args(arguments.iter().map(AsRef::as_ref))
+            .stdin(Stdio::piped());
         // commitChannels: standard output to the file or a pipe, and with merged channels the
         // standard error dup'ed from it.
         let mut merged_reader = None;
@@ -358,7 +375,9 @@ impl Process {
                     self.fail_to_start(last_errno());
                     return;
                 };
-                command.stdout(Stdio::from(writer)).stderr(Stdio::from(copy));
+                command
+                    .stdout(Stdio::from(writer))
+                    .stderr(Stdio::from(copy));
                 merged_reader = Some(reader);
             }
             (None, ChannelMode::Separate) => {
@@ -398,7 +417,10 @@ impl Process {
     fn fail_to_start(&mut self, code: i32) {
         self.state = ProcessState::NotRunning;
         self.error = ProcessError::FailedToStart;
-        self.error_string = format!("Child process set up failed: execve: {}", qdir::error_string(code));
+        self.error_string = format!(
+            "Child process set up failed: execve: {}",
+            qdir::error_string(code)
+        );
     }
 
     /// `QProcess::waitForStarted`: whether the child is running.
@@ -416,7 +438,11 @@ impl Process {
 
     /// `QIODevice::errorString`: "Unknown error" when no error has a message.
     pub fn error_string(&self) -> String {
-        if self.error_string.is_empty() { "Unknown error".into() } else { self.error_string.clone() }
+        if self.error_string.is_empty() {
+            "Unknown error".into()
+        } else {
+            self.error_string.clone()
+        }
     }
 
     /// The exit status, or the signal number for a child killed by one, as forkfd reports it.
@@ -523,30 +549,65 @@ impl Process {
     /// output pipes and the child. `None` when the deadline passed, `Err` when poll failed.
     fn poll(&mut self, deadline: &Deadline) -> Result<Option<Ready>, ()> {
         let fd = |fd: &Option<OwnedFd>| fd.as_ref().map_or(-1, AsRawFd::as_raw_fd);
-        let stdin = if self.bytes_to_write() > 0 || self.poll_stdin { fd(&self.stdin) } else { -1 };
+        let stdin = if self.bytes_to_write() > 0 || self.poll_stdin {
+            fd(&self.stdin)
+        } else {
+            -1
+        };
         let mut fds = [
-            libc::pollfd { fd: stdin, events: libc::POLLOUT, revents: 0 },
-            libc::pollfd { fd: fd(&self.stdout), events: libc::POLLIN, revents: 0 },
-            libc::pollfd { fd: fd(&self.stderr), events: libc::POLLIN, revents: 0 },
-            libc::pollfd { fd: fd(&self.pidfd), events: libc::POLLIN, revents: 0 },
+            libc::pollfd {
+                fd: stdin,
+                events: libc::POLLOUT,
+                revents: 0,
+            },
+            libc::pollfd {
+                fd: fd(&self.stdout),
+                events: libc::POLLIN,
+                revents: 0,
+            },
+            libc::pollfd {
+                fd: fd(&self.stderr),
+                events: libc::POLLIN,
+                revents: 0,
+            },
+            libc::pollfd {
+                fd: fd(&self.pidfd),
+                events: libc::POLLIN,
+                revents: 0,
+            },
         ];
         let child_known = self.child.is_some() && self.reaped.is_none();
         // Without a pidfd, a child `try_wait` reaped in an earlier poll stays ready, as a
         // pidfd would, until a wait gets to it.
         let already_reaped = self.pidfd.is_none() && self.reaped.is_some();
         loop {
-            let mut remaining = if already_reaped { Some(Duration::ZERO) } else { deadline.remaining() };
+            let mut remaining = if already_reaped {
+                Some(Duration::ZERO)
+            } else {
+                deadline.remaining()
+            };
             // Without a pidfd the child is checked between short polls.
             if self.pidfd.is_none() && child_known {
-                remaining = Some(remaining.map_or(Duration::from_millis(10), |r| r.min(Duration::from_millis(10))));
+                remaining = Some(remaining.map_or(Duration::from_millis(10), |r| {
+                    r.min(Duration::from_millis(10))
+                }));
             }
             let timeout = remaining.map(|r| libc::timespec {
                 tv_sec: r.as_secs() as libc::time_t,
                 tv_nsec: r.subsec_nanos() as libc::c_long,
             });
-            let timeout_ptr = timeout.as_ref().map_or(std::ptr::null(), |t| t as *const libc::timespec);
+            let timeout_ptr = timeout
+                .as_ref()
+                .map_or(std::ptr::null(), |t| t as *const libc::timespec);
             // SAFETY: `fds` holds four pollfds; the timeout is null or points at a timespec.
-            let result = unsafe { libc::ppoll(fds.as_mut_ptr(), fds.len() as libc::nfds_t, timeout_ptr, std::ptr::null()) };
+            let result = unsafe {
+                libc::ppoll(
+                    fds.as_mut_ptr(),
+                    fds.len() as libc::nfds_t,
+                    timeout_ptr,
+                    std::ptr::null(),
+                )
+            };
             if result < 0 {
                 if last_errno() == libc::EINTR {
                     continue;
@@ -567,7 +628,8 @@ impl Process {
                 continue;
             }
             let check = |pfd: &libc::pollfd, events: libc::c_short| {
-                pfd.fd >= 0 && pfd.revents & (events | libc::POLLHUP | libc::POLLERR | libc::POLLNVAL) != 0
+                pfd.fd >= 0
+                    && pfd.revents & (events | libc::POLLHUP | libc::POLLERR | libc::POLLNVAL) != 0
             };
             return Ok(Some(Ready {
                 stdin: check(&fds[0], libc::POLLOUT),
@@ -583,18 +645,25 @@ impl Process {
     /// read channel. End of file closes the pipe.
     fn read_from_channel(&mut self, stdout: bool) -> bool {
         let pipe = if stdout { &self.stdout } else { &self.stderr };
-        let Some(fd) = pipe.as_ref().map(AsRawFd::as_raw_fd) else { return false };
+        let Some(fd) = pipe.as_ref().map(AsRawFd::as_raw_fd) else {
+            return false;
+        };
         let mut available: libc::c_int = 0;
         // SAFETY: FIONREAD writes an int.
         if unsafe { libc::ioctl(fd, libc::FIONREAD, &mut available) } < 0 || available <= 0 {
             available = 1;
         }
-        let buffer = if stdout { &mut self.stdout_buffer } else { &mut self.stderr_buffer };
+        let buffer = if stdout {
+            &mut self.stdout_buffer
+        } else {
+            &mut self.stderr_buffer
+        };
         let old = buffer.len();
         buffer.resize(old + available as usize, 0);
         let read = loop {
             // SAFETY: the buffer has `available` bytes reserved at `old`.
-            let r = unsafe { libc::read(fd, buffer[old..].as_mut_ptr().cast(), available as usize) };
+            let r =
+                unsafe { libc::read(fd, buffer[old..].as_mut_ptr().cast(), available as usize) };
             if r < 0 && last_errno() == libc::EINTR {
                 continue;
             }
@@ -625,7 +694,9 @@ impl Process {
         if self.bytes_to_write() == 0 {
             return false;
         }
-        let Some(fd) = self.stdin.as_ref().map(AsRawFd::as_raw_fd) else { return false };
+        let Some(fd) = self.stdin.as_ref().map(AsRawFd::as_raw_fd) else {
+            return false;
+        };
         ignore_sigpipe();
         let data = &self.write_buffer[self.write_offset..];
         let written = loop {
@@ -660,7 +731,11 @@ impl Process {
         };
         if let Some(status) = status {
             self.exit_code = status.code().or(status.signal()).unwrap_or(0);
-            self.exit_status = if status.code().is_some() { ExitStatus::NormalExit } else { ExitStatus::CrashExit };
+            self.exit_status = if status.code().is_some() {
+                ExitStatus::NormalExit
+            } else {
+                ExitStatus::CrashExit
+            };
         }
         self.cleanup();
         if self.exit_status == ExitStatus::CrashExit {
@@ -766,12 +841,22 @@ impl Process {
     /// Returns how many bytes are now initialised at the start of `data`: all of them, or fewer
     /// at end of file, when the child went, or after `msecs` without any progress (timed out).
     /// Not a QProcess call: the exporter reads whole raw frames this way.
-    pub fn read_stdout_into(&mut self, data: &mut [std::mem::MaybeUninit<u8>], msecs: i32) -> usize {
+    pub fn read_stdout_into(
+        &mut self,
+        data: &mut [std::mem::MaybeUninit<u8>],
+        msecs: i32,
+    ) -> usize {
         let mut filled = self.bytes_available().min(data.len());
         if filled > 0 {
             let source = &self.stdout_buffer[self.stdout_offset..self.stdout_offset + filled];
             // SAFETY: `filled` bytes of `data` exist and don't overlap the buffer.
-            unsafe { std::ptr::copy_nonoverlapping(source.as_ptr(), data.as_mut_ptr().cast::<u8>(), filled) };
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    source.as_ptr(),
+                    data.as_mut_ptr().cast::<u8>(),
+                    filled,
+                )
+            };
             self.stdout_offset += filled;
             if self.stdout_offset == self.stdout_buffer.len() {
                 self.stdout_buffer.clear();
@@ -780,7 +865,9 @@ impl Process {
         }
         let mut deadline = Deadline::new(msecs);
         while filled < data.len() {
-            let Some(fd) = self.stdout.as_ref().map(AsRawFd::as_raw_fd) else { break };
+            let Some(fd) = self.stdout.as_ref().map(AsRawFd::as_raw_fd) else {
+                break;
+            };
             let rest = &mut data[filled..];
             // SAFETY: `rest` is writable memory of its length; read(2) only writes into it.
             let r = unsafe { libc::read(fd, rest.as_mut_ptr().cast(), rest.len()) };
@@ -837,7 +924,9 @@ impl Process {
         }
         let deadline = Deadline::new(msecs);
         loop {
-            let Some(fd) = self.stdin.as_ref().map(AsRawFd::as_raw_fd) else { return -1 };
+            let Some(fd) = self.stdin.as_ref().map(AsRawFd::as_raw_fd) else {
+                return -1;
+            };
             ignore_sigpipe();
             // SAFETY: `data` is valid for its length.
             let r = unsafe { libc::write(fd, data.as_ptr().cast(), data.len()) };
@@ -920,7 +1009,10 @@ impl Drop for Process {
     /// `~QProcess`: a child still running is reported, killed and waited for.
     fn drop(&mut self) {
         if self.state != ProcessState::NotRunning {
-            crate::compat::qlog::warning(&format!("QProcess: Destroyed while process (\"{}\") is still running.", self.program));
+            crate::compat::qlog::warning(&format!(
+                "QProcess: Destroyed while process (\"{}\") is still running.",
+                self.program
+            ));
             self.kill();
             self.wait_for_finished(30000);
         }
@@ -962,7 +1054,11 @@ unsafe fn fail_child(spawn: &DetachedSpawn) -> ! {
     // SAFETY: async-signal-safe calls on the prepared descriptors.
     unsafe {
         let code: libc::c_int = *libc::__errno_location();
-        libc::write(spawn.started_write_fd, (&code as *const libc::c_int).cast(), size_of::<libc::c_int>());
+        libc::write(
+            spawn.started_write_fd,
+            (&code as *const libc::c_int).cast(),
+            size_of::<libc::c_int>(),
+        );
         libc::_exit(-1)
     }
 }
@@ -1005,7 +1101,11 @@ extern "C" fn detached_intermediate(argument: *mut libc::c_void) -> libc::c_int 
         if grandchild < 0 {
             fail_child(spawn);
         }
-        libc::write(spawn.pid_write_fd, (&grandchild as *const libc::pid_t).cast(), size_of::<libc::pid_t>());
+        libc::write(
+            spawn.pid_write_fd,
+            (&grandchild as *const libc::pid_t).cast(),
+            size_of::<libc::pid_t>(),
+        );
         libc::_exit(0)
     }
 }
@@ -1021,10 +1121,18 @@ extern "C" fn detached_intermediate(argument: *mut libc::c_void) -> libc::c_int 
 /// with every signal blocked) until each has exec'd, so starting one costs no copy of the
 /// address space. Returns the program's pid once it has exec'd, or `None` when it could not be
 /// started (not found, a redirection that can't be opened, a failed clone or exec).
-pub fn start_detached<S: AsRef<str>>(program: &str, arguments: &[S], channels: DetachedChannels) -> Option<i64> {
+pub fn start_detached<S: AsRef<str>>(
+    program: &str,
+    arguments: &[S],
+    channels: DetachedChannels,
+) -> Option<i64> {
     use std::ffi::CString;
     // Everything the children need is made here: they may only make async-signal-safe calls.
-    let resolved = if program.contains('/') { program.to_string() } else { qstandardpaths::find_executable(program) };
+    let resolved = if program.contains('/') {
+        program.to_string()
+    } else {
+        qstandardpaths::find_executable(program)
+    };
     let path = CString::new(resolved.as_bytes()).ok()?;
     let mut argv_strings = Vec::with_capacity(arguments.len() + 1);
     argv_strings.push(path.clone());
@@ -1089,7 +1197,13 @@ pub fn start_detached<S: AsRef<str>>(program: &str, arguments: &[S], channels: D
     let mut report = [0u8; size_of::<libc::c_int>()];
     let started = loop {
         // SAFETY: reads into a local buffer of its size.
-        let r = unsafe { libc::read(started_read.as_raw_fd(), report.as_mut_ptr().cast(), report.len()) };
+        let r = unsafe {
+            libc::read(
+                started_read.as_raw_fd(),
+                report.as_mut_ptr().cast(),
+                report.len(),
+            )
+        };
         if r < 0 && last_errno() == libc::EINTR {
             continue;
         }
@@ -1109,9 +1223,19 @@ pub fn start_detached<S: AsRef<str>>(program: &str, arguments: &[S], channels: D
     }
     let mut pid: libc::pid_t = 0;
     // SAFETY: reads one pid_t into a local.
-    let r = unsafe { libc::read(pid_read.as_raw_fd(), (&mut pid as *mut libc::pid_t).cast(), size_of::<libc::pid_t>()) };
+    let r = unsafe {
+        libc::read(
+            pid_read.as_raw_fd(),
+            (&mut pid as *mut libc::pid_t).cast(),
+            size_of::<libc::pid_t>(),
+        )
+    };
     // Qt reports 0 when the pid could not be read ("this shouldn't happen").
-    Some(if r == size_of::<libc::pid_t>() as isize { i64::from(pid) } else { 0 })
+    Some(if r == size_of::<libc::pid_t>() as isize {
+        i64::from(pid)
+    } else {
+        0
+    })
 }
 
 #[cfg(test)]
@@ -1163,7 +1287,10 @@ mod tests {
         p.close_write_channel();
         assert_eq!(p.write(b"late"), 0);
         assert!(p.wait_for_finished(2000));
-        assert_eq!((p.state(), p.exit_status(), p.exit_code()), (ProcessState::NotRunning, ExitStatus::NormalExit, 3));
+        assert_eq!(
+            (p.state(), p.exit_status(), p.exit_code()),
+            (ProcessState::NotRunning, ExitStatus::NormalExit, 3)
+        );
         assert_eq!(p.read_all_standard_error(), b"bye\n");
         assert!(!p.wait_for_finished(100));
 
@@ -1172,14 +1299,20 @@ mod tests {
         p.start("sleep", &["10"]);
         p.kill();
         assert!(p.wait_for_finished(2000));
-        assert_eq!((p.exit_status(), p.exit_code(), p.error()), (ExitStatus::CrashExit, 9, ProcessError::Crashed));
+        assert_eq!(
+            (p.exit_status(), p.exit_code(), p.error()),
+            (ExitStatus::CrashExit, 9, ProcessError::Crashed)
+        );
 
         // Not found on PATH: execve's error, as Qt words it.
         let mut p = Process::new();
         p.start("omareel-no-such-program", &[] as &[&str]);
         assert!(!p.wait_for_started(1000));
         assert_eq!(p.error(), ProcessError::FailedToStart);
-        assert_eq!(p.error_string(), "Child process set up failed: execve: No such file or directory");
+        assert_eq!(
+            p.error_string(),
+            "Child process set up failed: execve: No such file or directory"
+        );
 
         // A wait times out while the child runs.
         let mut p = Process::new();
@@ -1223,14 +1356,20 @@ mod tests {
         p.set_standard_output_file(&format!("{log}/missing/log"));
         p.start("sh", &["-c", "true"]);
         assert!(!p.wait_for_started(1000));
-        assert_eq!(p.error_string(), "Could not open input redirection for reading");
+        assert_eq!(
+            p.error_string(),
+            "Could not open input redirection for reading"
+        );
 
         // terminate: SIGTERM, a crash exit with the signal as the code.
         let mut p = Process::new();
         p.start("sleep", &["10"]);
         p.terminate();
         assert!(p.wait_for_finished(2000));
-        assert_eq!((p.exit_status(), p.exit_code()), (ExitStatus::CrashExit, libc::SIGTERM));
+        assert_eq!(
+            (p.exit_status(), p.exit_code()),
+            (ExitStatus::CrashExit, libc::SIGTERM)
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -1244,26 +1383,52 @@ mod tests {
         let pid = start_detached(
             "sh",
             &["-c", "echo $$ $(cut -d' ' -f6 /proc/$$/stat); echo err >&2"],
-            DetachedChannels { standard_output_file: Some(out), standard_error_file: Some(err) },
+            DetachedChannels {
+                standard_output_file: Some(out),
+                standard_error_file: Some(err),
+            },
         )
         .expect("started");
         let deadline = Instant::now() + Duration::from_secs(5);
-        while std::fs::read_to_string(err).unwrap_or_default() != "err\n" && Instant::now() < deadline {
+        while std::fs::read_to_string(err).unwrap_or_default() != "err\n"
+            && Instant::now() < deadline
+        {
             thread::sleep(Duration::from_millis(10));
         }
         let text = std::fs::read_to_string(out).unwrap();
         let fields: Vec<&str> = text.split_whitespace().collect();
-        assert_eq!(fields.first().copied(), Some(pid.to_string().as_str()), "{text:?}");
+        assert_eq!(
+            fields.first().copied(),
+            Some(pid.to_string().as_str()),
+            "{text:?}"
+        );
         // A session of its own, led by the intermediate child rather than the program.
         // SAFETY: getsid on this process.
         let own_session = unsafe { libc::getsid(0) }.to_string();
-        assert!(fields.get(1).is_some_and(|session| *session != pid.to_string() && *session != own_session));
+        assert!(
+            fields
+                .get(1)
+                .is_some_and(|session| *session != pid.to_string() && *session != own_session)
+        );
         // Not this process's child.
         // SAFETY: waitpid with WNOHANG on a pid that is not a child.
-        assert_eq!(unsafe { libc::waitpid(pid as libc::pid_t, std::ptr::null_mut(), libc::WNOHANG) }, -1);
-        assert_eq!(start_detached("omareel-no-such-program", &[] as &[&str], DetachedChannels::default()), None);
+        assert_eq!(
+            unsafe { libc::waitpid(pid as libc::pid_t, std::ptr::null_mut(), libc::WNOHANG) },
+            -1
+        );
+        assert_eq!(
+            start_detached(
+                "omareel-no-such-program",
+                &[] as &[&str],
+                DetachedChannels::default()
+            ),
+            None
+        );
         let missing = format!("{out}/missing/log");
-        let channels = DetachedChannels { standard_output_file: Some(&missing), standard_error_file: None };
+        let channels = DetachedChannels {
+            standard_output_file: Some(&missing),
+            standard_error_file: None,
+        };
         assert_eq!(start_detached("true", &[] as &[&str], channels), None);
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -1271,7 +1436,14 @@ mod tests {
     #[test]
     fn captures_output_and_exit_codes() {
         let done = run("sh", &["-c", "echo out; echo err >&2; exit 3"], 5000).unwrap();
-        assert_eq!((done.exit_code, done.stdout.as_slice(), done.stderr.as_slice()), (3, &b"out\n"[..], &b"err\n"[..]));
+        assert_eq!(
+            (
+                done.exit_code,
+                done.stdout.as_slice(),
+                done.stderr.as_slice()
+            ),
+            (3, &b"out\n"[..], &b"err\n"[..])
+        );
         assert!(!done.succeeded());
         assert!(run("sh", &["-c", "true"], 5000).unwrap().succeeded());
         assert_eq!(run("/nonexistent/program", &[], 5000), None);
@@ -1280,7 +1452,10 @@ mod tests {
         let cat = qstandardpaths::find_executable("cat");
         assert!(cat.starts_with('/'), "{cat}");
         let done = run("cat", &["/proc/self/cmdline"], 5000).unwrap();
-        assert_eq!(done.stdout, format!("{cat}\0/proc/self/cmdline\0").into_bytes());
+        assert_eq!(
+            done.stdout,
+            format!("{cat}\0/proc/self/cmdline\0").into_bytes()
+        );
         let started = Instant::now();
         assert_eq!(run("sleep", &["5"], 100), None);
         assert!(started.elapsed() < Duration::from_secs(2));

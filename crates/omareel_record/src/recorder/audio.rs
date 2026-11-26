@@ -8,8 +8,8 @@ use super::files::write_start_timestamp;
 use super::{monotonic_us, realtime_us};
 use crate::capture::RecordOptions;
 use omareel_core::compat::qdir::FileInfo;
-use omareel_core::compat::{qfile, qnumber, qstring};
 use omareel_core::compat::qprocess::{ChannelMode, Process, ProcessState};
+use omareel_core::compat::{qfile, qnumber, qstring};
 
 /// The PulseAudio sources [`start_audio_capture`] records: the default sink's monitor for the
 /// desktop audio (`pactl get-default-sink`), then the microphone (the chosen device, or `pactl
@@ -50,20 +50,41 @@ pub fn audio_sources(options: &RecordOptions) -> AudioSources {
 /// `-loglevel info` puts each input's start time in the log, which [`first_sample_us`] reads.
 /// ffmpeg only notices the SIGINT that stops it when its main loop wakes, every `-stats_period`
 /// (half a second by default, even with `-nostats`): at 50 ms, Stop no longer waits up to 0.5 s.
-pub fn audio_capture_arguments<S: AsRef<str>>(sources: &[S], microphone: bool, path: &str) -> Vec<String> {
-    let mut arguments: Vec<String> = ["-y", "-hide_banner", "-nostats", "-stats_period", "0.05", "-loglevel", "info"]
-        .iter()
-        .map(|s| (*s).to_owned())
-        .collect();
+pub fn audio_capture_arguments<S: AsRef<str>>(
+    sources: &[S],
+    microphone: bool,
+    path: &str,
+) -> Vec<String> {
+    let mut arguments: Vec<String> = [
+        "-y",
+        "-hide_banner",
+        "-nostats",
+        "-stats_period",
+        "0.05",
+        "-loglevel",
+        "info",
+    ]
+    .iter()
+    .map(|s| (*s).to_owned())
+    .collect();
     for source in sources {
-        arguments.extend(["-thread_queue_size", "1024", "-f", "pulse", "-i"].iter().map(|s| (*s).to_owned()));
+        arguments.extend(
+            ["-thread_queue_size", "1024", "-f", "pulse", "-i"]
+                .iter()
+                .map(|s| (*s).to_owned()),
+        );
         arguments.push(source.as_ref().to_owned());
     }
     if sources.len() > 1 {
         arguments.extend(
-            ["-filter_complex", "[1:a]volumedetect[m];[0:a][m]amix=inputs=2:duration=longest:normalize=0[a]", "-map", "[a]"]
-                .iter()
-                .map(|s| (*s).to_owned()),
+            [
+                "-filter_complex",
+                "[1:a]volumedetect[m];[0:a][m]amix=inputs=2:duration=longest:normalize=0[a]",
+                "-map",
+                "[a]",
+            ]
+            .iter()
+            .map(|s| (*s).to_owned()),
         );
     } else {
         arguments.extend(["-map", "0:a"].iter().map(|s| (*s).to_owned()));
@@ -72,9 +93,18 @@ pub fn audio_capture_arguments<S: AsRef<str>>(sources: &[S], microphone: bool, p
         arguments.extend(["-af", "volumedetect"].iter().map(|s| (*s).to_owned()));
     }
     arguments.extend(
-        ["-c:a", "aac", "-b:a", "192k", "-flush_packets", "1", "-cluster_time_limit", "500"]
-            .iter()
-            .map(|s| (*s).to_owned()),
+        [
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-flush_packets",
+            "1",
+            "-cluster_time_limit",
+            "500",
+        ]
+        .iter()
+        .map(|s| (*s).to_owned()),
     );
     arguments.push(path.to_owned());
     arguments
@@ -106,7 +136,10 @@ pub fn first_sample_us(log: &str, started_us: i64, realtime_offset_us: i64) -> O
     let input = log.find("Input #0,")?;
     let rest = &log[input..];
     let start = rest.find("start: ")? + "start: ".len();
-    let digits: String = rest[start..].chars().take_while(|c| c.is_ascii_digit() || *c == '.').collect();
+    let digits: String = rest[start..]
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .collect();
     let seconds: f64 = digits.parse().ok()?;
     let first_us = (seconds * 1e6).round() as i64 - realtime_offset_us;
     ((first_us - started_us).abs() <= 10_000_000).then_some(first_us)
@@ -115,10 +148,21 @@ pub fn first_sample_us(log: &str, started_us: i64, realtime_offset_us: i64) -> O
 /// The file-static `startAudioCapture`: starts ffmpeg on `process` recording the sources of
 /// `options` into `path`, its merged output into `<path>.log` (which volumedetect's report
 /// ends up in), and writes the start time to `<path>.ts`.
-pub fn start_audio_capture(process: &mut Process, options: &RecordOptions, path: &str) -> AudioCaptureStart {
-    let AudioSources { sources, microphone } = audio_sources(options);
+pub fn start_audio_capture(
+    process: &mut Process,
+    options: &RecordOptions,
+    path: &str,
+) -> AudioCaptureStart {
+    let AudioSources {
+        sources,
+        microphone,
+    } = audio_sources(options);
     if sources.is_empty() {
-        return AudioCaptureStart { started: false, started_us: None, realtime_offset_us: 0 };
+        return AudioCaptureStart {
+            started: false,
+            started_us: None,
+            realtime_offset_us: 0,
+        };
     }
     let arguments = audio_capture_arguments(&sources, microphone, path);
     process.set_process_channel_mode(ChannelMode::Merged);
@@ -126,8 +170,13 @@ pub fn start_audio_capture(process: &mut Process, options: &RecordOptions, path:
     let started_us = monotonic_us();
     let realtime_offset_us = realtime_us() - started_us;
     process.start("ffmpeg", &arguments);
-    let started = process.wait_for_started(5000) && write_start_timestamp(&format!("{path}.ts"), started_us);
-    AudioCaptureStart { started, started_us: Some(started_us), realtime_offset_us }
+    let started =
+        process.wait_for_started(5000) && write_start_timestamp(&format!("{path}.ts"), started_us);
+    AudioCaptureStart {
+        started,
+        started_us: Some(started_us),
+        realtime_offset_us,
+    }
 }
 
 /// The mux's arguments: the screen video and the audio shifted by `audio_started_us -
@@ -145,15 +194,25 @@ pub fn mux_arguments(
 ) -> Vec<String> {
     let offset = (audio_started_us - screen_started_us) as f64 / 1_000_000.0;
     let length: Vec<String> = if screen_duration_us > 0 {
-        vec!["-t".into(), qnumber::number_f64(screen_duration_us as f64 / 1_000_000.0, 'f', 6)]
+        vec![
+            "-t".into(),
+            qnumber::number_f64(screen_duration_us as f64 / 1_000_000.0, 'f', 6),
+        ]
     } else {
         vec!["-shortest".into()]
     };
-    let mut arguments: Vec<String> =
-        ["-y", "-loglevel", "error", "-i", screen_path, "-itsoffset"].iter().map(|s| (*s).to_owned()).collect();
+    let mut arguments: Vec<String> = ["-y", "-loglevel", "error", "-i", screen_path, "-itsoffset"]
+        .iter()
+        .map(|s| (*s).to_owned())
+        .collect();
     arguments.push(qnumber::number_f64(offset, 'f', 6));
-    arguments
-        .extend(["-i", audio_path, "-map", "0:v:0", "-map", "1:a:0", "-c", "copy"].iter().map(|s| (*s).to_owned()));
+    arguments.extend(
+        [
+            "-i", audio_path, "-map", "0:v:0", "-map", "1:a:0", "-c", "copy",
+        ]
+        .iter()
+        .map(|s| (*s).to_owned()),
+    );
     arguments.extend(length);
     arguments.push(output_path.to_owned());
     arguments
@@ -191,18 +250,35 @@ pub fn finish_audio_capture(
     }
     let started_us = audio.started_us.unwrap_or(0);
     let log = qfile::read_all(format!("{audio_path}.log")).unwrap_or_default();
-    let first_sample_us =
-        first_sample_us(&qstring::from_utf8(&log), started_us, audio.realtime_offset_us).unwrap_or(started_us);
+    let first_sample_us = first_sample_us(
+        &qstring::from_utf8(&log),
+        started_us,
+        audio.realtime_offset_us,
+    )
+    .unwrap_or(started_us);
     if FileInfo::new(audio_path).size() <= 0 {
-        return AudioMux { muxed: false, first_sample_us };
+        return AudioMux {
+            muxed: false,
+            first_sample_us,
+        };
     }
-    let arguments =
-        mux_arguments(screen_path, audio_path, output_path, screen_started_us, first_sample_us, screen_duration_us);
+    let arguments = mux_arguments(
+        screen_path,
+        audio_path,
+        output_path,
+        screen_started_us,
+        first_sample_us,
+        screen_duration_us,
+    );
     let mut mux = Process::new();
     mux.start("ffmpeg", &arguments);
-    let muxed =
-        mux.wait_for_finished(mux_timeout_ms(screen_path)) && mux.exit_code() == 0 && FileInfo::new(output_path).size() > 0;
-    AudioMux { muxed, first_sample_us }
+    let muxed = mux.wait_for_finished(mux_timeout_ms(screen_path))
+        && mux.exit_code() == 0
+        && FileInfo::new(output_path).size() > 0;
+    AudioMux {
+        muxed,
+        first_sample_us,
+    }
 }
 
 /// What [`finish_audio_capture`] did.

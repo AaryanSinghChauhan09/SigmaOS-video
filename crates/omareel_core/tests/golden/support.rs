@@ -67,7 +67,8 @@ pub fn read_doubles(relative: &str) -> Vec<f64> {
 
 /// A corpus JSON document, read with the port's own parser (the oracle used Qt's).
 pub fn read_json(relative: &str) -> Value {
-    qjson::from_json(&read_corpus(relative)).unwrap_or_else(|e| panic!("corpus file {relative} is not JSON: {e}"))
+    qjson::from_json(&read_corpus(relative))
+        .unwrap_or_else(|e| panic!("corpus file {relative} is not JSON: {e}"))
 }
 
 /// The oracle's `sortedEntries`: the files (or directories) of a directory, hidden ones
@@ -103,7 +104,8 @@ pub fn next_after(x: f64, toward: f64) -> f64 {
 /// Parses a **num** cell back into the double it printed (the format round-trips).
 #[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
 pub fn parse_num(cell: &str) -> f64 {
-    cell.parse().unwrap_or_else(|_| panic!("bad num cell {cell:?}"))
+    cell.parse()
+        .unwrap_or_else(|_| panic!("bad num cell {cell:?}"))
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -121,7 +123,9 @@ pub fn after(x: f64) -> f64 {
 
 /// `i / denominator` for `i = from..=to`, as the oracle's `uniform` divides (`i / double(d)`).
 pub fn uniform(denominator: i32, from: i32, to: i32) -> Vec<f64> {
-    (from..=to).map(|i| f64::from(i) / f64::from(denominator)).collect()
+    (from..=to)
+        .map(|i| f64::from(i) / f64::from(denominator))
+        .collect()
 }
 
 /// The oracle's `sortedUnique`: ascending, exact duplicates removed (`std::sort` then
@@ -157,7 +161,11 @@ pub fn num(value: f64) -> String {
         out.push('-');
     }
     let strip = |text: String| -> String {
-        if text.contains('.') { text.trim_end_matches('0').trim_end_matches('.').to_owned() } else { text }
+        if text.contains('.') {
+            text.trim_end_matches('0').trim_end_matches('.').to_owned()
+        } else {
+            text
+        }
     };
     if !(-4..17).contains(&exponent) {
         let mantissa = strip(format!("{}.{}", &digits[..1], &digits[1..]));
@@ -235,8 +243,16 @@ pub fn clips_text(clips: &[Clip]) -> String {
     let items: Vec<String> = clips
         .iter()
         .map(|c| {
-            [quote(&c.id), num(c.in_), num(c.out), num(c.speed), quote(&c.layout), quote(&c.media), quote(&c.fit)]
-                .join(" ")
+            [
+                quote(&c.id),
+                num(c.in_),
+                num(c.out),
+                num(c.speed),
+                quote(&c.layout),
+                quote(&c.media),
+                quote(&c.fit),
+            ]
+            .join(" ")
         })
         .collect();
     format!("[{}]", items.join(";"))
@@ -266,10 +282,16 @@ pub fn variant(value: &Variant) -> String {
         Variant::Map(entries) => {
             let mut entries: Vec<&(String, Variant)> = entries.iter().collect();
             entries.sort_by(|(a, _), (b, _)| a.encode_utf16().cmp(b.encode_utf16()));
-            let items: Vec<String> = entries.iter().map(|(key, value)| format!("{key}={}", variant(value))).collect();
+            let items: Vec<String> = entries
+                .iter()
+                .map(|(key, value)| format!("{key}={}", variant(value)))
+                .collect();
             format!("{{{}}}", items.join(","))
         }
-        Variant::List(items) => format!("[{}]", items.iter().map(variant).collect::<Vec<_>>().join(",")),
+        Variant::List(items) => format!(
+            "[{}]",
+            items.iter().map(variant).collect::<Vec<_>>().join(",")
+        ),
     }
 }
 
@@ -289,12 +311,24 @@ pub fn rgba64_hex(color: &QColor) -> String {
 
 /// `redF() greenF() blueF() alphaF()` as four **num** joined by spaces.
 pub fn color_floats(color: &QColor) -> String {
-    [color.red_f(), color.green_f(), color.blue_f(), color.alpha_f()].map(|f| num(f64::from(f))).join(" ")
+    [
+        color.red_f(),
+        color.green_f(),
+        color.blue_f(),
+        color.alpha_f(),
+    ]
+    .map(|f| num(f64::from(f)))
+    .join(" ")
 }
 
 /// **color**: `<spec> <rgba64> <#aarrggbb>`, plus the four float channels for `ExtendedRgb`.
 pub fn color(color: &QColor) -> String {
-    let mut out = format!("{} {} {}", spec_name(color.spec()), rgba64_hex(color), color.name_argb());
+    let mut out = format!(
+        "{} {} {}",
+        spec_name(color.spec()),
+        rgba64_hex(color),
+        color.name_argb()
+    );
     if color.spec() == Spec::ExtendedRgb {
         out.push(' ');
         out += &color_floats(color);
@@ -387,7 +421,10 @@ pub fn sanitize_with(text: &str, roots: &[(String, String)]) -> String {
         for (name, path) in roots {
             if !path.is_empty()
                 && rest.starts_with(path.as_str())
-                && !rest[path.len()..].chars().next().is_some_and(path_character)
+                && !rest[path.len()..]
+                    .chars()
+                    .next()
+                    .is_some_and(path_character)
             {
                 out += name;
                 i += path.len();
@@ -562,8 +599,11 @@ pub fn assert_same(name: &str, expected: &[u8], actual: &[u8]) {
 /// Whether the tests were started with `OMAREEL_GOLDEN_BLESS=1`. Read from the environment the
 /// process started with: the hermetic tests replace the live one.
 fn blessing() -> bool {
-    std::fs::read("/proc/self/environ")
-        .is_ok_and(|environ| environ.split(|&b| b == 0).any(|entry| entry == b"OMAREEL_GOLDEN_BLESS=1"))
+    std::fs::read("/proc/self/environ").is_ok_and(|environ| {
+        environ
+            .split(|&b| b == 0)
+            .any(|entry| entry == b"OMAREEL_GOLDEN_BLESS=1")
+    })
 }
 
 /// Compares a whole regenerated file with `expected/<relative>`. With `OMAREEL_GOLDEN_BLESS=1`
@@ -581,7 +621,11 @@ pub fn assert_golden(relative: &str, actual: &str) {
 #[track_caller]
 pub fn assert_no_differences(reports: Vec<String>) {
     if !reports.is_empty() {
-        panic!("{} file(s) differ:\n{}", reports.len(), reports.join("\n\n"));
+        panic!(
+            "{} file(s) differ:\n{}",
+            reports.len(),
+            reports.join("\n\n")
+        );
     }
 }
 
@@ -596,7 +640,11 @@ pub fn sections(text: &[u8]) -> Vec<(Option<String>, Vec<u8>)> {
         } else if result.is_empty() {
             result.push((None, Vec::new()));
         }
-        result.last_mut().expect("a section").1.extend_from_slice(line);
+        result
+            .last_mut()
+            .expect("a section")
+            .1
+            .extend_from_slice(line);
     }
     result
 }
@@ -622,7 +670,10 @@ pub fn keep_lines(text: &[u8], keep: impl Fn(&[u8]) -> bool) -> Vec<u8> {
 
 /// The cells of a golden row.
 pub fn cells(line: &[u8]) -> Vec<String> {
-    String::from_utf8_lossy(line).split('\t').map(str::to_owned).collect()
+    String::from_utf8_lossy(line)
+        .split('\t')
+        .map(str::to_owned)
+        .collect()
 }
 
 /// The rows of a golden file as cells.
@@ -663,11 +714,21 @@ fn num_prints_like_glibc() {
 #[test]
 fn variant_prints_like_the_oracle() {
     use Variant::*;
-    let map = |entries: Vec<(&str, Variant)>| Map(entries.into_iter().map(|(k, v)| (k.to_owned(), v)).collect());
+    let map = |entries: Vec<(&str, Variant)>| {
+        Map(entries
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v))
+            .collect())
+    };
     let golden = rows(&read_expected("composition/editor.txt"));
     let first = golden.iter().find(|row| row.len() > 1).expect("a row");
     let cells = [
-        map(vec![("velocity", Double(0.0)), ("scale", Double(1.0)), ("cy", Double(0.5)), ("cx", Double(0.5))]),
+        map(vec![
+            ("velocity", Double(0.0)),
+            ("scale", Double(1.0)),
+            ("cy", Double(0.5)),
+            ("cx", Double(0.5)),
+        ]),
         map(vec![("cameraFull", Double(1.0)), ("bubble", Double(0.0))]),
         map(vec![
             ("width", Int(16)),
@@ -686,9 +747,19 @@ fn variant_prints_like_the_oracle() {
     let pills = List(vec![map(vec![
         ("text", String(keys.join(" + "))),
         ("opacity", Double(1.0)),
-        ("keys", StringList(keys.iter().map(|k| (*k).to_owned()).collect())),
+        (
+            "keys",
+            StringList(keys.iter().map(|k| (*k).to_owned()).collect()),
+        ),
     ])]);
-    assert!(golden.iter().any(|row| row.get(7) == Some(&variant(&pills))));
+    assert!(
+        golden
+            .iter()
+            .any(|row| row.get(7) == Some(&variant(&pills)))
+    );
     // Keys sort by UTF-16 code units: U+1F600 (0xD83D 0xDE00) before U+FF5E, unlike their UTF-8.
-    assert_eq!(variant(&map(vec![("\u{ff5e}", Int(2)), ("\u{1f600}", Int(1))])), "{\u{1f600}=int(1),\u{ff5e}=int(2)}");
+    assert_eq!(
+        variant(&map(vec![("\u{ff5e}", Int(2)), ("\u{1f600}", Int(1))])),
+        "{\u{1f600}=int(1),\u{ff5e}=int(2)}"
+    );
 }

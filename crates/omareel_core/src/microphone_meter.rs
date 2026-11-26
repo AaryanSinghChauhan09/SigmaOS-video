@@ -34,16 +34,18 @@ impl SampleFormat {
     pub fn normalized_sample_value(self, sample: &[u8]) -> f32 {
         let bytes = |n: usize| -> Option<&[u8]> { sample.get(..n) };
         match self {
-            SampleFormat::UInt8 => {
-                bytes(1).map_or(0.0, |b| (f64::from(f32::from(b[0]) / f32::from(i8::MAX as u8)) - 1.0) as f32)
+            SampleFormat::UInt8 => bytes(1).map_or(0.0, |b| {
+                (f64::from(f32::from(b[0]) / f32::from(i8::MAX as u8)) - 1.0) as f32
+            }),
+            SampleFormat::Int16 => bytes(2).map_or(0.0, |b| {
+                f32::from(i16::from_ne_bytes([b[0], b[1]])) / f32::from(i16::MAX)
+            }),
+            SampleFormat::Int32 => bytes(4).map_or(0.0, |b| {
+                i32::from_ne_bytes([b[0], b[1], b[2], b[3]]) as f32 / i32::MAX as f32
+            }),
+            SampleFormat::Float => {
+                bytes(4).map_or(0.0, |b| f32::from_ne_bytes([b[0], b[1], b[2], b[3]]))
             }
-            SampleFormat::Int16 => {
-                bytes(2).map_or(0.0, |b| f32::from(i16::from_ne_bytes([b[0], b[1]])) / f32::from(i16::MAX))
-            }
-            SampleFormat::Int32 => {
-                bytes(4).map_or(0.0, |b| i32::from_ne_bytes([b[0], b[1], b[2], b[3]]) as f32 / i32::MAX as f32)
-            }
-            SampleFormat::Float => bytes(4).map_or(0.0, |b| f32::from_ne_bytes([b[0], b[1], b[2], b[3]])),
             SampleFormat::Unknown => 0.0,
         }
     }
@@ -62,7 +64,10 @@ pub fn peak_level(format: SampleFormat, samples: &[u8]) -> f64 {
     let mut offset = 0;
     while offset + bytes <= samples.len() {
         // std::max: a NaN sample never wins.
-        peak = cpp::max(peak, format.normalized_sample_value(&samples[offset..]).abs());
+        peak = cpp::max(
+            peak,
+            format.normalized_sample_value(&samples[offset..]).abs(),
+        );
         offset += bytes;
     }
     if peak <= 0.0 {
@@ -116,9 +121,18 @@ mod tests {
     fn samples_normalize_as_qt_does() {
         assert_eq!(SampleFormat::UInt8.normalized_sample_value(&[0]), -1.0);
         assert_eq!(SampleFormat::UInt8.normalized_sample_value(&[127]), 0.0);
-        assert_eq!(SampleFormat::Int16.normalized_sample_value(&i16::MIN.to_ne_bytes()), -32768.0 / 32767.0);
-        assert_eq!(SampleFormat::Int32.normalized_sample_value(&i32::MAX.to_ne_bytes()), 1.0);
-        assert_eq!(SampleFormat::Unknown.normalized_sample_value(&[1, 2, 3, 4]), 0.0);
+        assert_eq!(
+            SampleFormat::Int16.normalized_sample_value(&i16::MIN.to_ne_bytes()),
+            -32768.0 / 32767.0
+        );
+        assert_eq!(
+            SampleFormat::Int32.normalized_sample_value(&i32::MAX.to_ne_bytes()),
+            1.0
+        );
+        assert_eq!(
+            SampleFormat::Unknown.normalized_sample_value(&[1, 2, 3, 4]),
+            0.0
+        );
         assert_eq!(peak_level(SampleFormat::Int16, &[0, 0, 0]), 0.0);
         assert_eq!(peak_level(SampleFormat::Unknown, &[0xff; 8]), 0.0);
         let mut meter = MicrophoneLevel::default();
@@ -132,11 +146,18 @@ mod tests {
     // test_recorder.cpp's microphoneMeterReadsPeakLevel.
     #[test]
     fn microphone_meter_reads_peak_level() {
-        let samples = |values: &[i16]| values.iter().flat_map(|value| value.to_ne_bytes()).collect::<Vec<u8>>();
+        let samples = |values: &[i16]| {
+            values
+                .iter()
+                .flat_map(|value| value.to_ne_bytes())
+                .collect::<Vec<u8>>()
+        };
         assert_eq!(peak_level(SampleFormat::Int16, &samples(&[0, 0, 0])), 0.0);
         assert!(peak_level(SampleFormat::Int16, &samples(&[0, 32767, 0])) > 0.99);
         // -20 dBFS is two thirds of the way up the meter's 60 dB.
-        assert!((peak_level(SampleFormat::Int16, &samples(&[100, -3277, 50])) - 2.0 / 3.0).abs() < 0.01);
+        assert!(
+            (peak_level(SampleFormat::Int16, &samples(&[100, -3277, 50])) - 2.0 / 3.0).abs() < 0.01
+        );
         assert_eq!(peak_level(SampleFormat::Int16, &samples(&[16])), 0.0);
         assert_eq!(peak_level(SampleFormat::Int16, &[]), 0.0);
         let level = peak_level(SampleFormat::Float, &0.5f32.to_ne_bytes());

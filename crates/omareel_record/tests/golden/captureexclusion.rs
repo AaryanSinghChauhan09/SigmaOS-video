@@ -9,7 +9,11 @@ use omareel_core::compat::qjson::{Format, Value};
 use omareel_record::capture_exclusion::{self, HardwareCursorHold, Status};
 
 fn strings(value: &Value) -> Vec<String> {
-    value.to_array().iter().map(|item| item.to_string_or("")).collect()
+    value
+        .to_array()
+        .iter()
+        .map(|item| item.to_string_or(""))
+        .collect()
 }
 
 fn cases() -> Value {
@@ -20,7 +24,10 @@ fn dump_status(h: &Hermetic, out: &mut Text, status: &Status) {
     out.row(["loaded", boolean(status.loaded)]);
     out.row(["builtHash".to_owned(), quote(&status.built_hash)]);
     out.row(["reason".to_owned(), quote(&h.sanitize(&status.reason))]);
-    out.row(["details".to_owned(), Value::Object(status.details.clone()).to_json(Format::Compact)]);
+    out.row([
+        "details".to_owned(),
+        Value::Object(status.details.clone()).to_json(Format::Compact),
+    ]);
 }
 
 /// Replaces `@PLUGIN@` in the answers' argv by the plugin's absolute path.
@@ -34,7 +41,13 @@ fn with_plugin(answers: &Value, plugin: &str) -> Value {
                 .value("argv")
                 .to_array()
                 .into_iter()
-                .map(|argument| if argument.as_str() == Some("@PLUGIN@") { Value::from(plugin) } else { argument })
+                .map(|argument| {
+                    if argument.as_str() == Some("@PLUGIN@") {
+                        Value::from(plugin)
+                    } else {
+                        argument
+                    }
+                })
                 .collect();
             object.insert("argv", Value::array(argv));
             Value::Object(object)
@@ -50,7 +63,11 @@ fn compatible_hash_and_overlay_monitor() {
     let hashes = strings(cases.get("hashes"));
     for built in &hashes {
         for running in &hashes {
-            out.row([quote(built), quote(running), boolean(capture_exclusion::compatible_hash(built, running)).into()]);
+            out.row([
+                quote(built),
+                quote(running),
+                boolean(capture_exclusion::compatible_hash(built, running)).into(),
+            ]);
         }
     }
     let hash = out.into_string();
@@ -65,7 +82,9 @@ fn compatible_hash_and_overlay_monitor() {
                     boolean(plugin).to_owned(),
                     quote(&recorded),
                     quote_list(&monitors),
-                    quote(&capture_exclusion::overlay_monitor(plugin, &recorded, &monitors)),
+                    quote(&capture_exclusion::overlay_monitor(
+                        plugin, &recorded, &monitors,
+                    )),
                 ]);
             }
         }
@@ -73,10 +92,13 @@ fn compatible_hash_and_overlay_monitor() {
     let overlay = out.into_string();
 
     assert_no_differences(
-        [("captureexclusion/compatible-hash.txt", hash), ("captureexclusion/overlay-monitor.txt", overlay)]
-            .iter()
-            .filter_map(|(name, text)| difference(name, &read_expected(name), text.as_bytes()))
-            .collect(),
+        [
+            ("captureexclusion/compatible-hash.txt", hash),
+            ("captureexclusion/overlay-monitor.txt", overlay),
+        ]
+        .iter()
+        .filter_map(|(name, text)| difference(name, &read_expected(name), text.as_bytes()))
+        .collect(),
     );
 }
 
@@ -128,7 +150,9 @@ fn status_ensure_loaded_overlays_and_hardware_cursor() {
                 }
                 // Relative to the working directory, $HOME.
                 variable = if kind == "relative" {
-                    file.strip_prefix(&format!("{}/", h.root("HOME"))).expect("under $HOME").to_owned()
+                    file.strip_prefix(&format!("{}/", h.root("HOME")))
+                        .expect("under $HOME")
+                        .to_owned()
                 } else {
                     file.clone()
                 };
@@ -143,9 +167,17 @@ fn status_ensure_loaded_overlays_and_hardware_cursor() {
         out.section(label);
         out.row([
             "OMAREEL_PLUGIN_PATH".to_owned(),
-            if kind.is_null() { "<unset>".into() } else { quote(&h.sanitize(&variable)) },
+            if kind.is_null() {
+                "<unset>".into()
+            } else {
+                quote(&h.sanitize(&variable))
+            },
         ]);
-        dump_status(&h, &mut out, &capture_exclusion::ensure_loaded(&application_dir));
+        dump_status(
+            &h,
+            &mut out,
+            &capture_exclusion::ensure_loaded(&application_dir),
+        );
         replay.dump_calls(&h, &mut out);
     }
     let _ = std::fs::remove_dir_all(&plugins);
@@ -161,15 +193,30 @@ fn status_ensure_loaded_overlays_and_hardware_cursor() {
         replay.activate(&h);
         let mut cells = vec![label.to_owned()];
         for monitor in &monitors {
-            cells.push(format!("{}={}", quote(monitor), boolean(capture_exclusion::overlays_off_monitor(monitor))));
+            cells.push(format!(
+                "{}={}",
+                quote(monitor),
+                boolean(capture_exclusion::overlays_off_monitor(monitor))
+            ));
         }
         out.row(cells);
     };
     for name in strings(input.get("files")) {
-        row(&mut out, &name, &Answer::stdout(std::fs::read(directory.join(&name)).expect("corpus")));
+        row(
+            &mut out,
+            &name,
+            &Answer::stdout(std::fs::read(directory.join(&name)).expect("corpus")),
+        );
     }
-    let failing = Answer { status: 1, ..Answer::stdout(std::fs::read(directory.join("crafted-clean-two.json")).expect("corpus")) };
-    row(&mut out, "<crafted-clean-two.json, exit status 1>", &failing);
+    let failing = Answer {
+        status: 1,
+        ..Answer::stdout(std::fs::read(directory.join("crafted-clean-two.json")).expect("corpus"))
+    };
+    row(
+        &mut out,
+        "<crafted-clean-two.json, exit status 1>",
+        &failing,
+    );
     let overlays = out.into_string();
 
     let mut out = Text::new();
@@ -184,7 +231,10 @@ fn status_ensure_loaded_overlays_and_hardware_cursor() {
             held = replay.calls().len();
         }
         for (index, call) in replay.calls().iter().enumerate() {
-            out.row([if index < held { "hold" } else { "release" }.to_owned(), quote_list(call)]);
+            out.row([
+                if index < held { "hold" } else { "release" }.to_owned(),
+                quote_list(call),
+            ]);
         }
     }
     let cursor = out.into_string();

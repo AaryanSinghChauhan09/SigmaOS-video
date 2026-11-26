@@ -19,7 +19,11 @@ pub fn camera_name(description: &str) -> String {
     };
     let device = qstring::trimmed(&description[..separator]);
     let stream = qstring::trimmed(&description[separator + 2..]);
-    if device.starts_with(stream) { device.to_owned() } else { description.to_owned() }
+    if device.starts_with(stream) {
+        device.to_owned()
+    } else {
+        description.to_owned()
+    }
 }
 
 /// `Launcher::formatDuration`: whole seconds (rounded with `qRound`, never below 0) as
@@ -39,7 +43,11 @@ pub fn normalized_webcam_height(value: i32) -> i32 {
 pub fn normalized_webcam_rotation(value: i32) -> i32 {
     // ((value % 360) + 360) % 360 in the C++, which is the Euclidean remainder for every int.
     let value = value.rem_euclid(360);
-    if matches!(value, 0 | 90 | 180 | 270) { value } else { 0 }
+    if matches!(value, 0 | 90 | 180 | 270) {
+        value
+    } else {
+        0
+    }
 }
 
 /// What `setSelfViewSize` makes of a value: `S`, `M` or `L` in upper case, or `None` when the
@@ -73,18 +81,28 @@ pub struct AudioDevice {
 pub fn audio_devices_from(output: Option<&[u8]>) -> Vec<AudioDevice> {
     let mut devices = Vec::new();
     if let Some(output) = output {
-        for line in qstring::from_utf8(output).split('\n').filter(|line| !line.is_empty()) {
-            let Some(separator) = line.find('|').filter(|&separator| separator > 0) else { continue };
+        for line in qstring::from_utf8(output)
+            .split('\n')
+            .filter(|line| !line.is_empty())
+        {
+            let Some(separator) = line.find('|').filter(|&separator| separator > 0) else {
+                continue;
+            };
             let id = qstring::trimmed(&line[..separator]);
             if id != "default_input" && !id.starts_with("alsa_input.") {
                 continue;
             }
-            devices
-                .push(AudioDevice { value: id.to_owned(), text: qstring::trimmed(&line[separator + 1..]).to_owned() });
+            devices.push(AudioDevice {
+                value: id.to_owned(),
+                text: qstring::trimmed(&line[separator + 1..]).to_owned(),
+            });
         }
     }
     if devices.is_empty() {
-        devices.push(AudioDevice { value: "default_input".into(), text: "Default input".into() });
+        devices.push(AudioDevice {
+            value: "default_input".into(),
+            text: "Default input".into(),
+        });
     }
     devices
 }
@@ -93,8 +111,8 @@ pub fn audio_devices_from(output: Option<&[u8]>) -> Vec<AudioDevice> {
 pub fn audio_devices() -> Vec<AudioDevice> {
     let mut process = Process::new();
     process.start("gpu-screen-recorder", &["--list-audio-devices"]);
-    let output =
-        (process.wait_for_finished(5000) && process.exit_code() == 0).then(|| process.read_all_standard_output());
+    let output = (process.wait_for_finished(5000) && process.exit_code() == 0)
+        .then(|| process.read_all_standard_output());
     audio_devices_from(output.as_deref())
 }
 
@@ -108,10 +126,21 @@ pub struct MicrophoneSelection {
 
 /// `refreshAudioDevices`'s choice among `devices`. A microphone that isn't plugged in stays
 /// chosen, so it is used again once it is back.
-pub fn select_microphone(devices: &[AudioDevice], chosen: &str, current: &str) -> MicrophoneSelection {
+pub fn select_microphone(
+    devices: &[AudioDevice],
+    chosen: &str,
+    current: &str,
+) -> MicrophoneSelection {
     let chosen_found = devices.iter().any(|device| device.value == chosen);
-    let microphone = if chosen_found { chosen.to_owned() } else { "default_input".to_owned() };
-    MicrophoneSelection { changed: microphone != current, microphone }
+    let microphone = if chosen_found {
+        chosen.to_owned()
+    } else {
+        "default_input".to_owned()
+    };
+    MicrophoneSelection {
+        changed: microphone != current,
+        microphone,
+    }
 }
 
 /// A camera as the launcher lists it (`webcamDevices`): the path settings keep, the name shown,
@@ -174,7 +203,11 @@ pub fn webcam_devices(
         }
     }
     if cameras.is_empty() && exists(webcam_device) {
-        devices.push(WebcamDevice { value: webcam_device.to_owned(), text: webcam_device.to_owned(), node: None });
+        devices.push(WebcamDevice {
+            value: webcam_device.to_owned(),
+            text: webcam_device.to_owned(),
+            node: None,
+        });
     }
     let listed = |path: &str| devices.iter().any(|device| device.value == path);
     let selected = if listed(chosen_webcam_device) {
@@ -184,7 +217,11 @@ pub fn webcam_devices(
     } else {
         devices[0].value.clone()
     };
-    WebcamSelection { changed: selected != webcam_device, device: selected, devices }
+    WebcamSelection {
+        changed: selected != webcam_device,
+        device: selected,
+        devices,
+    }
 }
 
 /// The self-view status line of `refreshRecording` (with the webcam on), from the self-view
@@ -200,7 +237,10 @@ pub fn self_view_status(host_pid: i64, host_alive: impl FnOnce() -> bool, host: 
     } else if host.value("camera_status").to_string_or("") == "ready" {
         status = if host.value("visible").to_bool(false) {
             // arg() does not scan the monitor's name for placeholders.
-            format!("Self-view floating on {} — drag it where you want it", host.value("monitor").to_string_or(""))
+            format!(
+                "Self-view floating on {} — drag it where you want it",
+                host.value("monitor").to_string_or("")
+            )
         } else {
             "Camera ready — self-view hidden".into()
         };

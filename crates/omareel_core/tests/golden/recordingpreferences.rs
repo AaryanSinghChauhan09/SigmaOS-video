@@ -25,9 +25,13 @@ fn append_bytes(cells: &mut Vec<String>, path: &str) {
 
 /// README: `missing` | `directory <mode>` | `file <mode> [<bytes>]` | `symlink <target str> <state>`.
 fn file_state(h: &Hermetic, path: &str) -> Vec<String> {
-    let Ok(meta) = std::fs::symlink_metadata(path) else { return vec!["missing".into()] };
+    let Ok(meta) = std::fs::symlink_metadata(path) else {
+        return vec!["missing".into()];
+    };
     if meta.file_type().is_symlink() {
-        let target = std::fs::read_link(path).map(|t| t.to_string_lossy().into_owned()).unwrap_or_default();
+        let target = std::fs::read_link(path)
+            .map(|t| t.to_string_lossy().into_owned())
+            .unwrap_or_default();
         let mut cells = vec!["symlink".to_owned(), quote(&h.sanitize(&target))];
         let Ok(meta) = std::fs::metadata(path) else {
             cells.push("missing".into());
@@ -59,14 +63,23 @@ fn fields(p: &RecordingPreferences) -> Vec<(&'static str, String)> {
         ("webcamChosenDevice", quote(&p.webcam_chosen_device)),
         ("webcamHeight", p.webcam_height.to_string()),
         ("webcamRotation", p.webcam_rotation.to_string()),
-        ("webcamFlipHorizontal", boolean(p.webcam_flip_horizontal).into()),
+        (
+            "webcamFlipHorizontal",
+            boolean(p.webcam_flip_horizontal).into(),
+        ),
         ("selfViewEnabled", boolean(p.self_view_enabled).into()),
         ("selfViewSize", quote(&p.self_view_size)),
         ("selfViewX", num(p.self_view_x)),
         ("selfViewY", num(p.self_view_y)),
         ("captureBackend", quote(&p.capture_backend)),
-        ("countdownBeforeRecording", boolean(p.countdown_before_recording).into()),
-        ("webcam", Value::Object(p.webcam.clone()).to_json(Format::Compact)),
+        (
+            "countdownBeforeRecording",
+            boolean(p.countdown_before_recording).into(),
+        ),
+        (
+            "webcam",
+            Value::Object(p.webcam.clone()).to_json(Format::Compact),
+        ),
     ]
 }
 
@@ -87,7 +100,9 @@ fn legacy_file(config: &str) -> String {
 /// Gives every directory and file under `root` its owner bits back (links are not followed),
 /// so the scratch can be removed.
 fn restore_modes(path: &str) {
-    let Ok(meta) = std::fs::symlink_metadata(path) else { return };
+    let Ok(meta) = std::fs::symlink_metadata(path) else {
+        return;
+    };
     if meta.file_type().is_symlink() {
         return;
     }
@@ -106,14 +121,22 @@ fn save_and_reload(h: &Hermetic, out: &mut Text, preferences: &RecordingPreferen
         Ok(()) => (true, String::new()),
         Err(error) => (false, error),
     };
-    out.row(["save".to_owned(), boolean(ok).into(), quote(&h.sanitize(&error))]);
+    out.row([
+        "save".to_owned(),
+        boolean(ok).into(),
+        quote(&h.sanitize(&error)),
+    ]);
     let mut after = vec!["after-save".to_owned(), "current".into()];
     after.extend(file_state(h, &current_file(config)));
     out.row(after);
     let before = fields(preferences);
     let reloaded = fields(&RecordingPreferences::load());
-    let differing: Vec<String> =
-        before.iter().zip(&reloaded).filter(|(a, b)| a.1 != b.1).map(|(a, _)| a.0.to_owned()).collect();
+    let differing: Vec<String> = before
+        .iter()
+        .zip(&reloaded)
+        .filter(|(a, b)| a.1 != b.1)
+        .map(|(a, _)| a.0.to_owned())
+        .collect();
     let mut row = vec!["reload".to_owned()];
     if differing.is_empty() {
         row.push("same".into());
@@ -127,7 +150,9 @@ fn save_and_reload(h: &Hermetic, out: &mut Text, preferences: &RecordingPreferen
 #[test]
 fn cases_txt() {
     if running_as_root() {
-        eprintln!("skipped: the recordingpreferences states check permission errors as an ordinary user");
+        eprintln!(
+            "skipped: the recordingpreferences states check permission errors as an ordinary user"
+        );
         return;
     }
     let h = Hermetic::new("recordingpreferences");
@@ -148,7 +173,10 @@ fn cases_txt() {
         h.set_env("XDG_CONFIG_HOME", &config);
         setup(&root, &mut config);
         out.section(label);
-        out.row(["path".to_owned(), quote(&h.sanitize(&RecordingPreferences::path()))]);
+        out.row([
+            "path".to_owned(),
+            quote(&h.sanitize(&RecordingPreferences::path())),
+        ]);
         let preferences = RecordingPreferences::load();
         dump_fields(&mut out, &preferences);
         let mut current = vec!["after-load".to_owned(), "current".into()];
@@ -165,13 +193,23 @@ fn cases_txt() {
 
     for file in sorted_entries(&corpus, false) {
         let bytes = std::fs::read(corpus.join(&file)).expect("corpus file");
-        let base = file.rsplit_once('.').map_or(file.as_str(), |(base, _)| base);
-        run(&format!("current-{base}"), &|_, config| write_file(&current_file(config), &bytes));
+        let base = file
+            .rsplit_once('.')
+            .map_or(file.as_str(), |(base, _)| base);
+        run(&format!("current-{base}"), &|_, config| {
+            write_file(&current_file(config), &bytes)
+        });
     }
-    for file in ["valid-full.json", "invalid-json.json", "webcam-legacy-inset.json"] {
+    for file in [
+        "valid-full.json",
+        "invalid-json.json",
+        "webcam-legacy-inset.json",
+    ] {
         let bytes = corpus_file(file);
         let base = file.trim_end_matches(".json");
-        run(&format!("legacy-{base}"), &|_, config| write_file(&legacy_file(config), &bytes));
+        run(&format!("legacy-{base}"), &|_, config| {
+            write_file(&legacy_file(config), &bytes)
+        });
     }
     let full = corpus_file("valid-full.json");
     let small = corpus_file("self-view-small-lowercase.json");
@@ -220,7 +258,9 @@ fn cases_txt() {
         write_file(&format!("{config}/omareel/real.json"), &full);
         symlink("real.json", current_file(config)).expect("symlink");
     });
-    run("special-config-home-read-only", &|_, config| chmod(config, 0o500));
+    run("special-config-home-read-only", &|_, config| {
+        chmod(config, 0o500)
+    });
     run("special-xdg-config-home-unset", &|root, config| {
         h.unset_env("XDG_CONFIG_HOME");
         *config = format!("{root}/home/.config");
@@ -238,7 +278,10 @@ fn cases_txt() {
         std::fs::create_dir_all(&config).expect("mkpath config");
         h.set_env("XDG_CONFIG_HOME", &config);
         out.section(label);
-        out.row(["path".to_owned(), quote(&h.sanitize(&RecordingPreferences::path()))]);
+        out.row([
+            "path".to_owned(),
+            quote(&h.sanitize(&RecordingPreferences::path())),
+        ]);
         dump_fields(&mut out, preferences);
         save_and_reload(&h, &mut out, preferences, &config);
         h.set_env("XDG_CONFIG_HOME", &original_config);

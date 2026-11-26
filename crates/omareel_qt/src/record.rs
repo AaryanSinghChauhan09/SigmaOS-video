@@ -66,7 +66,9 @@ fn record_command(arguments: &QStringList) -> i32 {
 }
 
 fn daemon_main(arguments: &QStringList) -> i32 {
-    daemon::daemon_main(&strings(arguments), &|message| ffi::warning(&QString::from(message)))
+    daemon::daemon_main(&strings(arguments), &|message| {
+        ffi::warning(&QString::from(message))
+    })
 }
 
 fn self_view_ipc(arguments: &QStringList) -> i32 {
@@ -82,7 +84,9 @@ fn start_waiting_bar() {
     if omareel_core::recording_preferences::RecordingPreferences::load().webcam_enabled {
         return;
     }
-    omareel_record::recorder::waiting_bar::start(&omareel_core::compat::qcoreapplication::application_file_path());
+    omareel_record::recorder::waiting_bar::start(
+        &omareel_core::compat::qcoreapplication::application_file_path(),
+    );
 }
 
 fn register_waiting_bar() {

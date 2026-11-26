@@ -20,23 +20,28 @@ use super::files::{
 };
 use super::self_view::{monitor_layouts, self_view_placement};
 use super::state::{
-    notify_stop_failure, read_state_file, run_optional_detached, self_view_host_path, state_file_path,
-    update_recording_state, write_last_error,
+    notify_stop_failure, read_state_file, run_optional_detached, self_view_host_path,
+    state_file_path, update_recording_state, write_last_error,
 };
 use super::{
-    DiscardActions, GsrExitClassification, camera_capture_block, classify_gsr_exit, debug_start_stage,
-    discard_timeline, environment_variable, even_capture_region, microphone_missing, microphone_peak_db, mode_name,
-    monotonic_us, pactl_sources, value_after, write_stderr,
+    DiscardActions, GsrExitClassification, camera_capture_block, classify_gsr_exit,
+    debug_start_stage, discard_timeline, environment_variable, even_capture_region,
+    microphone_missing, microphone_peak_db, mode_name, monotonic_us, pactl_sources, value_after,
+    write_stderr,
 };
 use crate::capture::{CaptureMode, CaptureRegion, RecordOptions};
 use crate::capture_exclusion::{self, HardwareCursorHold};
 use crate::cursor_sampler::CursorSampler;
 use crate::evdev_listener::EvdevListener;
 use crate::screen_capture::{Rect, ScreenCapture, ScreenCaptureConfig};
-use omareel_core::compat::qcoreapplication::{application_dir_path, application_file_path, application_pid};
+use omareel_core::compat::qcoreapplication::{
+    application_dir_path, application_file_path, application_pid,
+};
 use omareel_core::compat::qdir::{self, FileInfo};
 use omareel_core::compat::qjson::{self, Object, Value};
-use omareel_core::compat::qprocess::{self, ChannelMode, DetachedChannels, ExitStatus, Process, ProcessState};
+use omareel_core::compat::qprocess::{
+    self, ChannelMode, DetachedChannels, ExitStatus, Process, ProcessState,
+};
 use omareel_core::compat::qround::q_round;
 use omareel_core::compat::{qfile, qnumber, qstring};
 use omareel_core::recording_preferences::RecordingPreferences;
@@ -78,7 +83,10 @@ fn read_state() -> Object {
 
 /// `updateRecordingState(values)` with its result ignored, as the daemon calls it.
 fn update_state(values: &[(&str, Value)]) {
-    let object: Object = values.iter().map(|(key, value)| (*key, value.clone())).collect();
+    let object: Object = values
+        .iter()
+        .map(|(key, value)| (*key, value.clone()))
+        .collect();
     let _ = update_recording_state(&object);
 }
 
@@ -106,7 +114,10 @@ fn lround_int(x: f64) -> i32 {
 
 /// `QDateTime::currentDateTime().toString("yyyy-MM-dd HH-mm-ss")` in the local time zone.
 fn current_date_time_text() -> String {
-    let mut now = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+    let mut now = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
     // SAFETY: tzset reads TZ, as Qt does before converting; the rest fills locals.
     let tm = unsafe {
         libc::clock_gettime(libc::CLOCK_REALTIME, &mut now);
@@ -142,7 +153,10 @@ impl Drop for BarLaunch {
 
 /// `notifyStartFailure(detail)`.
 fn notify_start_failure(detail: &str) {
-    run_optional_detached("omarchy-notification-send", &["-u", "critical", "Recording failed", detail]);
+    run_optional_detached(
+        "omarchy-notification-send",
+        &["-u", "critical", "Recording failed", detail],
+    );
 }
 
 /// `omarchy-shell -q omarchy.indicators refresh`, so the REC indicator follows.
@@ -194,7 +208,12 @@ fn wait_for_fallback_placement(plugin_exclusion: bool, monitor: &str) -> bool {
 /// with `-s 0x0` for a fullscreen capture that did not need trimming, else the region rounded to
 /// whole logical pixels; no cursor, the first frame's time written, constant frame rate, AAC for
 /// the desktop's and the microphone's audio.
-pub fn gsr_arguments(region: &CaptureRegion, trimmed: bool, options: &RecordOptions, video: &str) -> Vec<String> {
+pub fn gsr_arguments(
+    region: &CaptureRegion,
+    trimmed: bool,
+    options: &RecordOptions,
+    video: &str,
+) -> Vec<String> {
     let mut gsr: Vec<String> = Vec::new();
     let mut push = |items: &[&str]| gsr.extend(items.iter().map(|item| (*item).to_owned()));
     if region.mode == CaptureMode::Fullscreen && !trimmed {
@@ -244,7 +263,10 @@ pub fn gsr_arguments(region: &CaptureRegion, trimmed: bool, options: &RecordOpti
 /// The options `daemonMain` reads from its arguments, with the defaults and normalisation of
 /// each, and whether the chosen microphone had to be swapped for the default one because the
 /// audio server does not have it.
-pub fn daemon_options(arguments: &[String], sources: impl FnOnce() -> Vec<String>) -> (RecordOptions, bool) {
+pub fn daemon_options(
+    arguments: &[String],
+    sources: impl FnOnce() -> Vec<String>,
+) -> (RecordOptions, bool) {
     let has = |name: &str| arguments.iter().any(|argument| argument == name);
     let mut options = RecordOptions {
         fps: to_int(&value_after(arguments, "--fps")),
@@ -345,7 +367,14 @@ fn initial_state(
     state.insert("capture_width", region.width);
     state.insert("capture_height", region.height);
     state.insert("capture_backend", capture_backend);
-    state.insert("overlay_exclusion", if plugin_exclusion { "plugin" } else { "fallback" });
+    state.insert(
+        "overlay_exclusion",
+        if plugin_exclusion {
+            "plugin"
+        } else {
+            "fallback"
+        },
+    );
     state.insert("overlay_monitor", overlay_monitor);
     state.insert("capture_started", false);
     state.insert("countdown_requested", options.countdown);
@@ -354,7 +383,10 @@ fn initial_state(
     state.insert("countdown_end_us", countdown_end_us);
     state.insert("countdown_width", 240);
     state.insert("countdown_height", 240);
-    state.insert("bar_visible", !options.no_bar && !overlay_monitor.is_empty());
+    state.insert(
+        "bar_visible",
+        !options.no_bar && !overlay_monitor.is_empty(),
+    );
     state.insert("bar_width", if options.webcam { 448 } else { 288 });
     state.insert("bar_height", 40);
     state.insert("selfview", self_view.visible);
@@ -364,7 +396,14 @@ fn initial_state(
     state.insert("selfview_pixels", self_view.pixels);
     state.insert("selfview_x", self_view.position.x);
     state.insert("selfview_y", self_view.position.y);
-    state.insert("camera_status", if options.webcam { "starting" } else { "disabled" });
+    state.insert(
+        "camera_status",
+        if options.webcam {
+            "starting"
+        } else {
+            "disabled"
+        },
+    );
     state.insert("camera_record", false);
     state.insert("camera_stop", false);
     state
@@ -380,7 +419,11 @@ fn start_waiting_editor(application: &str, bundle: &str) -> Option<i64> {
         return None;
     }
     let pid = application_pid().to_string();
-    qprocess::start_detached(application, &["edit", "--wait", pid.as_str(), bundle], DetachedChannels::default())
+    qprocess::start_detached(
+        application,
+        &["edit", "--wait", pid.as_str(), bundle],
+        DetachedChannels::default(),
+    )
 }
 
 /// Asks the waiting editor to open the saved recording: SIGUSR1, once its handler is installed
@@ -389,11 +432,18 @@ fn start_waiting_editor(application: &str, bundle: &str) -> Option<i64> {
 fn open_waiting_editor(pid: i64) -> bool {
     let started = Instant::now();
     while started.elapsed() < Duration::from_millis(300) {
-        let Ok(command) = std::fs::read(format!("/proc/{pid}/cmdline")) else { return false };
-        if !command.split(|byte| *byte == 0).any(|argument| argument == b"--wait") {
+        let Ok(command) = std::fs::read(format!("/proc/{pid}/cmdline")) else {
+            return false;
+        };
+        if !command
+            .split(|byte| *byte == 0)
+            .any(|argument| argument == b"--wait")
+        {
             return false;
         }
-        let Ok(status) = std::fs::read_to_string(format!("/proc/{pid}/status")) else { return false };
+        let Ok(status) = std::fs::read_to_string(format!("/proc/{pid}/status")) else {
+            return false;
+        };
         let caught = status
             .lines()
             .find_map(|line| line.strip_prefix("SigCgt:"))
@@ -418,7 +468,15 @@ fn recorded_duration(video: &str) -> Option<f64> {
     let mut ffprobe = Process::new();
     ffprobe.start(
         "ffprobe",
-        &["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video],
+        &[
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            video,
+        ],
     );
     if !ffprobe.wait_for_finished(10000) || ffprobe.exit_code() != 0 {
         return None;
@@ -482,8 +540,14 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
     // SAFETY: the handlers only store to atomics; glibc's signal() installs them with
     // SA_RESTART, as std::signal does.
     unsafe {
-        libc::signal(libc::SIGUSR1, request_stop as extern "C" fn(libc::c_int) as libc::sighandler_t);
-        libc::signal(libc::SIGUSR2, request_discard as extern "C" fn(libc::c_int) as libc::sighandler_t);
+        libc::signal(
+            libc::SIGUSR1,
+            request_stop as extern "C" fn(libc::c_int) as libc::sighandler_t,
+        );
+        libc::signal(
+            libc::SIGUSR2,
+            request_discard as extern "C" fn(libc::c_int) as libc::sighandler_t,
+        );
     }
     let (options, microphone_replaced) = daemon_options(arguments, pactl_sources);
     let mut region = daemon_region(arguments);
@@ -496,10 +560,16 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
 
     let display_name = format!("Recording {}", current_date_time_text());
     qdir::mkpath(&options.output_directory);
-    let mut bundle = qdir::file_path(&options.output_directory, &format!("{display_name}.omareel"));
+    let mut bundle = qdir::file_path(
+        &options.output_directory,
+        &format!("{display_name}.omareel"),
+    );
     let mut suffix = 2;
     while qdir::file_exists(&bundle) {
-        bundle = qdir::file_path(&options.output_directory, &format!("{display_name} {suffix}.omareel"));
+        bundle = qdir::file_path(
+            &options.output_directory,
+            &format!("{display_name} {suffix}.omareel"),
+        );
         suffix += 1;
     }
     if !qdir::mkpath(&bundle) {
@@ -521,7 +591,11 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
     recorder.set_process_channel_mode(ChannelMode::Merged);
     let mut recorder_output = Vec::new();
     let mut debug_log: Option<File> = if environment_variable("OMAREEL_DEBUG") == "1" {
-        std::fs::OpenOptions::new().append(true).create(true).open("/tmp/omareel.log").ok()
+        std::fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open("/tmp/omareel.log")
+            .ok()
     } else {
         None
     };
@@ -529,16 +603,30 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
     let mut camera_backend = String::new();
     let environment_backend = qstring::to_lower(&environment_variable("OMAREEL_CAPTURE"));
     let mut native_capture = environment_backend != "gsr" && options.capture_backend != "gsr";
-    let mut capture_backend = if native_capture { "ext-image-copy-capture" } else { "gsr" }.to_owned();
-    let mut plugin_exclusion = capture_exclusion::ensure_loaded(&application_dir_path()).loaded && native_capture;
-    let output_names: Vec<String> = monitor_layouts().into_iter().map(|layout| layout.name).collect();
-    let mut overlay_monitor = capture_exclusion::overlay_monitor(plugin_exclusion, &region.monitor_name, &output_names);
+    let mut capture_backend = if native_capture {
+        "ext-image-copy-capture"
+    } else {
+        "gsr"
+    }
+    .to_owned();
+    let mut plugin_exclusion =
+        capture_exclusion::ensure_loaded(&application_dir_path()).loaded && native_capture;
+    let output_names: Vec<String> = monitor_layouts()
+        .into_iter()
+        .map(|layout| layout.name)
+        .collect();
+    let mut overlay_monitor =
+        capture_exclusion::overlay_monitor(plugin_exclusion, &region.monitor_name, &output_names);
     if !plugin_exclusion {
         self_view.monitor = overlay_monitor.clone();
         self_view.safe = !overlay_monitor.is_empty();
     }
     let audio_requested = options.desktop_audio || options.microphone_audio;
-    let native_video = if audio_requested { format!("{bundle}/screen-video.mp4") } else { video.clone() };
+    let native_video = if audio_requested {
+        format!("{bundle}/screen-video.mp4")
+    } else {
+        video.clone()
+    };
     let audio_video = format!("{bundle}/audio.mka");
     let mut audio_recorder = Process::new();
     let mut audio_started_us = 0i64;
@@ -562,7 +650,8 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
     let host = read_state_file(&self_view_host_path());
     let host_pid = host.value("pid").to_variant_long_long();
     // SAFETY: kill with signal 0 only checks that the process exists.
-    let adopt_host = options.webcam && host_pid > 0 && unsafe { libc::kill(host_pid as libc::pid_t, 0) } == 0;
+    let adopt_host =
+        options.webcam && host_pid > 0 && unsafe { libc::kill(host_pid as libc::pid_t, 0) } == 0;
     if adopt_host {
         state.insert("host_pid", host_pid);
     }
@@ -572,23 +661,40 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
         } else {
             format!("Could not write recorder state: {message}")
         };
-        return fail_recorder_startup(&reason, &bundle, &video, &mut cursor_sampler, &mut evdev_listener);
+        return fail_recorder_startup(
+            &reason,
+            &bundle,
+            &video,
+            &mut cursor_sampler,
+            &mut evdev_listener,
+        );
     }
-    let _bar_launch = BarLaunch(if !adopt_host && (!options.no_bar || options.webcam || options.countdown) {
-        let mut bar_arguments = vec!["__record-bar".to_owned()];
-        if options.no_bar {
-            bar_arguments.push("--hidden".into());
-        }
-        let application = application_file_path();
-        let flags = if options.no_bar { super::waiting_bar::HIDDEN } else { 0 };
-        Some(std::thread::spawn(move || {
-            // The bar `omareel record` started before its picker, when there is one.
-            super::waiting_bar::adopt(&application, flags)
-                || qprocess::start_detached(&application, &bar_arguments, DetachedChannels::default()).is_some()
-        }))
-    } else {
-        None
-    });
+    let _bar_launch = BarLaunch(
+        if !adopt_host && (!options.no_bar || options.webcam || options.countdown) {
+            let mut bar_arguments = vec!["__record-bar".to_owned()];
+            if options.no_bar {
+                bar_arguments.push("--hidden".into());
+            }
+            let application = application_file_path();
+            let flags = if options.no_bar {
+                super::waiting_bar::HIDDEN
+            } else {
+                0
+            };
+            Some(std::thread::spawn(move || {
+                // The bar `omareel record` started before its picker, when there is one.
+                super::waiting_bar::adopt(&application, flags)
+                    || qprocess::start_detached(
+                        &application,
+                        &bar_arguments,
+                        DetachedChannels::default(),
+                    )
+                    .is_some()
+            }))
+        } else {
+            None
+        },
+    );
     if adopt_host {
         debug_start_stage("host_adopted", daemon_start_us, &format!("pid={host_pid}"));
         let hide_timer = Instant::now();
@@ -617,7 +723,10 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
         let mut crop = Rect::default();
         if region.mode != CaptureMode::Fullscreen {
             let layouts = monitor_layouts();
-            if let Some(monitor) = layouts.iter().find(|layout| layout.name == region.monitor_name) {
+            if let Some(monitor) = layouts
+                .iter()
+                .find(|layout| layout.name == region.monitor_name)
+            {
                 crop = Rect::new(
                     q_round((region.x - monitor.geometry.x) * region.scale),
                     q_round((region.y - monitor.geometry.y) * region.scale),
@@ -639,12 +748,16 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
             native_capture = false;
             capture_backend = "gsr".into();
             plugin_exclusion = false;
-            overlay_monitor = capture_exclusion::overlay_monitor(false, &region.monitor_name, &output_names);
+            overlay_monitor =
+                capture_exclusion::overlay_monitor(false, &region.monitor_name, &output_names);
             update_state(&[
                 ("capture_backend", capture_backend.as_str().into()),
                 ("overlay_exclusion", "fallback".into()),
                 ("overlay_monitor", overlay_monitor.as_str().into()),
-                ("bar_visible", (!options.no_bar && !overlay_monitor.is_empty()).into()),
+                (
+                    "bar_visible",
+                    (!options.no_bar && !overlay_monitor.is_empty()).into(),
+                ),
                 ("selfview_monitor", overlay_monitor.as_str().into()),
                 ("selfview_safe", (!overlay_monitor.is_empty()).into()),
             ]);
@@ -668,12 +781,22 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
             if options.webcam {
                 update_state(&[("camera_stop", true.into())]);
             }
-            drain_recorder_output(&mut recorder, &mut recorder_output, debug_log.as_mut().map(|log| log as &mut dyn Write));
+            drain_recorder_output(
+                &mut recorder,
+                &mut recorder_output,
+                debug_log.as_mut().map(|log| log as &mut dyn Write),
+            );
             let mut reason = last_non_empty_line(&recorder_output);
             if reason.is_empty() {
                 reason = recorder.error_string();
             }
-            return fail_recorder_startup(&reason, &bundle, &video, &mut cursor_sampler, &mut evdev_listener);
+            return fail_recorder_startup(
+                &reason,
+                &bundle,
+                &video,
+                &mut cursor_sampler,
+                &mut evdev_listener,
+            );
         }
     }
     if native_capture && audio_requested {
@@ -694,8 +817,15 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
             msleep(2);
         }
         countdown_end_us = monotonic_us() + 3_000_000;
-        update_state(&[("countdown_active", true.into()), ("countdown_end_us", countdown_end_us.into())]);
-        debug_start_stage("countdown_begin", daemon_start_us, &format!("end_us={countdown_end_us}"));
+        update_state(&[
+            ("countdown_active", true.into()),
+            ("countdown_end_us", countdown_end_us.into()),
+        ]);
+        debug_start_stage(
+            "countdown_begin",
+            daemon_start_us,
+            &format!("end_us={countdown_end_us}"),
+        );
         while monotonic_us() < countdown_end_us && !stop_requested() {
             msleep(20);
         }
@@ -709,7 +839,10 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
     let mut capture_loop_failed = false;
     if native_capture {
         let first_frame_timer = Instant::now();
-        while screen_capture.encoded_frames() == 0 && elapsed_ms(&first_frame_timer) < 2500 && !stop_requested() {
+        while screen_capture.encoded_frames() == 0
+            && elapsed_ms(&first_frame_timer) < 2500
+            && !stop_requested()
+        {
             if !screen_capture.capture_frame(&mut error) {
                 capture_loop_failed = true;
                 break;
@@ -724,7 +857,9 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
     let timestamp_path = format!("{video}.ts");
     if !native_capture && !capture_loop_failed {
         let first_frame_timer = Instant::now();
-        while first_frame_timestamp(&timestamp_path) <= 0 && elapsed_ms(&first_frame_timer) < 2500 && !stop_requested()
+        while first_frame_timestamp(&timestamp_path) <= 0
+            && elapsed_ms(&first_frame_timer) < 2500
+            && !stop_requested()
         {
             if recorder.state() == ProcessState::NotRunning {
                 capture_loop_failed = true;
@@ -737,13 +872,26 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
         }
     }
     if !capture_loop_failed {
-        update_state(&[("capture_started", true.into()), ("camera_record", options.webcam.into())]);
-        let first_us =
-            if native_capture { screen_capture.first_frame_us() } else { first_frame_timestamp(&timestamp_path) };
-        debug_start_stage("first_frame", daemon_start_us, &format!("first_frame_us={first_us}"));
+        update_state(&[
+            ("capture_started", true.into()),
+            ("camera_record", options.webcam.into()),
+        ]);
+        let first_us = if native_capture {
+            screen_capture.first_frame_us()
+        } else {
+            first_frame_timestamp(&timestamp_path)
+        };
+        debug_start_stage(
+            "first_frame",
+            daemon_start_us,
+            &format!("first_frame_us={first_us}"),
+        );
     }
-    let waiting_editor =
-        if !capture_loop_failed && !options.no_open { start_waiting_editor(&application, &bundle) } else { None };
+    let waiting_editor = if !capture_loop_failed && !options.no_open {
+        start_waiting_editor(&application, &bundle)
+    } else {
+        None
+    };
     if let Err(warning) = cursor_sampler.start(&region.monitor_name, options.fps) {
         warn(&warning);
     }
@@ -767,7 +915,10 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
     }
     refresh_indicators();
     while !stop_requested() && !capture_loop_failed {
-        if options.webcam && !camera_available && read_state().value("camera_status").to_string_or("") == "ready" {
+        if options.webcam
+            && !camera_available
+            && read_state().value("camera_status").to_string_or("") == "ready"
+        {
             camera_available = true;
             camera_backend = "ffmpeg-pipe".into();
         }
@@ -782,7 +933,11 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
                 break;
             }
             recorder.wait_for_finished(0);
-            drain_recorder_output(&mut recorder, &mut recorder_output, debug_log.as_mut().map(|log| log as &mut dyn Write));
+            drain_recorder_output(
+                &mut recorder,
+                &mut recorder_output,
+                debug_log.as_mut().map(|log| log as &mut dyn Write),
+            );
             msleep(40);
         }
     }
@@ -827,17 +982,26 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
                     msleep(20);
                 }
             })),
-            remove_bundle: Some(Box::new(|| !qdir::file_exists(&bundle) || qdir::remove_recursively(&bundle))),
+            remove_bundle: Some(Box::new(|| {
+                !qdir::file_exists(&bundle) || qdir::remove_recursively(&bundle)
+            })),
             remove_state: Some(Box::new(|| {
                 qfile::remove(&state_file_path());
             })),
         });
         refresh_indicators();
         let name = FileInfo::new(bundle.clone()).complete_base_name();
-        run_optional_detached("omarchy-notification-send", &["Recording discarded", name.as_str()]);
+        run_optional_detached(
+            "omarchy-notification-send",
+            &["Recording discarded", name.as_str()],
+        );
         write_stderr(&format!(
             "{}{bundle}\n",
-            if removed { "Recording discarded: " } else { "Could not discard recording: " }
+            if removed {
+                "Recording discarded: "
+            } else {
+                "Could not discard recording: "
+            }
         ));
         return if removed { 0 } else { 2 };
     }
@@ -870,7 +1034,10 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
         debug_start_stage("stop_audio_muxed", daemon_start_us, "");
         // A killed ffmpeg wrote no report.
         let audio_log = format!("{audio_video}.log");
-        if audio_active && options.microphone_audio && audio_recorder.exit_status() == ExitStatus::NormalExit {
+        if audio_active
+            && options.microphone_audio
+            && audio_recorder.exit_status() == ExitStatus::NormalExit
+        {
             if let Ok(log) = qfile::read_all(&audio_log) {
                 microphone_peak = microphone_peak_db(&qstring::from_utf8(&log));
             }
@@ -907,13 +1074,23 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
         }
     }
     debug_start_stage("stop_camera_stopped", daemon_start_us, "");
-    if FileInfo::new(camera_video.clone()).exists() && FileInfo::new(camera_video.clone()).size() == 0 {
+    if FileInfo::new(camera_video.clone()).exists()
+        && FileInfo::new(camera_video.clone()).size() == 0
+    {
         qfile::remove(&camera_video);
     }
     if !native_capture {
-        drain_recorder_output(&mut recorder, &mut recorder_output, debug_log.as_mut().map(|log| log as &mut dyn Write));
+        drain_recorder_output(
+            &mut recorder,
+            &mut recorder_output,
+            debug_log.as_mut().map(|log| log as &mut dyn Write),
+        );
     }
-    let recorder_error_line = if native_capture { error.clone() } else { last_non_empty_line(&recorder_output) };
+    let recorder_error_line = if native_capture {
+        error.clone()
+    } else {
+        last_non_empty_line(&recorder_output)
+    };
     let recorder_failed = if native_capture {
         capture_loop_failed
     } else {
@@ -961,7 +1138,8 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
         );
         let _ = log.flush();
     }
-    let mut ok = !forced_stop && exit_classification != GsrExitClassification::Failure && first_frame_us > 0;
+    let mut ok =
+        !forced_stop && exit_classification != GsrExitClassification::Failure && first_frame_us > 0;
     let mut recorded_region = region.clone();
     let recorded_fps = options.fps;
     let output_size = screen_capture.output_size();
@@ -971,15 +1149,43 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
         recorded_region.scale = f64::from(output_size.width) / region.width;
     }
     // The C++ keeps these writers' messages in `error`, which nothing reads any more.
-    ok = write_input_log(&format!("{bundle}/input.jsonl"), &cursor, &device_events, &recorded_region).is_ok() && ok;
+    ok = write_input_log(
+        &format!("{bundle}/input.jsonl"),
+        &cursor,
+        &device_events,
+        &recorded_region,
+    )
+    .is_ok()
+        && ok;
     debug_start_stage("stop_input_written", daemon_start_us, "");
     let mut capture = Object::new();
     capture.insert("version", 1);
     capture.insert("backend", capture_backend.as_str());
     capture.insert("fps", recorded_fps);
-    capture.insert("overlay_exclusion", if plugin_exclusion { "plugin" } else { "fallback" });
-    capture.insert("width", if native_capture { output_size.width } else { region.physical_width });
-    capture.insert("height", if native_capture { output_size.height } else { region.physical_height });
+    capture.insert(
+        "overlay_exclusion",
+        if plugin_exclusion {
+            "plugin"
+        } else {
+            "fallback"
+        },
+    );
+    capture.insert(
+        "width",
+        if native_capture {
+            output_size.width
+        } else {
+            region.physical_width
+        },
+    );
+    capture.insert(
+        "height",
+        if native_capture {
+            output_size.height
+        } else {
+            region.physical_height
+        },
+    );
     capture.insert("mode", mode_name(region.mode));
     let mut region_object = Object::new();
     region_object.insert("x", region.x);
@@ -993,15 +1199,25 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
     capture.insert("started_us", started_us);
     capture.insert("stopped_us", stopped_us);
     let mut audio = Object::new();
-    audio.insert("desktop", options.desktop_audio && (!native_capture || audio_muxed));
-    audio.insert("mic", options.microphone_audio && (!native_capture || audio_muxed));
+    audio.insert(
+        "desktop",
+        options.desktop_audio && (!native_capture || audio_muxed),
+    );
+    audio.insert(
+        "mic",
+        options.microphone_audio && (!native_capture || audio_muxed),
+    );
     audio.insert("microphoneDevice", options.microphone_device.as_str());
     capture.insert("audio", audio);
     if native_capture {
-        let captured_span_us = (screen_capture.last_frame_us() - screen_capture.first_frame_us()).max(1);
+        let captured_span_us =
+            (screen_capture.last_frame_us() - screen_capture.first_frame_us()).max(1);
         let frames = screen_capture.encoded_frames();
-        let measured_rate =
-            if frames > 1 { f64::from(frames - 1) * 1_000_000.0 / captured_span_us as f64 } else { 0.0 };
+        let measured_rate = if frames > 1 {
+            f64::from(frames - 1) * 1_000_000.0 / captured_span_us as f64
+        } else {
+            0.0
+        };
         let mut statistics = Object::new();
         statistics.insert("frames", frames);
         statistics.insert("drops", screen_capture.dropped_frames());
@@ -1013,7 +1229,10 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
             audio.insert("desktop", options.desktop_audio && audio_muxed);
             audio.insert("mic", options.microphone_audio && audio_muxed);
             audio.insert("microphoneDevice", options.microphone_device.as_str());
-            audio.insert("startOffsetUs", audio_started_us - screen_capture.first_frame_us());
+            audio.insert(
+                "startOffsetUs",
+                audio_started_us - screen_capture.first_frame_us(),
+            );
             capture.insert("audio", audio);
         }
     }
@@ -1025,7 +1244,13 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
             let stream = streams.first().map(Value::to_object).unwrap_or_default();
             // camera.mp4 is fragmented: a recorder killed before its first fragment was written
             // leaves a header that probes as a stream without a single frame.
-            let duration = to_double(&document.value("format").to_object().value("duration").to_string_or(""));
+            let duration = to_double(
+                &document
+                    .value("format")
+                    .to_object()
+                    .value("duration")
+                    .to_string_or(""),
+            );
             if !stream.is_empty() && duration > 0.0 {
                 let rate_text = stream.value("r_frame_rate").to_string_or("");
                 let rate: Vec<&str> = rate_text.split('/').collect();
@@ -1036,7 +1261,9 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
                 };
                 let camera_state = read_state();
                 if camera_backend.is_empty() {
-                    camera_backend = camera_state.value("camera_backend").to_string_or("ffmpeg-pipe");
+                    camera_backend = camera_state
+                        .value("camera_backend")
+                        .to_string_or("ffmpeg-pipe");
                 }
                 capture.insert(
                     "camera",
@@ -1048,8 +1275,12 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
                         fps,
                         camera_first_frame_us,
                         &camera_backend,
-                        camera_state.value("camera_rotation").to_int(options.webcam_rotation),
-                        camera_state.value("camera_flip_horizontal").to_bool(options.webcam_flip_horizontal),
+                        camera_state
+                            .value("camera_rotation")
+                            .to_int(options.webcam_rotation),
+                        camera_state
+                            .value("camera_flip_horizontal")
+                            .to_bool(options.webcam_flip_horizontal),
                         &camera_state.value("camera_shape").to_string_or("round"),
                         camera_state.value("camera_radius").to_double(16.0),
                     ),
@@ -1066,10 +1297,18 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
     debug_start_stage("stop_camera_probed", daemon_start_us, "");
     ok = write_json(&format!("{bundle}/capture.json"), &capture).is_ok() && ok;
     let mut recording = Object::new();
-    recording.insert("overlay_exclusion", if plugin_exclusion { "plugin" } else { "fallback" });
+    recording.insert(
+        "overlay_exclusion",
+        if plugin_exclusion {
+            "plugin"
+        } else {
+            "fallback"
+        },
+    );
     ok = write_json(&format!("{bundle}/recording.json"), &recording).is_ok() && ok;
 
-    if !ok && (!FileInfo::new(video.clone()).is_file() || FileInfo::new(video.clone()).size() == 0) {
+    if !ok && (!FileInfo::new(video.clone()).is_file() || FileInfo::new(video.clone()).size() == 0)
+    {
         qdir::remove_recursively(&bundle);
     }
     qfile::remove(&state_file_path());
@@ -1077,7 +1316,11 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
         // The editor first: everything after it can happen while it opens.
         debug_start_stage("stop_editor_launch", daemon_start_us, "");
         if !waiting_editor.is_some_and(open_waiting_editor) {
-            qprocess::start_detached(&application, &["edit", bundle.as_str()], DetachedChannels::default());
+            qprocess::start_detached(
+                &application,
+                &["edit", bundle.as_str()],
+                DetachedChannels::default(),
+            );
         }
     }
     refresh_indicators();
@@ -1091,21 +1334,35 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
         let microphone_silent = !audio_lost && microphone_peak <= -90.0;
         let name = FileInfo::new(bundle.clone()).complete_base_name();
         let (title, body) = if audio_lost {
-            ("Recording saved without audio", "No sound arrived from the desktop or microphone")
+            (
+                "Recording saved without audio",
+                "No sound arrived from the desktop or microphone",
+            )
         } else if microphone_silent {
-            ("Recording saved with a silent microphone", "It recorded no sound at all. Check that it isn't muted.")
+            (
+                "Recording saved with a silent microphone",
+                "It recorded no sound at all. Check that it isn't muted.",
+            )
         } else {
             ("Recording saved", name.as_str())
         };
         run_optional_detached(
             "omarchy-notification-send",
-            &[title, body, "--exec", application.as_str(), "edit", bundle.as_str()],
+            &[
+                title,
+                body,
+                "--exec",
+                application.as_str(),
+                "edit",
+                bundle.as_str(),
+            ],
         );
     } else {
         let mut detail = if forced_stop {
             "Recording process had to be force-killed. Video may be corrupted.".to_owned()
         } else {
-            "The recording could not be finalized. Set OMAREEL_DEBUG=1 and check /tmp/omareel.log.".to_owned()
+            "The recording could not be finalized. Set OMAREEL_DEBUG=1 and check /tmp/omareel.log."
+                .to_owned()
         };
         if (unexpected_exit || recorder_failed) && !recorder_error_line.is_empty() {
             detail += &format!("\ngpu-screen-recorder: {recorder_error_line}");
@@ -1118,13 +1375,28 @@ pub fn daemon_main(arguments: &[String], warn: &dyn Fn(&str)) -> i32 {
         let mut ffmpeg = Process::new();
         ffmpeg.start(
             "ffmpeg",
-            &["-y", "-loglevel", "error", "-i", &video, "-frames:v", "1", "-q:v", "3", &format!("{bundle}/thumb.jpg")],
+            &[
+                "-y",
+                "-loglevel",
+                "error",
+                "-i",
+                &video,
+                "-frames:v",
+                "1",
+                "-q:v",
+                "3",
+                &format!("{bundle}/thumb.jpg"),
+            ],
         );
         ffmpeg.wait_for_finished(10000);
     }
     debug_start_stage("stop_thumbnail", daemon_start_us, "");
     if let Some(log) = debug_log.as_mut() {
-        let _ = log.write_all(if ok { b"omareel: daemon exit=0\n" } else { b"omareel: daemon exit=2\n" });
+        let _ = log.write_all(if ok {
+            b"omareel: daemon exit=0\n"
+        } else {
+            b"omareel: daemon exit=2\n"
+        });
         let _ = log.flush();
     }
     if ok { 0 } else { 2 }
@@ -1163,7 +1435,13 @@ mod tests {
         assert_eq!((options.fps, options.output_directory.as_str()), (30, "/r"));
         assert_eq!((options.webcam_height, options.webcam_rotation), (1080, 0));
         assert_eq!(options.self_view_size, "L");
-        assert_eq!((options.webcam_device.as_str(), options.capture_backend.as_str()), ("/dev/video2", "auto"));
+        assert_eq!(
+            (
+                options.webcam_device.as_str(),
+                options.capture_backend.as_str()
+            ),
+            ("/dev/video2", "auto")
+        );
         let (options, replaced) = daemon_options(&arguments(&["--microphone-audio"]), Vec::new);
         assert!(!replaced);
         assert_eq!((options.fps, options.self_view_size.as_str()), (0, "M"));
@@ -1191,9 +1469,28 @@ mod tests {
         };
         let gsr = gsr_arguments(&region, false, &options, "/b/screen.mp4");
         assert_eq!(gsr[..4], ["-w", "region", "-region", "641x360+11+-1"]);
-        assert_eq!(gsr[gsr.len() - 6..], ["-a", "default_output|mic", "-ac", "aac", "-o", "/b/screen.mp4"]);
-        let whole = CaptureRegion { mode: CaptureMode::Fullscreen, ..region.clone() };
-        assert_eq!(gsr_arguments(&whole, false, &RecordOptions::default(), "v")[..4], ["-w", "DP-1", "-s", "0x0"]);
-        assert_eq!(gsr_arguments(&whole, true, &RecordOptions::default(), "v")[1], "region");
+        assert_eq!(
+            gsr[gsr.len() - 6..],
+            [
+                "-a",
+                "default_output|mic",
+                "-ac",
+                "aac",
+                "-o",
+                "/b/screen.mp4"
+            ]
+        );
+        let whole = CaptureRegion {
+            mode: CaptureMode::Fullscreen,
+            ..region.clone()
+        };
+        assert_eq!(
+            gsr_arguments(&whole, false, &RecordOptions::default(), "v")[..4],
+            ["-w", "DP-1", "-s", "0x0"]
+        );
+        assert_eq!(
+            gsr_arguments(&whole, true, &RecordOptions::default(), "v")[1],
+            "region"
+        );
     }
 }

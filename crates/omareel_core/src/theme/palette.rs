@@ -30,7 +30,11 @@ fn mix_color(from: &QColor, to: &QColor, amount: f64) -> QColor {
 fn luminance(color: &QColor) -> f64 {
     let linear = |channel: i32| {
         let channel = channel as f64 / 255.0;
-        if channel <= 0.04045 { channel / 12.92 } else { ((channel + 0.055) / 1.055).powf(2.4) }
+        if channel <= 0.04045 {
+            channel / 12.92
+        } else {
+            ((channel + 0.055) / 1.055).powf(2.4)
+        }
     };
     0.2126 * linear(color.red()) + 0.7152 * linear(color.green()) + 0.0722 * linear(color.blue())
 }
@@ -44,7 +48,14 @@ fn white() -> QColor {
 }
 
 /// A colour from shell.toml: a role name, or a colour (the first word of the value).
-fn role_color(value: &str, foreground: &QColor, background: &QColor, accent: &QColor, attention: &QColor, fallback: &QColor) -> QColor {
+fn role_color(
+    value: &str,
+    foreground: &QColor,
+    background: &QColor,
+    accent: &QColor,
+    attention: &QColor,
+    fallback: &QColor,
+) -> QColor {
     let value = value.trim();
     match value.to_lowercase().as_str() {
         "foreground" | "text" | "hyprland.active-border-foreground" => return *foreground,
@@ -114,8 +125,11 @@ impl Palette {
         let zoom_accent = color_or(".color4", "#bb9af7");
         let background = color_or(".background", "#1a1b26");
         let foreground = color_or(".foreground", "#a9b1d6");
-        let lighter =
-            if colors.contains_key(".lighter_background") { QColor::parse(get(colors, ".lighter_background")) } else { background.lighter(106) };
+        let lighter = if colors.contains_key(".lighter_background") {
+            QColor::parse(get(colors, ".lighter_background"))
+        } else {
+            background.lighter(106)
+        };
         let darker = if colors.contains_key(".dark_background") {
             QColor::parse(get(colors, ".dark_background"))
         } else {
@@ -125,24 +139,55 @@ impl Palette {
                 q_round(background.blue() as f64 * 0.75),
             )
         };
-        let attention =
-            role_color(values_or(shell, "bar.active", get(colors, ".red")), &foreground, &background, &accent, &accent, &accent);
-        let number = |key: &str, fallback: f64| shell.get(key).and_then(|v| qnumber::to_double(v)).unwrap_or(fallback);
-        let color = |key: &str, fallback: &QColor| role_color(get(shell, key), &foreground, &background, &accent, &attention, fallback);
+        let attention = role_color(
+            values_or(shell, "bar.active", get(colors, ".red")),
+            &foreground,
+            &background,
+            &accent,
+            &accent,
+            &accent,
+        );
+        let number = |key: &str, fallback: f64| {
+            shell
+                .get(key)
+                .and_then(|v| qnumber::to_double(v))
+                .unwrap_or(fallback)
+        };
+        let color = |key: &str, fallback: &QColor| {
+            role_color(
+                get(shell, key),
+                &foreground,
+                &background,
+                &accent,
+                &attention,
+                fallback,
+            )
+        };
         let surface = |key: &str, fallback: &QColor, fallback_alpha: f64| {
-            alpha_color(&color(key, fallback), number(&format!("{key}-alpha"), fallback_alpha))
+            alpha_color(
+                &color(key, fallback),
+                number(&format!("{key}-alpha"), fallback_alpha),
+            )
         };
 
         let dark = get(colors, ".mode") == "dark" || luminance(&background) < 0.35;
         // Layered surfaces: the stage sits below the chrome, cards and raised controls lift
         // above it.
         let canvas = if dark {
-            if colors.contains_key(".dark_background") { darker } else { mix_color(&background, &black(), 0.22) }
+            if colors.contains_key(".dark_background") {
+                darker
+            } else {
+                mix_color(&background, &black(), 0.22)
+            }
         } else {
             mix_color(&background, &foreground, 0.05)
         };
         let card = mix_color(&background, &foreground, if dark { 0.035 } else { 0.025 });
-        let raised = if dark { mix_color(&background, &foreground, 0.11) } else { mix_color(&background, &white(), 0.7) };
+        let raised = if dark {
+            mix_color(&background, &foreground, 0.11)
+        } else {
+            mix_color(&background, &white(), 0.7)
+        };
         let text_strong = if colors.contains_key(".bright_foreground") && dark {
             QColor::parse(get(colors, ".bright_foreground"))
         } else if dark {
@@ -158,14 +203,24 @@ impl Palette {
 
         let base = q_round(number("font.base-size", 12.0)).max(1);
         let type_size = |multiplier: f64| q_round(base as f64 * multiplier).max(1);
-        let font_token = |key: &str, multiplier: f64| match shell.get(&format!("font.{key}")).and_then(|v| qnumber::to_int(v)) {
+        let font_token = |key: &str, multiplier: f64| match shell
+            .get(&format!("font.{key}"))
+            .and_then(|v| qnumber::to_int(v))
+        {
             Some(explicit) => explicit.max(1),
             None => q_round(base as f64 * multiplier).max(1),
         };
         let scale_with_font = values_or(shell, "spacing.scale-with-font", "true") != "false";
-        let spacing_scale = number("spacing.scale", 1.0) * if scale_with_font { base as f64 / 12.0 } else { 1.0 };
+        let spacing_scale = number("spacing.scale", 1.0)
+            * if scale_with_font {
+                base as f64 / 12.0
+            } else {
+                1.0
+            };
         let spacing = |key: &str, fallback: i32| {
-            let explicit = shell.get(&format!("spacing.{key}")).and_then(|v| qnumber::to_double(v));
+            let explicit = shell
+                .get(&format!("spacing.{key}"))
+                .and_then(|v| qnumber::to_double(v));
             q_round(explicit.unwrap_or(fallback as f64 * spacing_scale)).max(0)
         };
 
@@ -173,11 +228,26 @@ impl Palette {
             normal_fill: alpha_color(&normal, number("controls.normal-fill-alpha", 0.04)),
             hover_fill: alpha_color(&hover, number("controls.hover-cursor-fill-alpha", 0.08)),
             selected_fill: alpha_color(&selected, number("controls.selected-fill-alpha", 0.18)),
-            pressed_fill: alpha_color(&color("controls.pressed-color", &hover), number("controls.pressed-fill-alpha", 0.22)),
-            selection_fill: alpha_color(&color("controls.selection-color", &foreground), number("controls.selection-fill-alpha", 0.35)),
-            normal_border: alpha_color(&color("controls.normal-border", &normal), number("controls.normal-border-alpha", 0.40)),
-            hover_border: alpha_color(&color("controls.hover-cursor-border", &hover), number("controls.hover-cursor-border-alpha", 0.25)),
-            selected_border: alpha_color(&color("controls.selected-border", &selected), number("controls.selected-border-alpha", 1.0)),
+            pressed_fill: alpha_color(
+                &color("controls.pressed-color", &hover),
+                number("controls.pressed-fill-alpha", 0.22),
+            ),
+            selection_fill: alpha_color(
+                &color("controls.selection-color", &foreground),
+                number("controls.selection-fill-alpha", 0.35),
+            ),
+            normal_border: alpha_color(
+                &color("controls.normal-border", &normal),
+                number("controls.normal-border-alpha", 0.40),
+            ),
+            hover_border: alpha_color(
+                &color("controls.hover-cursor-border", &hover),
+                number("controls.hover-cursor-border-alpha", 0.25),
+            ),
+            selected_border: alpha_color(
+                &color("controls.selected-border", &selected),
+                number("controls.selected-border-alpha", 1.0),
+            ),
             normal_border_width: width("controls.normal-border-width", 1.0),
             hover_border_width: width("controls.hover-cursor-border-width", 1.0),
             selected_border_width: width("controls.selected-border-width", 0.0),
@@ -250,7 +320,10 @@ impl Palette {
 
     /// The body text size, which the application font is set to.
     pub fn body_size(&self) -> i32 {
-        self.type_sizes.iter().find(|(k, _)| *k == "body").map_or(0, |(_, v)| *v)
+        self.type_sizes
+            .iter()
+            .find(|(k, _)| *k == "body")
+            .map_or(0, |(_, v)| *v)
     }
 
     pub fn surface(&self) -> QColor {
@@ -308,11 +381,19 @@ impl Palette {
     }
 
     pub fn accent_hover(&self) -> QColor {
-        if self.dark { self.accent.lighter(112) } else { self.accent.darker(108) }
+        if self.dark {
+            self.accent.lighter(112)
+        } else {
+            self.accent.darker(108)
+        }
     }
 
     pub fn accent_pressed(&self) -> QColor {
-        if self.dark { self.accent.darker(112) } else { self.accent.darker(118) }
+        if self.dark {
+            self.accent.darker(112)
+        } else {
+            self.accent.darker(118)
+        }
     }
 
     pub fn shadow(&self) -> QColor {
@@ -320,7 +401,11 @@ impl Palette {
     }
 
     pub fn accent_foreground(&self) -> QColor {
-        if luminance(&self.accent) > 0.179 { QColor::from_rgb(16, 17, 22) } else { white() }
+        if luminance(&self.accent) > 0.179 {
+            QColor::from_rgb(16, 17, 22)
+        } else {
+            white()
+        }
     }
 
     /// A control's fill: the selected fill, the hover fill when focused or hovered, otherwise
@@ -368,7 +453,8 @@ pub fn rounding_from_hyprctl(output: &str) -> Option<i32> {
     // `"int"\s*:\s*(\d+)`
     let mut rest = output;
     while let Some(at) = rest.find("\"int\"") {
-        let after = rest[at + 5..].trim_start_matches(|c: char| c.is_ascii_whitespace() || c == '\x0b');
+        let after =
+            rest[at + 5..].trim_start_matches(|c: char| c.is_ascii_whitespace() || c == '\x0b');
         if let Some(after) = after.strip_prefix(':') {
             let after = after.trim_start_matches(|c: char| c.is_ascii_whitespace() || c == '\x0b');
             let digits: String = after.chars().take_while(char::is_ascii_digit).collect();
@@ -387,16 +473,33 @@ mod tests {
     use super::*;
 
     fn values(pairs: &[(&str, &str)]) -> Values {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     // tests/test_omarchypaths.cpp themeDerivesShadesAndMode
     #[test]
     fn derives_shades_and_mode() {
-        let mut colors = values(&[(".background", "#faf4ed"), (".foreground", "#575279"), (".accent", "#907aa9")]);
+        let mut colors = values(&[
+            (".background", "#faf4ed"),
+            (".foreground", "#575279"),
+            (".accent", "#907aa9"),
+        ]);
         let inferred = Palette::from_files(&colors, &Values::new());
-        assert_eq!(inferred.lighter_background, QColor::parse("#faf4ed").lighter(106));
-        assert_eq!(inferred.dark_background, QColor::from_rgb(q_round(250.0 * 0.75), q_round(244.0 * 0.75), q_round(237.0 * 0.75)));
+        assert_eq!(
+            inferred.lighter_background,
+            QColor::parse("#faf4ed").lighter(106)
+        );
+        assert_eq!(
+            inferred.dark_background,
+            QColor::from_rgb(
+                q_round(250.0 * 0.75),
+                q_round(244.0 * 0.75),
+                q_round(237.0 * 0.75)
+            )
+        );
         assert!(!inferred.dark);
         colors.insert(".mode".into(), "dark".into());
         assert!(Palette::from_files(&colors, &Values::new()).dark);
@@ -404,7 +507,12 @@ mod tests {
 
     #[test]
     fn reads_the_hyprctl_rounding() {
-        assert_eq!(rounding_from_hyprctl("{\"option\": \"decoration:rounding\", \"int\": 8, \"set\": true}"), Some(8));
+        assert_eq!(
+            rounding_from_hyprctl(
+                "{\"option\": \"decoration:rounding\", \"int\": 8, \"set\": true}"
+            ),
+            Some(8)
+        );
         assert_eq!(rounding_from_hyprctl("{\"int\" :\n 12}"), Some(12));
         assert_eq!(rounding_from_hyprctl("{\"int\": \"x\"}"), None);
         assert_eq!(rounding_from_hyprctl("{\"int\": 99999999999}"), Some(0));

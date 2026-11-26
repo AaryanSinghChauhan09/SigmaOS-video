@@ -24,11 +24,17 @@ pub struct Answer {
 
 impl Answer {
     pub fn stdout(out: impl AsRef<[u8]>) -> Answer {
-        Answer { out: out.as_ref().to_vec(), ..Answer::default() }
+        Answer {
+            out: out.as_ref().to_vec(),
+            ..Answer::default()
+        }
     }
 
     pub fn status(status: i32) -> Answer {
-        Answer { status, ..Answer::default() }
+        Answer {
+            status,
+            ..Answer::default()
+        }
     }
 }
 
@@ -48,7 +54,11 @@ impl Replay {
     pub fn new(directory: &str) -> Replay {
         let _ = std::fs::remove_dir_all(directory);
         std::fs::create_dir_all(directory).expect("replay directory");
-        Replay { directory: directory.to_owned(), log: format!("{directory}.log"), active: false }
+        Replay {
+            directory: directory.to_owned(),
+            log: format!("{directory}.log"),
+            active: false,
+        }
     }
 
     /// The shim's file name for a call: the program and every argument, each after a space, with
@@ -74,7 +84,10 @@ impl Replay {
             write(&format!("{base}.stdin"), b"");
         }
         if hang && answer.hang_seconds > 0 {
-            write(&format!("{base}.hang"), format!("{}\n", answer.hang_seconds));
+            write(
+                &format!("{base}.hang"),
+                format!("{}\n", answer.hang_seconds),
+            );
         }
         if let Some(creates) = &answer.creates {
             write(&format!("{base}.creates"), creates);
@@ -82,12 +95,22 @@ impl Replay {
     }
 
     /// `call` > 0 answers only the call-th call with these arguments (1-based); 0 answers the rest.
-    pub fn answer<S: AsRef<str>>(&self, program: &str, arguments: &[S], answer: &Answer, call: i32) {
+    pub fn answer<S: AsRef<str>>(
+        &self,
+        program: &str,
+        arguments: &[S],
+        answer: &Answer,
+        call: i32,
+    ) {
         let mut base = format!("{}/{}", self.directory, Replay::key(program, arguments));
         if call > 0 {
             base += &format!(".{call}");
         }
-        assert!(!Path::new(&format!("{base}.status")).exists(), "two answers for {}", Replay::key(program, arguments));
+        assert!(
+            !Path::new(&format!("{base}.status")).exists(),
+            "two answers for {}",
+            Replay::key(program, arguments)
+        );
         Replay::write_answer(&base, answer, true);
     }
 
@@ -101,8 +124,12 @@ impl Replay {
     pub fn answer_json(&self, answers: &Value) {
         for value in answers.to_array() {
             let object = value.to_object();
-            let mut argv: Vec<String> =
-                object.value("argv").to_array().iter().map(|argument| argument.to_string_or("")).collect();
+            let mut argv: Vec<String> = object
+                .value("argv")
+                .to_array()
+                .iter()
+                .map(|argument| argument.to_string_or(""))
+                .collect();
             assert!(!argv.is_empty(), "a replay answer without argv");
             let out = if object.contains("stdoutFile") {
                 let file = object.value("stdoutFile").to_string_or("");
@@ -117,7 +144,9 @@ impl Replay {
                 status: object.value("status").to_int(0),
                 read_stdin: object.value("stdin").to_bool(false),
                 hang_seconds: object.value("hang").to_int(0),
-                creates: object.contains("creates").then(|| object.value("creates").to_string_or("").into_bytes()),
+                creates: object
+                    .contains("creates")
+                    .then(|| object.value("creates").to_string_or("").into_bytes()),
             };
             let program = argv.remove(0);
             self.answer(&program, &argv, &answer, object.value("call").to_int(0));
@@ -129,7 +158,10 @@ impl Replay {
     pub fn activate(&mut self, h: &Hermetic) {
         let _ = std::fs::remove_file(&self.log);
         let log = Path::new(&self.log);
-        let (parent, name) = (log.parent().expect("log directory"), log.file_name().expect("log name"));
+        let (parent, name) = (
+            log.parent().expect("log directory"),
+            log.file_name().expect("log name"),
+        );
         let prefix = format!("{}.", name.to_string_lossy());
         for entry in std::fs::read_dir(parent).into_iter().flatten().flatten() {
             let file = entry.file_name().to_string_lossy().into_owned();
@@ -157,7 +189,12 @@ impl Replay {
         let data = std::fs::read(&self.log).unwrap_or_default();
         data.split(|&b| b == b'\n')
             .filter(|line| !line.is_empty())
-            .map(|line| String::from_utf8_lossy(line).split('\t').map(str::to_owned).collect())
+            .map(|line| {
+                String::from_utf8_lossy(line)
+                    .split('\t')
+                    .map(str::to_owned)
+                    .collect()
+            })
             .collect()
     }
 
@@ -196,7 +233,10 @@ pub struct ScopedEnvironment<'a> {
 
 impl<'a> ScopedEnvironment<'a> {
     pub fn new(h: &'a Hermetic) -> ScopedEnvironment<'a> {
-        ScopedEnvironment { h, saved: Vec::new() }
+        ScopedEnvironment {
+            h,
+            saved: Vec::new(),
+        }
     }
 
     fn remember(&mut self, name: &str) {
@@ -238,7 +278,9 @@ pub fn shim_directory(scratch: &str, name: &str, programs: &[&str]) -> String {
         std::os::unix::fs::symlink(shims.join(program), format!("{directory}/{program}"))
             .unwrap_or_else(|e| panic!("could not link the {program} shim: {e}"));
     }
-    for tool in ["sh", "cat", "cksum", "cut", "dirname", "mkdir", "readlink", "sed", "sleep", "wc"] {
+    for tool in [
+        "sh", "cat", "cksum", "cut", "dirname", "mkdir", "readlink", "sed", "sleep", "wc",
+    ] {
         let found = ["/usr/bin", "/bin"]
             .iter()
             .map(|dir| format!("{dir}/{tool}"))
@@ -293,7 +335,10 @@ pub fn directory_listing(path: &str) -> String {
 
 /// `CLOCK_REALTIME` in microseconds, as the oracle reads it around a write.
 pub fn realtime_now_us() -> i64 {
-    let mut now = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+    let mut now = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
     // SAFETY: clock_gettime writes a timespec.
     unsafe { libc::clock_gettime(libc::CLOCK_REALTIME, &mut now) };
     now.tv_sec * 1_000_000 + now.tv_nsec / 1000
@@ -309,9 +354,14 @@ pub fn mask_realtime(bytes: &[u8], before_us: i64, after_us: i64) -> Vec<u8> {
         if cells.len() != 2 {
             continue;
         }
-        let Some(value) = to_long_long(cells[1]) else { continue };
-        let mask: &[u8] =
-            if value >= before_us && value <= after_us { b"{realtime}" } else { b"{realtime out of range}" };
+        let Some(value) = to_long_long(cells[1]) else {
+            continue;
+        };
+        let mask: &[u8] = if value >= before_us && value <= after_us {
+            b"{realtime}"
+        } else {
+            b"{realtime out of range}"
+        };
         let mut masked = cells[0].to_vec();
         masked.push(b'\t');
         masked.extend_from_slice(mask);

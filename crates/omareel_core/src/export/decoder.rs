@@ -20,7 +20,11 @@ pub const PIPE_CAPACITY: i32 = 1 << 20;
 static FAILED: std::sync::Mutex<Vec<(HwAccel, String)>> = std::sync::Mutex::new(Vec::new());
 
 fn failed(acceleration: &HwAccel, path: &str) -> bool {
-    FAILED.lock().unwrap_or_else(std::sync::PoisonError::into_inner).iter().any(|(a, p)| a == acceleration && p == path)
+    FAILED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .iter()
+        .any(|(a, p)| a == acceleration && p == path)
 }
 
 pub struct FfmpegDecoder {
@@ -104,7 +108,12 @@ impl FfmpegDecoder {
         self.attempt = 0;
         self.delivered_frame = false;
         self.eof = false;
-        if !FileInfo::new(path).is_file() || width <= 0 || height <= 0 || fps <= 0.0 || length <= 0.0 {
+        if !FileInfo::new(path).is_file()
+            || width <= 0
+            || height <= 0
+            || fps <= 0.0
+            || length <= 0.0
+        {
             *error = "Invalid decoder input".into();
             return false;
         }
@@ -132,7 +141,11 @@ impl FfmpegDecoder {
 
     /// Starts ffmpeg with the acceleration `attempt` picks, or in software after the last.
     fn launch(&mut self, error: &mut String) -> bool {
-        while self.accelerations.get(self.attempt).is_some_and(|a| failed(a, &self.path)) {
+        while self
+            .accelerations
+            .get(self.attempt)
+            .is_some_and(|a| failed(a, &self.path))
+        {
             self.attempt += 1;
         }
         let mut args: Vec<String> = vec!["-v".into(), "error".into()];
@@ -149,7 +162,10 @@ impl FfmpegDecoder {
             if self.yuv {
                 video_filter += &format!(",scale={}:{}:flags=bilinear", self.width, self.height);
             } else {
-                video_filter += &format!(",format=rgba,scale={}:{}:flags=bilinear", self.width, self.height);
+                video_filter += &format!(
+                    ",format=rgba,scale={}:{}:flags=bilinear",
+                    self.width, self.height
+                );
             }
         }
         // The conversion to RGBA reads the matrix from the frames; an untagged file's are told
@@ -184,7 +200,9 @@ impl FfmpegDecoder {
 
     /// What decodes now: "cuda", "vaapi" or "software".
     pub fn acceleration(&self) -> &'static str {
-        self.accelerations.get(self.attempt).map_or("software", HwAccel::name)
+        self.accelerations
+            .get(self.attempt)
+            .map_or("software", HwAccel::name)
     }
 
     /// The next frame, tightly packed RGBA rows (or yuv420p planes after [`set_yuv`](Self::set_yuv)),
@@ -201,10 +219,14 @@ impl FfmpegDecoder {
         let mut next: Vec<u8> = Vec::with_capacity(needed);
         let mut received = 0usize;
         while received < needed && !self.cancelled {
-            let got = self.process.read_stdout_into(&mut next.spare_capacity_mut()[received..needed], 30000);
+            let got = self
+                .process
+                .read_stdout_into(&mut next.spare_capacity_mut()[received..needed], 30000);
             received += got;
             if received < needed && got == 0 {
-                if self.process.state() == ProcessState::NotRunning || self.process.error() != ProcessError::Timedout {
+                if self.process.state() == ProcessState::NotRunning
+                    || self.process.error() != ProcessError::Timedout
+                {
                     break;
                 }
                 *error = "Timed out reading decoded video".into();
@@ -279,16 +301,35 @@ mod tests {
     /// A losslessly encoded red, converted with `matrix` and tagged with it or not at all.
     fn red(path: &str, matrix: &str, tagged: bool) -> bool {
         let tags = if tagged {
-            format!(",setparams=colorspace={}:color_primaries=bt709:color_trc=bt709:range=tv",
-                    if matrix == "bt601" { "bt470bg" } else { matrix })
+            format!(
+                ",setparams=colorspace={}:color_primaries=bt709:color_trc=bt709:range=tv",
+                if matrix == "bt601" { "bt470bg" } else { matrix }
+            )
         } else {
-            ",setparams=colorspace=unknown:color_primaries=unknown:color_trc=unknown:range=unknown".into()
+            ",setparams=colorspace=unknown:color_primaries=unknown:color_trc=unknown:range=unknown"
+                .into()
         };
         let filter = format!("scale=out_color_matrix={matrix}:out_range=tv,format=yuv420p{tags}");
         run(
             "ffmpeg",
-            &["-y", "-v", "error", "-f", "lavfi", "-i", "color=c=red:size=64x64:rate=30,format=rgba", "-frames:v", "3",
-              "-vf", &filter, "-c:v", "libx264", "-qp", "0", path],
+            &[
+                "-y",
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=red:size=64x64:rate=30,format=rgba",
+                "-frames:v",
+                "3",
+                "-vf",
+                &filter,
+                "-c:v",
+                "libx264",
+                "-qp",
+                "0",
+                path,
+            ],
             30000,
         )
         .is_some_and(|finished| finished.succeeded())
@@ -302,10 +343,18 @@ mod tests {
             eprintln!("ffmpeg/ffprobe unavailable");
             return;
         }
-        let dir = std::env::temp_dir().join(format!("omareel-decoder-colour-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("omareel-decoder-colour-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        for (name, matrix, tagged) in [("untagged601", "bt601", false), ("tagged709", "bt709", true), ("tagged601", "bt601", true)] {
-            let path = dir.join(format!("{name}.mp4")).to_string_lossy().into_owned();
+        for (name, matrix, tagged) in [
+            ("untagged601", "bt601", false),
+            ("tagged709", "bt709", true),
+            ("tagged601", "bt601", true),
+        ] {
+            let path = dir
+                .join(format!("{name}.mp4"))
+                .to_string_lossy()
+                .into_owned();
             assert!(red(&path, matrix, tagged), "{name}");
             let (media, _) = plan::probe(&path);
             assert_eq!(media.colour_tagged, tagged, "{name}");
@@ -314,22 +363,66 @@ mod tests {
                 decoder.accelerations.clear();
                 let mut error = String::new();
                 let (width, height) = if scale { (32, 32) } else { (64, 64) };
-                assert!(decoder.start(&path, 0.0, 0.1, 30.0, width, height, scale, !media.colour_tagged, &mut error), "{error}");
-                let frame = decoder.read_frame(&mut error).unwrap_or_else(|| panic!("{name}: {error}"));
+                assert!(
+                    decoder.start(
+                        &path,
+                        0.0,
+                        0.1,
+                        30.0,
+                        width,
+                        height,
+                        scale,
+                        !media.colour_tagged,
+                        &mut error
+                    ),
+                    "{error}"
+                );
+                let frame = decoder
+                    .read_frame(&mut error)
+                    .unwrap_or_else(|| panic!("{name}: {error}"));
                 let centre = ((height / 2 * width + width / 2) * 4) as usize;
                 let rgb = &frame[centre..centre + 3];
-                assert!(rgb[0] >= 250 && rgb[1] <= 3 && rgb[2] <= 3, "{name} (scaled {scale}): {rgb:?}");
+                assert!(
+                    rgb[0] >= 250 && rgb[1] <= 3 && rgb[2] <= 3,
+                    "{name} (scaled {scale}): {rgb:?}"
+                );
                 // The same as YUV for the renderer: the planes as the file holds them, in the
                 // matrix the probe names (limited range: red's luma is 81 in BT.601, 63 in BT.709).
                 decoder.set_yuv(true);
-                assert!(decoder.start(&path, 0.0, 0.1, 30.0, width, height, scale, !media.colour_tagged, &mut error), "{error}");
-                let frame = decoder.read_frame(&mut error).unwrap_or_else(|| panic!("{name} yuv: {error}"));
+                assert!(
+                    decoder.start(
+                        &path,
+                        0.0,
+                        0.1,
+                        30.0,
+                        width,
+                        height,
+                        scale,
+                        !media.colour_tagged,
+                        &mut error
+                    ),
+                    "{error}"
+                );
+                let frame = decoder
+                    .read_frame(&mut error)
+                    .unwrap_or_else(|| panic!("{name} yuv: {error}"));
                 assert_eq!(frame.len(), (width * height * 3 / 2) as usize, "{name}");
                 let bt709 = matrix == "bt709";
-                assert_eq!(media.yuv_matrix, Some(if bt709 { plan::YuvMatrix::Bt709 } else { plan::YuvMatrix::Bt601 }), "{name}");
+                assert_eq!(
+                    media.yuv_matrix,
+                    Some(if bt709 {
+                        plan::YuvMatrix::Bt709
+                    } else {
+                        plan::YuvMatrix::Bt601
+                    }),
+                    "{name}"
+                );
                 assert!(!media.full_range, "{name}");
                 let luma = i32::from(frame[(height / 2 * width + width / 2) as usize]);
-                assert!((luma - if bt709 { 63 } else { 81 }).abs() <= 2, "{name} (scaled {scale}) luma {luma}");
+                assert!(
+                    (luma - if bt709 { 63 } else { 81 }).abs() <= 2,
+                    "{name} (scaled {scale}) luma {luma}"
+                );
             }
         }
         let _ = std::fs::remove_dir_all(dir);

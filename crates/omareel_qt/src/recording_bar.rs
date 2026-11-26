@@ -23,8 +23,8 @@ use omareel_core::recording_preferences::RecordingPreferences;
 use omareel_record::cursor_sampler;
 use omareel_record::recorder::{self, state};
 use omareel_record::recording_bar::{
-    self, CameraShape, Point, SelfViewGeometry, Size, clamped_self_view_drag_position, self_view_host_should_exit,
-    self_view_pixels,
+    self, CameraShape, Point, SelfViewGeometry, Size, clamped_self_view_drag_position,
+    self_view_host_should_exit, self_view_pixels,
 };
 use omareel_record::screen_capture::probe;
 
@@ -230,7 +230,11 @@ pub mod qobject {
         #[inherit]
         fn camera_frame_rate(self: &RecordingBar) -> f64;
         #[inherit]
-        fn set_camera_recording_output(self: Pin<&mut RecordingBar>, video_path: &QString, timestamp_path: &QString);
+        fn set_camera_recording_output(
+            self: Pin<&mut RecordingBar>,
+            video_path: &QString,
+            timestamp_path: &QString,
+        );
         #[inherit]
         fn begin_camera_recording(self: Pin<&mut RecordingBar>);
         #[inherit]
@@ -274,10 +278,18 @@ fn debug_bar_stage(stage: &str, detail: &str) {
     if !env_equals("OMAREEL_DEBUG", "1") {
         return;
     }
-    let mut line = format!("OMAREEL_START stage={stage} monotonic_us={}", recorder::monotonic_us());
-    let daemon_start_us = state::recording_state().value("daemon_started_us").to_variant_long_long();
+    let mut line = format!(
+        "OMAREEL_START stage={stage} monotonic_us={}",
+        recorder::monotonic_us()
+    );
+    let daemon_start_us = state::recording_state()
+        .value("daemon_started_us")
+        .to_variant_long_long();
     if daemon_start_us > 0 {
-        line += &format!(" elapsed_ms={:.3}", (recorder::monotonic_us() - daemon_start_us) as f64 / 1000.0);
+        line += &format!(
+            " elapsed_ms={:.3}",
+            (recorder::monotonic_us() - daemon_start_us) as f64 / 1000.0
+        );
     }
     if !detail.is_empty() {
         line.push(' ');
@@ -343,14 +355,22 @@ impl cxx_qt::Constructor<(bool, bool, i64)> for qobject::RecordingBar {
     type InitializeArguments = ();
     type NewArguments = (bool, bool, i64);
 
-    fn route_arguments(arguments: (bool, bool, i64)) -> (Self::NewArguments, Self::BaseArguments, Self::InitializeArguments) {
+    fn route_arguments(
+        arguments: (bool, bool, i64),
+    ) -> (
+        Self::NewArguments,
+        Self::BaseArguments,
+        Self::InitializeArguments,
+    ) {
         (arguments, (), ())
     }
 
     /// The member initializers of `RecordingBar(hidden, standby, owner)`.
     fn new((hidden, standby, owner): (bool, bool, i64)) -> RecordingBarRust {
         let overlay_monitor = state::recording_state();
-        let recorded_monitor = overlay_monitor.value("overlay_monitor").to_string_or(&state::recorded_monitor());
+        let recorded_monitor = overlay_monitor
+            .value("overlay_monitor")
+            .to_string_or(&state::recorded_monitor());
         RecordingBarRust {
             standby,
             adopted: false,
@@ -400,7 +420,10 @@ impl qobject::RecordingBar {
         if self.standby {
             let host_path = state::self_view_host_path();
             qdir::mkpath(&FileInfo::new(host_path.clone()).absolute_path());
-            if !self.as_mut().try_lock_host(&qstring(&format!("{host_path}.host-lock"))) {
+            if !self
+                .as_mut()
+                .try_lock_host(&qstring(&format!("{host_path}.host-lock")))
+            {
                 self.as_mut().call_later(FINISHED_CALL);
                 return;
             }
@@ -416,7 +439,10 @@ impl qobject::RecordingBar {
                 rust.webcam = true;
             }
             state = placement.state;
-            let _ = state::update_state_file(&host_path, &object([("command", "".into()), ("command_sequence", 0.into())]));
+            let _ = state::update_state_file(
+                &host_path,
+                &object([("command", "".into()), ("command_sequence", 0.into())]),
+            );
         }
         {
             let preferences = RecordingPreferences::load();
@@ -427,13 +453,17 @@ impl qobject::RecordingBar {
             rust.shape = CameraShape::from_preferences(&preferences);
             rust.self_view_visible = state.value("selfview").to_bool(false);
             rust.self_view_safe = state.value("selfview_safe").to_bool(false);
-            rust.self_view_monitor = state.value("selfview_monitor").to_string_or(&rust.recorded_monitor);
+            rust.self_view_monitor = state
+                .value("selfview_monitor")
+                .to_string_or(&rust.recorded_monitor);
             rust.geometry.pixels = state.value("selfview_pixels").to_int(160);
             rust.geometry.x = state.value("selfview_x").to_int(16);
             rust.geometry.y = state.value("selfview_y").to_int(16);
             rust.capture_started = state.value("capture_started").to_bool(false);
             rust.countdown_active = state.value("countdown_active").to_bool(false);
-            rust.command_sequence = state.value("recording_bar_command_sequence").to_variant_long_long();
+            rust.command_sequence = state
+                .value("recording_bar_command_sequence")
+                .to_variant_long_long();
         }
         if self.webcam {
             self.as_mut().create_camera(&state);
@@ -452,7 +482,10 @@ impl qobject::RecordingBar {
     // Properties.
 
     fn bubble_mapped(&self) -> bool {
-        self.self_view_visible && !self.suppressed && self.self_view_safe && (self.standby || self.capture_started)
+        self.self_view_visible
+            && !self.suppressed
+            && self.self_view_safe
+            && (self.standby || self.capture_started)
     }
 
     fn elapsed(&self) -> QString {
@@ -585,9 +618,11 @@ impl qobject::RecordingBar {
             let sequence = host.value("command_sequence").to_variant_long_long();
             if sequence != self.host_sequence {
                 self.as_mut().rust_mut().host_sequence = sequence;
-                self.as_mut().host_command(&host.value("command").to_string_or(""));
+                self.as_mut()
+                    .host_command(&host.value("command").to_string_or(""));
             }
-            let ours = active && state.value("host_pid").to_variant_long_long() == application_pid();
+            let ours =
+                active && state.value("host_pid").to_variant_long_long() == application_pid();
             if ours && !self.adopted {
                 let fallback = state.value("overlay_exclusion").to_string_or("") == "fallback";
                 {
@@ -669,7 +704,9 @@ impl qobject::RecordingBar {
             self.finished();
             return;
         }
-        let bar_monitor = state.value("overlay_monitor").to_string_or(&self.recorded_monitor);
+        let bar_monitor = state
+            .value("overlay_monitor")
+            .to_string_or(&self.recorded_monitor);
         let hidden = !state.value("bar_visible").to_bool(!self.hidden);
         if self.recorded_monitor != bar_monitor || self.hidden != hidden {
             {
@@ -680,7 +717,9 @@ impl qobject::RecordingBar {
             self.as_mut().capture_started_changed();
         }
         let safe = state.value("selfview_safe").to_bool(self.self_view_safe);
-        let bubble_monitor = state.value("selfview_monitor").to_string_or(&self.self_view_monitor);
+        let bubble_monitor = state
+            .value("selfview_monitor")
+            .to_string_or(&self.self_view_monitor);
         if safe != self.self_view_safe || bubble_monitor != self.self_view_monitor {
             {
                 let mut rust = self.as_mut().rust_mut();
@@ -707,7 +746,8 @@ impl qobject::RecordingBar {
         }
         let countdown_active = state.value("countdown_active").to_bool(false);
         let countdown_end_us = state.value("countdown_end_us").to_variant_long_long();
-        let countdown_value = recording_bar::countdown_value(countdown_end_us, recorder::monotonic_us());
+        let countdown_value =
+            recording_bar::countdown_value(countdown_end_us, recorder::monotonic_us());
         if countdown_active != self.countdown_active || countdown_value != self.countdown_value {
             {
                 let mut rust = self.as_mut().rust_mut();
@@ -723,7 +763,9 @@ impl qobject::RecordingBar {
         }
         let requested_x = state.value("selfview_x").to_int(self.geometry.x);
         let requested_y = state.value("selfview_y").to_int(self.geometry.y);
-        let next = self.geometry.clamped_requested_position(requested_x, requested_y);
+        let next = self
+            .geometry
+            .clamped_requested_position(requested_x, requested_y);
         if !self.drag_active
             && !self.bar_timer_active(POSITION_WRITE_TIMER)
             && (next.x != self.geometry.x || next.y != self.geometry.y)
@@ -735,10 +777,16 @@ impl qobject::RecordingBar {
             }
             self.as_mut().self_view_placement_changed();
         }
-        let command_sequence = state.value("recording_bar_command_sequence").to_variant_long_long();
+        let command_sequence = state
+            .value("recording_bar_command_sequence")
+            .to_variant_long_long();
         if command_sequence != self.command_sequence {
             self.as_mut().rust_mut().command_sequence = command_sequence;
-            match state.value("recording_bar_command").to_string_or("").as_str() {
+            match state
+                .value("recording_bar_command")
+                .to_string_or("")
+                .as_str()
+            {
                 "rotate" => self.as_mut().rotate_camera(),
                 "flip" => self.as_mut().flip_camera(),
                 "drag-sim" => {
@@ -752,19 +800,26 @@ impl qobject::RecordingBar {
                 _ => {}
             }
         }
-        if self.has_camera() && state.value("camera_record").to_bool(false) && !self.camera_record_requested {
+        if self.has_camera()
+            && state.value("camera_record").to_bool(false)
+            && !self.camera_record_requested
+        {
             self.as_mut().rust_mut().camera_record_requested = true;
             debug_bar_stage("camera_record_begin", "");
             self.as_mut().begin_camera_recording();
         }
-        if self.has_camera() && state.value("camera_stop").to_bool(false) && !self.camera_stop_requested {
+        if self.has_camera()
+            && state.value("camera_stop").to_bool(false)
+            && !self.camera_stop_requested
+        {
             self.as_mut().rust_mut().camera_stop_requested = true;
             self.as_mut().stop_camera();
         }
         if self.stopping {
             return;
         }
-        let elapsed = recording_bar::elapsed_text(recorder::monotonic_us(), state::recording_started_us());
+        let elapsed =
+            recording_bar::elapsed_text(recorder::monotonic_us(), state::recording_started_us());
         if elapsed != self.elapsed {
             self.as_mut().rust_mut().elapsed = elapsed;
             self.elapsed_changed();
@@ -778,7 +833,9 @@ impl qobject::RecordingBar {
         // Round, then square with rounded corners, then square with sharp corners.
         self.as_mut().rust_mut().shape.cycle();
         let mut preferences = RecordingPreferences::load();
-        preferences.webcam.insert("shape", self.shape.shape.as_str());
+        preferences
+            .webcam
+            .insert("shape", self.shape.shape.as_str());
         preferences.webcam.insert("radius", self.shape.radius);
         let _ = preferences.save();
         if self.writes_recording_state() {
@@ -898,12 +955,18 @@ impl qobject::RecordingBar {
     }
 
     fn set_self_view_screen_size(mut self: Pin<&mut Self>, size: &QSize) {
-        self.as_mut().rust_mut().geometry.set_screen_size(Size::new(size.width(), size.height()));
+        self.as_mut()
+            .rust_mut()
+            .geometry
+            .set_screen_size(Size::new(size.width(), size.height()));
         self.self_view_placement_changed();
     }
 
     fn move_self_view(self: Pin<&mut Self>, delta_x: i32, delta_y: i32) {
-        let (x, y) = (self.geometry.x.wrapping_add(delta_x), self.geometry.y.wrapping_add(delta_y));
+        let (x, y) = (
+            self.geometry.x.wrapping_add(delta_x),
+            self.geometry.y.wrapping_add(delta_y),
+        );
         self.set_self_view_position(x, y);
     }
 
@@ -1013,7 +1076,10 @@ impl qobject::RecordingBar {
                 preferences.self_view_size = command.to_owned();
                 let _ = preferences.save();
                 let screen_size = self.geometry.screen_size;
-                self.as_mut().rust_mut().geometry.set_screen_size(screen_size);
+                self.as_mut()
+                    .rust_mut()
+                    .geometry
+                    .set_screen_size(screen_size);
                 self.as_mut().self_view_placement_changed();
                 self.publish_geometry();
             }
@@ -1024,10 +1090,17 @@ impl qobject::RecordingBar {
     /// `saveSelfViewPosition`: the bubble's place as fractions of its screen, which the next
     /// standby host starts from; not while an adopted host shows the fallback placement.
     fn save_self_view_position(self: Pin<&mut Self>) {
-        if self.adopted && state::recording_state().value("overlay_exclusion").to_string_or("") == "fallback" {
+        if self.adopted
+            && state::recording_state()
+                .value("overlay_exclusion")
+                .to_string_or("")
+                == "fallback"
+        {
             return;
         }
-        let Some((x, y)) = self.geometry.saved_position() else { return };
+        let Some((x, y)) = self.geometry.saved_position() else {
+            return;
+        };
         let mut preferences = RecordingPreferences::load();
         preferences.self_view_x = x;
         preferences.self_view_y = y;
@@ -1041,7 +1114,13 @@ impl qobject::RecordingBar {
     /// `camera.mp4` when the state has a bundle.
     fn create_camera(mut self: Pin<&mut Self>, state: &Object) {
         let bundle = state.value("bundle").to_string_or("");
-        let in_bundle = |name: &str| if bundle.is_empty() { String::new() } else { format!("{bundle}/{name}") };
+        let in_bundle = |name: &str| {
+            if bundle.is_empty() {
+                String::new()
+            } else {
+                format!("{bundle}/{name}")
+            }
+        };
         self.as_mut().create_camera_capture(
             &qstring(&state.value("camera_device").to_string_or("")),
             state.value("camera_height").to_int(1080),
@@ -1075,11 +1154,18 @@ impl qobject::RecordingBar {
             rust.camera_error = message.clone();
         }
         self.as_mut().camera_error_changed();
-        self.camera_state(&object([("camera_status", "releasing".into()), ("camera_error", message.into())]));
+        self.camera_state(&object([
+            ("camera_status", "releasing".into()),
+            ("camera_error", message.into()),
+        ]));
     }
 
     fn handle_camera_stopped(self: Pin<&mut Self>) {
-        let status = if self.camera_failed { "failed" } else { "stopped" };
+        let status = if self.camera_failed {
+            "failed"
+        } else {
+            "stopped"
+        };
         self.camera_state(&object([("camera_status", status.into())]));
     }
 
@@ -1087,11 +1173,17 @@ impl qobject::RecordingBar {
     // main.cpp's window glue.
 
     fn owns_standby_host(&self) -> bool {
-        state::read_state_file(&state::self_view_host_path()).value("pid").to_variant_long_long() == application_pid()
+        state::read_state_file(&state::self_view_host_path())
+            .value("pid")
+            .to_variant_long_long()
+            == application_pid()
     }
 
     fn publish_bar_geometry(&self, width: i32, height: i32) {
-        update_recording_state(&object([("bar_width", width.into()), ("bar_height", height.into())]));
+        update_recording_state(&object([
+            ("bar_width", width.into()),
+            ("bar_height", height.into()),
+        ]));
     }
 
     fn publish_countdown_geometry(&self, width: i32, height: i32) {
@@ -1109,8 +1201,16 @@ impl qobject::RecordingBar {
             return;
         }
         let monotonic_us = recorder::monotonic_us();
-        let daemon_start_us = state::recording_state().value("daemon_started_us").to_variant_long_long();
-        let elapsed_ms = if daemon_start_us > 0 { (monotonic_us - daemon_start_us) as f64 / 1000.0 } else { 0.0 };
-        append_debug_log(&format!("OMAREEL_START stage={stage} monotonic_us={monotonic_us} elapsed_ms={elapsed_ms:.3}\n"));
+        let daemon_start_us = state::recording_state()
+            .value("daemon_started_us")
+            .to_variant_long_long();
+        let elapsed_ms = if daemon_start_us > 0 {
+            (monotonic_us - daemon_start_us) as f64 / 1000.0
+        } else {
+            0.0
+        };
+        append_debug_log(&format!(
+            "OMAREEL_START stage={stage} monotonic_us={monotonic_us} elapsed_ms={elapsed_ms:.3}\n"
+        ));
     }
 }

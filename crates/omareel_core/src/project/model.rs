@@ -11,7 +11,11 @@ pub struct Spring {
 
 impl Default for Spring {
     fn default() -> Spring {
-        Spring { mass: 1.0, stiffness: 100.0, damping: 20.0 }
+        Spring {
+            mass: 1.0,
+            stiffness: 100.0,
+            damping: 20.0,
+        }
     }
 }
 
@@ -26,7 +30,11 @@ pub struct ZoomStyle {
 impl Default for ZoomStyle {
     fn default() -> ZoomStyle {
         ZoomStyle {
-            spring: Spring { mass: 2.25, stiffness: 200.0, damping: 40.0 },
+            spring: Spring {
+                mass: 2.25,
+                stiffness: 200.0,
+                damping: 40.0,
+            },
             snap_to_edges_ratio: 0.25,
             instant_animation: false,
             motion_blur: 0.0,
@@ -122,7 +130,11 @@ pub struct Audio {
 
 impl Default for Audio {
     fn default() -> Audio {
-        Audio { desktop: true, mic: true, volume: 1.0 }
+        Audio {
+            desktop: true,
+            mic: true,
+            volume: 1.0,
+        }
     }
 }
 
@@ -136,7 +148,12 @@ pub struct GifExport {
 
 impl Default for GifExport {
     fn default() -> GifExport {
-        GifExport { fps: 15, height: 480, quality: "studio".into(), loop_: true }
+        GifExport {
+            fps: 15,
+            height: 480,
+            quality: "studio".into(),
+            loop_: true,
+        }
     }
 }
 
@@ -151,6 +168,12 @@ pub struct ExportSettings {
 
 impl Default for ExportSettings {
     fn default() -> ExportSettings {
-        ExportSettings { format: "mp4".into(), fps: 60, height: 1080, quality: "social".into(), gif: GifExport::default() }
+        ExportSettings {
+            format: "mp4".into(),
+            fps: 60,
+            height: 1080,
+            quality: "social".into(),
+            gif: GifExport::default(),
+        }
     }
 }

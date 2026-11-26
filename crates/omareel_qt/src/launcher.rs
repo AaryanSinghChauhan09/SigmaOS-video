@@ -14,7 +14,9 @@
 
 use core::pin::Pin;
 use cxx_qt::{CxxQtType, Threading};
-use cxx_qt_lib::{QByteArray, QList, QMap, QMapPair_QString_QVariant, QString, QStringList, QVariant};
+use cxx_qt_lib::{
+    QByteArray, QList, QMap, QMapPair_QString_QVariant, QString, QStringList, QVariant,
+};
 use omareel_core::compat::qdir::{self, FileInfo};
 use omareel_core::compat::qprocess::{ChannelMode, ExitStatus, Process, ProcessState};
 use omareel_core::compat::qstring;
@@ -57,7 +59,13 @@ pub mod qobject {
         #[cxx_name = "addCamera"]
         fn add_camera(self: &mut CameraList, id: &QByteArray, description: &QString);
         #[cxx_name = "addFormat"]
-        fn add_format(self: &mut CameraList, width: i32, height: i32, min_frame_rate: f32, max_frame_rate: f32);
+        fn add_format(
+            self: &mut CameraList,
+            width: i32,
+            height: i32,
+            min_frame_rate: f32,
+            max_frame_rate: f32,
+        );
     }
 
     #[namespace = "Omareel"]
@@ -323,7 +331,10 @@ fn qstring(text: &str) -> QString {
 }
 
 fn map<const N: usize>(entries: [(&str, QVariant); N]) -> QVariant {
-    let map: QMap<QMapPair_QString_QVariant> = entries.into_iter().map(|(key, value)| (qstring(key), value)).collect();
+    let map: QMap<QMapPair_QString_QVariant> = entries
+        .into_iter()
+        .map(|(key, value)| (qstring(key), value))
+        .collect();
     QVariant::from(&map)
 }
 
@@ -332,7 +343,15 @@ fn text_variant(text: &str) -> QVariant {
 }
 
 fn audio_device_list(devices: &[AudioDevice]) -> QList<QVariant> {
-    devices.iter().map(|device| map([("value", text_variant(&device.value)), ("text", text_variant(&device.text))])).collect()
+    devices
+        .iter()
+        .map(|device| {
+            map([
+                ("value", text_variant(&device.value)),
+                ("text", text_variant(&device.text)),
+            ])
+        })
+        .collect()
 }
 
 fn webcam_device_list(devices: &[WebcamDevice]) -> QList<QVariant> {
@@ -344,7 +363,10 @@ fn webcam_device_list(devices: &[WebcamDevice]) -> QList<QVariant> {
                 ("text", text_variant(&device.text)),
                 ("node", text_variant(node)),
             ]),
-            None => map([("value", text_variant(&device.value)), ("text", text_variant(&device.text))]),
+            None => map([
+                ("value", text_variant(&device.value)),
+                ("text", text_variant(&device.text)),
+            ]),
         })
         .collect()
 }
@@ -355,7 +377,11 @@ pub struct CameraList(Vec<CameraDevice>);
 
 impl CameraList {
     fn add_camera(&mut self, id: &QByteArray, description: &QString) {
-        self.0.push(CameraDevice { id: id.as_slice().to_vec(), description: description.to_string(), formats: Vec::new() });
+        self.0.push(CameraDevice {
+            id: id.as_slice().to_vec(),
+            description: description.to_string(),
+            formats: Vec::new(),
+        });
     }
 
     /// A format of the camera added last.
@@ -410,7 +436,8 @@ fn run_record(program: &str, arguments: &[String], cancel: &AtomicBool) -> Optio
 }
 
 /// The launcher's hyprctl checks, started by [`prefetch_capture_exclusion`].
-static CAPTURE_EXCLUSION: std::sync::Mutex<Option<JoinHandle<capture_exclusion::Status>>> = std::sync::Mutex::new(None);
+static CAPTURE_EXCLUSION: std::sync::Mutex<Option<JoinHandle<capture_exclusion::Status>>> =
+    std::sync::Mutex::new(None);
 
 /// Restores a hardware cursor a killed recorder held and checks the capture-exclusion plugin, on
 /// a thread: main starts it before Qt, and the launcher's constructor takes the answer.
@@ -423,12 +450,17 @@ pub fn prefetch_capture_exclusion() {
         capture_exclusion::restore_abandoned_hardware_cursor();
         capture_exclusion::ensure_loaded(&application_dir)
     });
-    *CAPTURE_EXCLUSION.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(handle);
+    *CAPTURE_EXCLUSION
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(handle);
 }
 
 /// The prefetched checks' answer, or the checks made now.
 fn take_capture_exclusion(application_dir: &str) -> capture_exclusion::Status {
-    let prefetched = CAPTURE_EXCLUSION.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take();
+    let prefetched = CAPTURE_EXCLUSION
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .take();
     if let Some(status) = prefetched.and_then(|handle| handle.join().ok()) {
         return status;
     }
@@ -448,7 +480,10 @@ impl cxx_qt::Initialize for qobject::Launcher {
             let mut rust = self.as_mut().rust_mut();
             rust.capture_exclusion_note = launcher::capture_exclusion_note(screens).into();
             rust.capture_exclusion_reason = exclusion.reason.clone();
-            print_error(&format!("omareel: {}; recording overlays stay off the recorded screen\n", exclusion.reason));
+            print_error(&format!(
+                "omareel: {}; recording overlays stay off the recorded screen\n",
+                exclusion.reason
+            ));
         }
         let preferences = RecordingPreferences::load();
         {
@@ -461,7 +496,8 @@ impl cxx_qt::Initialize for qobject::Launcher {
             // Older settings saved the /dev/videoN node, which the camera keeps only until it is
             // replugged.
             rust.webcam_device = camera::stable_camera_path(&preferences.webcam_device);
-            rust.chosen_webcam_device = camera::stable_camera_path(&preferences.webcam_chosen_device);
+            rust.chosen_webcam_device =
+                camera::stable_camera_path(&preferences.webcam_chosen_device);
             rust.webcam_height = preferences.webcam_height;
             rust.webcam_rotation = preferences.webcam_rotation;
             rust.webcam_flip_horizontal = preferences.webcam_flip_horizontal;
@@ -471,7 +507,8 @@ impl cxx_qt::Initialize for qobject::Launcher {
         }
         self.as_mut().refresh_audio_devices();
         self.as_mut().refresh_webcam_devices();
-        if self.webcam_device != preferences.webcam_device || self.chosen_webcam_device != preferences.webcam_chosen_device
+        if self.webcam_device != preferences.webcam_device
+            || self.chosen_webcam_device != preferences.webcam_chosen_device
         {
             self.as_mut().save_recording_preferences();
         }
@@ -572,11 +609,16 @@ impl qobject::Launcher {
     /// The listed camera the chosen path resolves to now (`cameraDeviceForPath`), by index.
     fn webcam_camera_index(&self) -> Option<usize> {
         let found = camera::camera_device_for_path(&self.cameras, &self.webcam_device)?;
-        self.cameras.iter().position(|device| std::ptr::eq(device, found))
+        self.cameras
+            .iter()
+            .position(|device| std::ptr::eq(device, found))
     }
 
     fn webcam_camera_device(&self) -> QVariant {
-        match self.webcam_camera_index().and_then(|index| i32::try_from(index).ok()) {
+        match self
+            .webcam_camera_index()
+            .and_then(|index| i32::try_from(index).ok())
+        {
             Some(index) => self.camera_device_variant(index),
             None => QVariant::default(),
         }
@@ -636,7 +678,9 @@ impl qobject::Launcher {
 
     fn set_microphone_device(mut self: Pin<&mut Self>, value: &QString) {
         let value = value.to_string();
-        if value.is_empty() || (self.microphone_device == value && self.chosen_microphone_device == value) {
+        if value.is_empty()
+            || (self.microphone_device == value && self.chosen_microphone_device == value)
+        {
             return;
         }
         {
@@ -723,7 +767,9 @@ impl qobject::Launcher {
     }
 
     fn set_self_view_size(mut self: Pin<&mut Self>, value: &QString) {
-        let Some(normalized) = launcher::normalized_self_view_size(&value.to_string()) else { return };
+        let Some(normalized) = launcher::normalized_self_view_size(&value.to_string()) else {
+            return;
+        };
         if self.self_view_size == normalized {
             return;
         }
@@ -752,10 +798,13 @@ impl qobject::Launcher {
         let generation = self.audio_devices_generation.wrapping_add(1);
         self.as_mut().rust_mut().audio_devices_generation = generation;
         let thread = self.qt_thread();
-        let listed = std::thread::Builder::new().name("omareel-audio-devices".into()).spawn(move || {
-            let devices = launcher::audio_devices();
-            let _ = thread.queue(move |launcher| launcher.apply_audio_devices(generation, devices));
-        });
+        let listed = std::thread::Builder::new()
+            .name("omareel-audio-devices".into())
+            .spawn(move || {
+                let devices = launcher::audio_devices();
+                let _ =
+                    thread.queue(move |launcher| launcher.apply_audio_devices(generation, devices));
+            });
         if listed.is_err() {
             let devices = launcher::audio_devices();
             self.apply_audio_devices(generation, devices);
@@ -767,7 +816,11 @@ impl qobject::Launcher {
         if generation != self.audio_devices_generation {
             return;
         }
-        let selection = launcher::select_microphone(&devices, &self.chosen_microphone_device, &self.microphone_device);
+        let selection = launcher::select_microphone(
+            &devices,
+            &self.chosen_microphone_device,
+            &self.microphone_device,
+        );
         self.as_mut().rust_mut().audio_devices = audio_device_list(&devices);
         self.as_mut().audio_devices_changed();
         self.as_mut().rust_mut().microphone_device = selection.microphone;
@@ -782,9 +835,16 @@ impl qobject::Launcher {
     /// `updateMicrophoneMeter`: the meter listens while the microphone is on and no recording is
     /// starting or running, except for a screenshot.
     fn update_microphone_meter(mut self: Pin<&mut Self>) {
-        let listening = self.microphone && !self.recording && !self.starting_recording && !screenshot();
-        let device = if listening { qstring(&self.microphone_device) } else { QString::default() };
-        if self.as_mut().listen_to_microphone(&device) && self.as_mut().rust_mut().microphone_level.reset() {
+        let listening =
+            self.microphone && !self.recording && !self.starting_recording && !screenshot();
+        let device = if listening {
+            qstring(&self.microphone_device)
+        } else {
+            QString::default()
+        };
+        if self.as_mut().listen_to_microphone(&device)
+            && self.as_mut().rust_mut().microphone_level.reset()
+        {
             self.microphone_level_changed();
         }
     }
@@ -836,7 +896,12 @@ impl qobject::Launcher {
             4 => SampleFormat::Float,
             _ => SampleFormat::Unknown,
         };
-        if self.as_mut().rust_mut().microphone_level.read(format, samples.as_slice()) {
+        if self
+            .as_mut()
+            .rust_mut()
+            .microphone_level
+            .read(format, samples.as_slice())
+        {
             self.microphone_level_changed();
         }
     }
@@ -873,7 +938,11 @@ impl qobject::Launcher {
             }
         }
         let active = state::is_recording();
-        let state = if active { state::recording_state() } else { Default::default() };
+        let state = if active {
+            state::recording_state()
+        } else {
+            Default::default()
+        };
         let capture_started = state.value("capture_started").to_bool(false);
         let stopping = state.value("stopping").to_bool(false);
         if capture_started != self.recording {
@@ -886,10 +955,16 @@ impl qobject::Launcher {
             self.as_mut().stopping_recording_changed();
         }
         // The time stays where Stop left it while the recording is saved.
-        let mut elapsed = if stopping { self.recording_elapsed.clone() } else { "00:00".to_owned() };
+        let mut elapsed = if stopping {
+            self.recording_elapsed.clone()
+        } else {
+            "00:00".to_owned()
+        };
         if capture_started && !stopping {
             let started_us = state::recording_started_us();
-            elapsed = launcher::format_duration(recorder::monotonic_us().wrapping_sub(started_us).max(0) as f64 / 1_000_000.0);
+            elapsed = launcher::format_duration(
+                recorder::monotonic_us().wrapping_sub(started_us).max(0) as f64 / 1_000_000.0,
+            );
         }
         if elapsed != self.recording_elapsed {
             self.as_mut().rust_mut().recording_elapsed = elapsed;
@@ -908,14 +983,17 @@ impl qobject::Launcher {
     fn open_bundle(mut self: Pin<&mut Self>, value: &QString) {
         let path = qobject::bundle_path(value);
         if !FileInfo::new(path.to_string()).is_dir() {
-            self.as_mut().error_occurred(qstring("Choose an .omareel or legacy .omarecord bundle directory"));
+            self.as_mut().error_occurred(qstring(
+                "Choose an .omareel or legacy .omarecord bundle directory",
+            ));
             return;
         }
         let mut arguments = QStringList::default();
         arguments.append(qstring("edit"));
         arguments.append(path);
         if !qobject::start_detached(&qobject::application_file_path(), &arguments) {
-            self.as_mut().error_occurred(qstring("Could not launch editor"));
+            self.as_mut()
+                .error_occurred(qstring("Could not launch editor"));
             return;
         }
         self.quit_requested();
@@ -986,7 +1064,11 @@ impl qobject::Launcher {
             }
         };
         let mut rust = self.as_mut().rust_mut();
-        rust.record_jobs.retain(|job| job.worker.as_ref().is_some_and(|worker| !worker.is_finished()));
+        rust.record_jobs.retain(|job| {
+            job.worker
+                .as_ref()
+                .is_some_and(|worker| !worker.is_finished())
+        });
         // A thread that cannot be started is a run that failed to start, which QProcess did not
         // report through `finished` either.
         let worker = std::thread::Builder::new().spawn(work).ok();
@@ -1005,7 +1087,11 @@ impl qobject::Launcher {
             self.as_mut().update_microphone_meter();
             self.as_mut().starting_recording_changed();
         }
-        let message = if outcome.output.is_empty() { "Could not start recording".to_owned() } else { outcome.output };
+        let message = if outcome.output.is_empty() {
+            "Could not start recording".to_owned()
+        } else {
+            outcome.output
+        };
         self.error_occurred(qstring(&message));
     }
 

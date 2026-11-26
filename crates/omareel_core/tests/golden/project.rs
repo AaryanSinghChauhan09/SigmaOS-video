@@ -44,7 +44,13 @@ fn dump_project(out: &mut Text, p: &Project) {
     field(out, "defaultsVersion", p.defaults_version.to_string());
     field(out, "name", quote(&p.name));
     field(out, "aspect", quote(&p.aspect));
-    field(out, "crop", [p.crop.x, p.crop.y, p.crop.width, p.crop.height].map(num).join(" "));
+    field(
+        out,
+        "crop",
+        [p.crop.x, p.crop.y, p.crop.width, p.crop.height]
+            .map(num)
+            .join(" "),
+    );
     field(out, "clips.size", p.clips.len().to_string());
     for (i, c) in p.clips.iter().enumerate() {
         let prefix = format!("clips[{i}]");
@@ -55,7 +61,11 @@ fn dump_project(out: &mut Text, p: &Project) {
         field(out, &format!("{prefix}.layout"), quote(&c.layout));
         field(out, &format!("{prefix}.media"), quote(&c.media));
         field(out, &format!("{prefix}.fit"), quote(&c.fit));
-        field(out, &format!("{prefix}.isMedia"), boolean(c.is_media()).into());
+        field(
+            out,
+            &format!("{prefix}.isMedia"),
+            boolean(c.is_media()).into(),
+        );
     }
     field(out, "zooms.size", p.zooms.len().to_string());
     for (i, z) in p.zooms.iter().enumerate() {
@@ -64,18 +74,38 @@ fn dump_project(out: &mut Text, p: &Project) {
         field(out, &format!("{prefix}.start"), num(z.start));
         field(out, &format!("{prefix}.end"), num(z.end));
         field(out, &format!("{prefix}.level"), num(z.level));
-        field(out, &format!("{prefix}.automaticTarget"), boolean(z.automatic_target).into());
-        field(out, &format!("{prefix}.target"), format!("{} {}", num(z.target.x), num(z.target.y)));
+        field(
+            out,
+            &format!("{prefix}.automaticTarget"),
+            boolean(z.automatic_target).into(),
+        );
+        field(
+            out,
+            &format!("{prefix}.target"),
+            format!("{} {}", num(z.target.x), num(z.target.y)),
+        );
     }
     spring_fields(out, "zoomStyle.spring", &p.zoom_style.spring);
-    field(out, "zoomStyle.snapToEdgesRatio", num(p.zoom_style.snap_to_edges_ratio));
-    field(out, "zoomStyle.instantAnimation", boolean(p.zoom_style.instant_animation).into());
+    field(
+        out,
+        "zoomStyle.snapToEdgesRatio",
+        num(p.zoom_style.snap_to_edges_ratio),
+    );
+    field(
+        out,
+        "zoomStyle.instantAnimation",
+        boolean(p.zoom_style.instant_animation).into(),
+    );
     field(out, "zoomStyle.motionBlur", num(p.zoom_style.motion_blur));
     let bg = &p.background;
     field(out, "background.type", quote(&bg.type_));
     field(out, "background.wallpaper", quote(&bg.wallpaper));
     field(out, "background.gradient.angle", num(bg.gradient.angle));
-    field(out, "background.gradient.stops.size", bg.gradient.stops.len().to_string());
+    field(
+        out,
+        "background.gradient.stops.size",
+        bg.gradient.stops.len().to_string(),
+    );
     for (i, stop) in bg.gradient.stops.iter().enumerate() {
         let prefix = format!("background.gradient.stops[{i}]");
         field(out, &format!("{prefix}.color"), color(&stop.color));
@@ -95,8 +125,16 @@ fn dump_project(out: &mut Text, p: &Project) {
     spring_fields(out, "cursor.spring", &c.spring);
     field(out, "cursor.clickEffect", quote(&c.click_effect));
     field(out, "cursor.clickShrink", num(c.click_shrink));
-    field(out, "cursor.rotateOnXMovementRatio", num(c.rotate_on_x_movement_ratio));
-    field(out, "cursor.hideWhenIdleMs", c.hide_when_idle_ms.to_string());
+    field(
+        out,
+        "cursor.rotateOnXMovementRatio",
+        num(c.rotate_on_x_movement_ratio),
+    );
+    field(
+        out,
+        "cursor.hideWhenIdleMs",
+        c.hide_when_idle_ms.to_string(),
+    );
     field(out, "cursor.style", quote(&c.style));
     field(out, "cursor.ringColor", color(&c.ring_color));
     field(out, "cursor.clickSound", quote(&c.click_sound));
@@ -114,12 +152,20 @@ fn dump_project(out: &mut Text, p: &Project) {
     field(out, "camera.size", num(cam.size));
     field(out, "camera.shape", quote(&cam.shape));
     field(out, "camera.radius", num(cam.radius));
-    field(out, "camera.flipHorizontal", boolean(cam.flip_horizontal).into());
+    field(
+        out,
+        "camera.flipHorizontal",
+        boolean(cam.flip_horizontal).into(),
+    );
     field(out, "camera.rotation", cam.rotation.to_string());
     shadow_fields(out, "camera.shadow", &cam.shadow);
     border_fields(out, "camera.border", &cam.border);
     field(out, "camera.scaleDuringZoom", num(cam.scale_during_zoom));
-    field(out, "camera.offset", format!("{} {}", num(cam.offset.x), num(cam.offset.y)));
+    field(
+        out,
+        "camera.offset",
+        format!("{} {}", num(cam.offset.x), num(cam.offset.y)),
+    );
     field(out, "camera.fullFrame", quote(&cam.full_frame));
     let e = &p.export_settings;
     field(out, "exportSettings.format", quote(&e.format));
@@ -147,7 +193,11 @@ struct FileState {
 
 fn file_state(path: &str) -> FileState {
     match std::fs::metadata(path) {
-        Ok(meta) => FileState { exists: true, inode: meta.ino(), mode: meta.mode() & 0o7777 },
+        Ok(meta) => FileState {
+            exists: true,
+            inode: meta.ino(),
+            mode: meta.mode() & 0o7777,
+        },
         Err(_) => FileState::default(),
     }
 }
@@ -174,7 +224,13 @@ fn load_at(path: &str) -> LoadResult {
     let after_state = file_state(path);
     let after = read_file(path);
     let rewritten = before.inode != after_state.inode || original != after;
-    LoadResult { project, error, rewritten, after, after_state }
+    LoadResult {
+        project,
+        error,
+        rewritten,
+        after,
+        after_state,
+    }
 }
 
 /// What the oracle's `runProject` writes for the loads: `load.txt`, `fields.txt`, `migrate.txt`,
@@ -193,7 +249,12 @@ impl LoadOutputs {
     fn record(&mut self, hermetic: &Hermetic, name: &str, result: &LoadResult) {
         let mut cells = vec![
             name.to_owned(),
-            if result.rewritten { "rewritten" } else { "unchanged" }.to_owned(),
+            if result.rewritten {
+                "rewritten"
+            } else {
+                "unchanged"
+            }
+            .to_owned(),
             quote(&hermetic.sanitize(&result.error)),
         ];
         if result.after_state.exists {
@@ -203,7 +264,8 @@ impl LoadOutputs {
         if result.rewritten {
             self.load.push((name.to_owned(), result.after.clone()));
         }
-        self.tojson.push((name.to_owned(), indented(&result.project)));
+        self.tojson
+            .push((name.to_owned(), indented(&result.project)));
         self.fields.section(name);
         dump_project(&mut self.fields, &result.project);
     }
@@ -224,23 +286,42 @@ fn run_loads(hermetic: &Hermetic) -> LoadOutputs {
             Ok(Value::Object(object)) => object,
             // QJsonParseError::NoError for a document that is not an object.
             Ok(_) => {
-                outputs.migrate.row([file.clone(), "-".into(), quote("no error occurred")]);
+                outputs
+                    .migrate
+                    .row([file.clone(), "-".into(), quote("no error occurred")]);
                 continue;
             }
             Err(error) => {
-                outputs.migrate.row([file.clone(), "-".into(), quote(error.error_string())]);
+                outputs
+                    .migrate
+                    .row([file.clone(), "-".into(), quote(error.error_string())]);
                 continue;
             }
         };
         let (migrated, changed) = Project::migrate_defaults(&object);
-        outputs.migrate.row([file.clone(), boolean(changed).into(), json(&Value::Object(migrated.clone()))]);
+        outputs.migrate.row([
+            file.clone(),
+            boolean(changed).into(),
+            json(&Value::Object(migrated.clone())),
+        ]);
         let (twice, changed_again) = Project::migrate_defaults(&migrated);
-        let again = if twice == migrated { "same".to_owned() } else { json(&Value::Object(twice)) };
-        outputs.migrate.row([format!("{file} (again)"), boolean(changed_again).into(), again]);
+        let again = if twice == migrated {
+            "same".to_owned()
+        } else {
+            json(&Value::Object(twice))
+        };
+        outputs.migrate.row([
+            format!("{file} (again)"),
+            boolean(changed_again).into(),
+            again,
+        ]);
         // fromJson() migrates by itself, so it must agree with load() on the unmigrated input.
         let from_json = Project::from_json(&object).to_json();
         if from_json != loaded.project.to_json() {
-            outputs.migrate.row([format!("{file} (fromJson differs from load)"), json(&Value::Object(from_json))]);
+            outputs.migrate.row([
+                format!("{file} (fromJson differs from load)"),
+                json(&Value::Object(from_json)),
+            ]);
         }
     }
 
@@ -248,9 +329,17 @@ fn run_loads(hermetic: &Hermetic) -> LoadOutputs {
     let special = format!("{}/special", hermetic.scratch());
     std::fs::create_dir_all(&special).expect("mkpath special");
     let at = |name: &str| format!("{special}/{name}");
-    outputs.record(hermetic, "special-missing-file.json", &load_at(&at("missing/project.json")));
+    outputs.record(
+        hermetic,
+        "special-missing-file.json",
+        &load_at(&at("missing/project.json")),
+    );
     std::fs::create_dir_all(at("directory.json")).expect("mkpath directory.json");
-    outputs.record(hermetic, "special-directory.json", &load_at(&at("directory.json")));
+    outputs.record(
+        hermetic,
+        "special-directory.json",
+        &load_at(&at("directory.json")),
+    );
     let legacy = read_corpus("project/history-02-2026-09-02-96d74f9.json");
     let unreadable = at("unreadable.json");
     write_file(&unreadable, &legacy);
@@ -262,17 +351,29 @@ fn run_loads(hermetic: &Hermetic) -> LoadOutputs {
     let read_only = format!("{read_only_directory}/project.json");
     write_file(&read_only, &legacy);
     chmod(&read_only_directory, 0o500);
-    outputs.record(hermetic, "special-legacy-in-read-only-directory.json", &load_at(&read_only));
+    outputs.record(
+        hermetic,
+        "special-legacy-in-read-only-directory.json",
+        &load_at(&read_only),
+    );
     chmod(&read_only_directory, 0o700);
     let read_only_file = at("read-only-file.json");
     write_file(&read_only_file, &legacy);
     chmod(&read_only_file, 0o440);
-    outputs.record(hermetic, "special-legacy-read-only-file.json", &load_at(&read_only_file));
+    outputs.record(
+        hermetic,
+        "special-legacy-read-only-file.json",
+        &load_at(&read_only_file),
+    );
     chmod(&read_only_file, 0o600);
     let executable = at("mode-0750.json");
     write_file(&executable, &legacy);
     chmod(&executable, 0o750);
-    outputs.record(hermetic, "special-legacy-mode-0750.json", &load_at(&executable));
+    outputs.record(
+        hermetic,
+        "special-legacy-mode-0750.json",
+        &load_at(&executable),
+    );
     outputs
 }
 
@@ -290,21 +391,36 @@ fn load_fields_migrate_and_rewritten_files() {
     let hermetic = Hermetic::new("project");
     let outputs = run_loads(&hermetic);
     let mut reports = Vec::new();
-    for (name, text) in
-        [("load.txt", outputs.summary), ("fields.txt", outputs.fields), ("migrate.txt", outputs.migrate)]
-    {
+    for (name, text) in [
+        ("load.txt", outputs.summary),
+        ("fields.txt", outputs.fields),
+        ("migrate.txt", outputs.migrate),
+    ] {
         let relative = format!("project/{name}");
-        reports.extend(difference(&relative, &read_expected(&relative), text.into_string().as_bytes()));
+        reports.extend(difference(
+            &relative,
+            &read_expected(&relative),
+            text.into_string().as_bytes(),
+        ));
     }
     for (directory, files) in [
         ("load", outputs.load),
-        ("tojson", outputs.tojson.into_iter().map(|(name, text)| (name, text.into_bytes())).collect()),
+        (
+            "tojson",
+            outputs
+                .tojson
+                .into_iter()
+                .map(|(name, text)| (name, text.into_bytes()))
+                .collect(),
+        ),
     ] {
         let mut written: Vec<String> = files.iter().map(|(name, _)| name.clone()).collect();
         written.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
         let expected = expected_names(&format!("project/{directory}"));
         if written != expected {
-            reports.push(format!("project/{directory}: Rust wrote {written:?}, the golden has {expected:?}"));
+            reports.push(format!(
+                "project/{directory}: Rust wrote {written:?}, the golden has {expected:?}"
+            ));
         }
         for (name, bytes) in files {
             let relative = format!("project/{directory}/{name}");
@@ -348,14 +464,24 @@ fn save_txt() {
             boolean(result.is_ok()).to_owned(),
             quote(&hermetic.sanitize(&result.err().unwrap_or_default())),
             content.to_owned(),
-            if state.exists { octal(state.mode) } else { "-".to_owned() },
+            if state.exists {
+                octal(state.mode)
+            } else {
+                "-".to_owned()
+            },
         ]);
     };
     try_save("new file", &format!("{special}/saved.json"));
-    try_save("missing directory", &format!("{special}/no/such/dir/saved.json"));
+    try_save(
+        "missing directory",
+        &format!("{special}/no/such/dir/saved.json"),
+    );
     try_save("path is a directory", &format!("{special}/directory.json"));
     chmod(&read_only_directory, 0o500);
-    try_save("read-only directory", &format!("{read_only_directory}/saved.json"));
+    try_save(
+        "read-only directory",
+        &format!("{read_only_directory}/saved.json"),
+    );
     chmod(&read_only_directory, 0o700);
     try_save("empty path", "");
     assert_golden("project/save.txt", &out.into_string());
@@ -368,7 +494,10 @@ fn defaults_cases() -> Vec<(&'static str, Project)> {
         ("no-arguments", Project::defaults("Untitled Recording", 0.0)),
         ("demo-12.5", Project::defaults("Demo", 12.5)),
         ("empty-name-0", Project::defaults("", 0.0)),
-        ("unicode-tiny", Project::defaults("R\u{e9}sum\u{e9} \u{1F3AC} \"q\"", 1e-9)),
+        (
+            "unicode-tiny",
+            Project::defaults("R\u{e9}sum\u{e9} \u{1F3AC} \"q\"", 1e-9),
+        ),
         ("negative", Project::defaults("x", -5.0)),
         ("long", Project::defaults("Long", 86400.123456789)),
         ("nan", Project::defaults("NaN", f64::NAN)),
@@ -382,16 +511,25 @@ fn defaults_and_defaults_fields() {
     let mut fields = Text::new();
     for (label, project) in defaults_cases() {
         let relative = format!("project/defaults/{label}.json");
-        reports.extend(difference(&relative, &read_expected(&relative), indented(&project).as_bytes()));
+        reports.extend(difference(
+            &relative,
+            &read_expected(&relative),
+            indented(&project).as_bytes(),
+        ));
         fields.section(label);
         dump_project(&mut fields, &project);
     }
-    let names: Vec<String> = defaults_cases().iter().map(|(label, _)| format!("{label}.json")).collect();
+    let names: Vec<String> = defaults_cases()
+        .iter()
+        .map(|(label, _)| format!("{label}.json"))
+        .collect();
     let mut sorted = names.clone();
     sorted.sort();
     let expected = expected_names("project/defaults");
     if sorted != expected {
-        reports.push(format!("project/defaults: Rust wrote {sorted:?}, the golden has {expected:?}"));
+        reports.push(format!(
+            "project/defaults: Rust wrote {sorted:?}, the golden has {expected:?}"
+        ));
     }
     reports.extend(difference(
         "project/defaults-fields.txt",
@@ -407,10 +545,19 @@ fn helpers_txt() {
     let mut speeds = vec!["allowedClipSpeeds".to_owned()];
     speeds.extend(allowed_clip_speeds().into_iter().map(num));
     out.row(speeds);
-    out.row(["allowedClipLayouts".to_owned(), quote_list(&allowed_clip_layouts())]);
-    out.row(["allowedClipFits".to_owned(), quote_list(&allowed_clip_fits())]);
+    out.row([
+        "allowedClipLayouts".to_owned(),
+        quote_list(&allowed_clip_layouts()),
+    ]);
+    out.row([
+        "allowedClipFits".to_owned(),
+        quote_list(&allowed_clip_fits()),
+    ]);
     out.row(["allowedAspects".to_owned(), quote_list(&allowed_aspects())]);
-    out.row(["CurrentDefaultsVersion".to_owned(), Project::CURRENT_DEFAULTS_VERSION.to_string()]);
+    out.row([
+        "CurrentDefaultsVersion".to_owned(),
+        Project::CURRENT_DEFAULTS_VERSION.to_string(),
+    ]);
     for path in [
         "media/demo.mp4",
         "media/./demo.mp4",
@@ -448,10 +595,18 @@ fn helpers_txt() {
         " media/x.mp4",
         "media/x.mp4 ",
     ] {
-        out.row(["sanitizedMediaPath".to_owned(), quote(path), quote(&sanitized_media_path(path))]);
+        out.row([
+            "sanitizedMediaPath".to_owned(),
+            quote(path),
+            quote(&sanitized_media_path(path)),
+        ]);
     }
 
-    let fallback = Spring { mass: 1.5, stiffness: 250.0, damping: 25.0 };
+    let fallback = Spring {
+        mass: 1.5,
+        stiffness: 250.0,
+        damping: 25.0,
+    };
     for text in [
         "{}",
         r#"{"mass":2}"#,
@@ -474,10 +629,26 @@ fn helpers_txt() {
     }
     for spring in [
         Spring::default(),
-        Spring { mass: 3.0, stiffness: 470.0, damping: 70.0 },
-        Spring { mass: 2.25, stiffness: 200.0, damping: 40.0 },
-        Spring { mass: -0.0, stiffness: 1e21, damping: 0.1 },
-        Spring { mass: f64::NAN, stiffness: 1.0, damping: 2.0 },
+        Spring {
+            mass: 3.0,
+            stiffness: 470.0,
+            damping: 70.0,
+        },
+        Spring {
+            mass: 2.25,
+            stiffness: 200.0,
+            damping: 40.0,
+        },
+        Spring {
+            mass: -0.0,
+            stiffness: 1e21,
+            damping: 0.1,
+        },
+        Spring {
+            mass: f64::NAN,
+            stiffness: 1.0,
+            damping: 2.0,
+        },
     ] {
         out.row([
             "springToJson".to_owned(),

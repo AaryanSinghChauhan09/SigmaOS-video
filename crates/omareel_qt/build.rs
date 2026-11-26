@@ -8,7 +8,11 @@ fn main() {
     // The C++ compiled into this archive: the editor's base class and the exporter it starts, and
     // the launcher's and the recording bar's base classes, which call the Rust here and the
     // plumbing below it.
-    let moc = || MocArguments::default().include_path(plumbing.clone()).include_path(cpp.clone());
+    let moc = || {
+        MocArguments::default()
+            .include_path(plumbing.clone())
+            .include_path(cpp.clone())
+    };
     let builder = CxxQtBuilder::new()
         .qt_module("Gui")
         .qt_module("Multimedia")

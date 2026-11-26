@@ -53,7 +53,11 @@ impl InputLog {
     /// Reads `input.jsonl`, keeping events from `first_frame_us` to `duration` seconds later
     /// (no end when `duration` is negative). An unreadable file or an invalid line gives an
     /// error, and no events.
-    pub fn load(input_path: impl AsRef<Path>, first_frame_us: i64, duration: f64) -> Result<InputLog, String> {
+    pub fn load(
+        input_path: impl AsRef<Path>,
+        first_frame_us: i64,
+        duration: f64,
+    ) -> Result<InputLog, String> {
         let bytes = qfile::read_all(input_path)?;
         let mut result = InputLog::default();
         for (index, line) in qfile::lines(&bytes).enumerate() {
@@ -63,8 +67,19 @@ impl InputLog {
             }
             let object = match qjson::from_json(line) {
                 Ok(qjson::Value::Object(object)) => object,
-                Ok(_) => return Err(format!("Invalid JSON on line {}: no error occurred", index + 1)),
-                Err(error) => return Err(format!("Invalid JSON on line {}: {}", index + 1, error.error_string())),
+                Ok(_) => {
+                    return Err(format!(
+                        "Invalid JSON on line {}: no error occurred",
+                        index + 1
+                    ));
+                }
+                Err(error) => {
+                    return Err(format!(
+                        "Invalid JSON on line {}: {}",
+                        index + 1,
+                        error.error_string()
+                    ));
+                }
             };
             let monotonic_us = object.value("t").to_variant_long_long();
             let time = monotonic_us.wrapping_sub(first_frame_us) as f64 / 1_000_000.0;
@@ -75,14 +90,22 @@ impl InputLog {
                 monotonic_us,
                 time,
                 kind: kind_for(&object.value("k").to_string_or("")),
-                position: PointF::new(object.value("x").to_double(0.0), object.value("y").to_double(0.0)),
+                position: PointF::new(
+                    object.value("x").to_double(0.0),
+                    object.value("y").to_double(0.0),
+                ),
                 button: object.value("b").to_string_or(""),
                 dx: object.value("dx").to_double(0.0),
                 dy: object.value("dy").to_double(0.0),
                 key_code: object.value("code").to_int(0),
                 key_name: object.value("name").to_string_or(""),
                 key_label: object.value("label").to_string_or(""),
-                modifiers: object.value("mods").to_array().iter().map(|m| m.to_string_or("")).collect(),
+                modifiers: object
+                    .value("mods")
+                    .to_array()
+                    .iter()
+                    .map(|m| m.to_string_or(""))
+                    .collect(),
             });
         }
         Ok(result)
@@ -109,7 +132,11 @@ impl InputLog {
     }
 
     pub fn moves(&self) -> Vec<InputEvent> {
-        self.events.iter().filter(|e| e.kind == InputKind::Move).cloned().collect()
+        self.events
+            .iter()
+            .filter(|e| e.kind == InputKind::Move)
+            .cloned()
+            .collect()
     }
 
     /// Button presses, optionally only the left and right buttons.
@@ -123,7 +150,10 @@ impl InputLog {
     }
 
     pub fn key_count(&self) -> usize {
-        self.events.iter().filter(|e| e.kind == InputKind::KeyDown).count()
+        self.events
+            .iter()
+            .filter(|e| e.kind == InputKind::KeyDown)
+            .count()
     }
 }
 
@@ -151,14 +181,21 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("input.jsonl");
         std::fs::write(&path, "{\"t\":1}\n\n{\"t\":2\n").unwrap();
-        assert_eq!(InputLog::load(&path, 0, -1.0).unwrap_err(), "Invalid JSON on line 3: unterminated object");
-        assert_eq!(InputLog::load(dir.join("missing"), 0, -1.0).unwrap_err(), "No such file or directory");
+        assert_eq!(
+            InputLog::load(&path, 0, -1.0).unwrap_err(),
+            "Invalid JSON on line 3: unterminated object"
+        );
+        assert_eq!(
+            InputLog::load(dir.join("missing"), 0, -1.0).unwrap_err(),
+            "No such file or directory"
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
     fn a_key_down_may_carry_its_layout_label() {
-        let dir = std::env::temp_dir().join(format!("omareel-inputlog-label-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("omareel-inputlog-label-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("input.jsonl");
         std::fs::write(
@@ -168,7 +205,13 @@ mod tests {
         )
         .unwrap();
         let log = InputLog::load(&path, 0, -1.0).unwrap();
-        assert_eq!((log.events()[0].key_name.as_str(), log.events()[0].key_label.as_str()), ("KEY_Q", "A"));
+        assert_eq!(
+            (
+                log.events()[0].key_name.as_str(),
+                log.events()[0].key_label.as_str()
+            ),
+            ("KEY_Q", "A")
+        );
         assert_eq!(log.events()[1].key_label, "");
         std::fs::remove_dir_all(&dir).unwrap();
     }

@@ -188,7 +188,9 @@ pub fn capture_options() -> Vec<String> {
 
 /// `qEnvironmentVariable(name)`.
 fn environment_variable(name: &str) -> String {
-    std::env::var_os(name).map(|value| String::from_utf8_lossy(value.as_encoded_bytes()).into_owned()).unwrap_or_default()
+    std::env::var_os(name)
+        .map(|value| String::from_utf8_lossy(value.as_encoded_bytes()).into_owned())
+        .unwrap_or_default()
 }
 
 /// `capturableMonitor`: the index into `values` of the monitor to record instead of
@@ -229,13 +231,19 @@ pub fn capturable_monitor(
 fn rect_number(text: &str, signed: bool) -> Option<usize> {
     let bytes = text.as_bytes();
     let mut end = usize::from(signed && bytes.first() == Some(&b'-'));
-    let digits = bytes[end..].iter().take_while(|b| b.is_ascii_digit()).count();
+    let digits = bytes[end..]
+        .iter()
+        .take_while(|b| b.is_ascii_digit())
+        .count();
     if digits == 0 {
         return None;
     }
     end += digits;
     if bytes.get(end) == Some(&b'.') {
-        let fraction = bytes[end + 1..].iter().take_while(|b| b.is_ascii_digit()).count();
+        let fraction = bytes[end + 1..]
+            .iter()
+            .take_while(|b| b.is_ascii_digit())
+            .count();
         if fraction > 0 {
             end += 1 + fraction;
         }
@@ -289,7 +297,9 @@ pub fn window_rectangles(message: &mut Option<String>) -> String {
     if !workspace.wait_for_finished(3000) || workspace.exit_code() != 0 {
         return String::new();
     }
-    let active_id = json_object(&workspace.read_all_standard_output()).value("id").to_int(0);
+    let active_id = json_object(&workspace.read_all_standard_output())
+        .value("id")
+        .to_int(0);
     let mut clients = Process::new();
     clients.start("hyprctl", &["-j", "clients"]);
     if !clients.wait_for_finished(3000) || clients.exit_code() != 0 {
@@ -307,16 +317,28 @@ pub fn window_rectangles(message: &mut Option<String>) -> String {
         let at = client.value("at").to_array();
         let size = client.value("size").to_array();
         if at.len() == 2 && size.len() == 2 {
-            lines += &format!("{},{} {}x{}\n", at[0].to_int(0), at[1].to_int(0), size[0].to_int(0), size[1].to_int(0));
+            lines += &format!(
+                "{},{} {}x{}\n",
+                at[0].to_int(0),
+                at[1].to_int(0),
+                size[0].to_int(0),
+                size[1].to_int(0)
+            );
         }
     }
     lines
 }
 
 /// `snapToWindow`: the first rectangle of `rectangles` (one per line) holding the point.
-pub fn snap_to_window(rectangles: &str, point_x: f64, point_y: f64) -> Option<(f64, f64, f64, f64)> {
+pub fn snap_to_window(
+    rectangles: &str,
+    point_x: f64,
+    point_y: f64,
+) -> Option<(f64, f64, f64, f64)> {
     for line in rectangles.split('\n').filter(|line| !line.is_empty()) {
-        let Some((x, y, w, h)) = parse_rect(line) else { continue };
+        let Some((x, y, w, h)) = parse_rect(line) else {
+            continue;
+        };
         if point_x < x || point_x >= x + w || point_y < y || point_y >= y + h {
             continue;
         }
@@ -357,7 +379,10 @@ pub fn pick(mode: CaptureMode, is_supported: &dyn Fn() -> bool) -> Pick {
         }
     };
     if values.is_empty() {
-        return Pick { region: None, message };
+        return Pick {
+            region: None,
+            message,
+        };
     }
     if mode == CaptureMode::Fullscreen {
         let mut monitor = 0;
@@ -367,13 +392,18 @@ pub fn pick(mode: CaptureMode, is_supported: &dyn Fn() -> bool) -> Pick {
             }
         }
         let monitor = capturable_monitor(&values, monitor, &mut message, is_supported);
-        return Pick { region: Some(monitor_region(&values[monitor], mode)), message };
+        return Pick {
+            region: Some(monitor_region(&values[monitor], mode)),
+            message,
+        };
     }
 
     let program;
     let mut arguments: Vec<String>;
     let mut standard_input = Vec::new();
-    if mode == CaptureMode::Region && !qstandardpaths::find_executable("omarchy-capture-region").is_empty() {
+    if mode == CaptureMode::Region
+        && !qstandardpaths::find_executable("omarchy-capture-region").is_empty()
+    {
         program = "omarchy-capture-region";
         arguments = vec!["smart".into(), "--match-monitor".into()];
     } else {
@@ -387,26 +417,42 @@ pub fn pick(mode: CaptureMode, is_supported: &dyn Fn() -> bool) -> Pick {
     let mut picker = Process::new();
     picker.start(program, &arguments);
     if !picker.wait_for_started(2000) {
-        return Pick { region: None, message: Some(picker.error_string()) };
+        return Pick {
+            region: None,
+            message: Some(picker.error_string()),
+        };
     }
     if !standard_input.is_empty() {
         picker.write(&standard_input);
     }
     picker.close_write_channel();
     if !picker.wait_for_finished(-1) || picker.exit_code() != 0 {
-        return Pick { region: None, message: Some("Selection cancelled".into()) };
+        return Pick {
+            region: None,
+            message: Some("Selection cancelled".into()),
+        };
     }
     crate::recorder::debug_start_stage("picker_done", 0, "");
-    let selection = qstring::trimmed(&qstring::from_utf8(&picker.read_all_standard_output())).to_owned();
+    let selection =
+        qstring::trimmed(&qstring::from_utf8(&picker.read_all_standard_output())).to_owned();
     if let Some(name) = selection.strip_prefix("monitor:") {
         if let Some(index) = values.iter().position(|monitor| monitor.name == name) {
             let selected = capturable_monitor(&values, index, &mut message, is_supported);
-            return Pick { region: Some(monitor_region(&values[selected], CaptureMode::Fullscreen)), message };
+            return Pick {
+                region: Some(monitor_region(&values[selected], CaptureMode::Fullscreen)),
+                message,
+            };
         }
-        return Pick { region: None, message: Some(format!("Picker returned unknown monitor {name}")) };
+        return Pick {
+            region: None,
+            message: Some(format!("Picker returned unknown monitor {name}")),
+        };
     }
     let Some((mut x, mut y, mut w, mut h)) = parse_rect(&selection) else {
-        return Pick { region: None, message: Some(format!("Could not parse selection: {selection}")) };
+        return Pick {
+            region: None,
+            message: Some(format!("Could not parse selection: {selection}")),
+        };
     };
     // `values` is not empty, so there is always a monitor.
     let monitor = monitor_for(&values, x, y, w, h).unwrap_or(0);
@@ -438,7 +484,10 @@ pub fn pick(mode: CaptureMode, is_supported: &dyn Fn() -> bool) -> Pick {
             mode: selected_mode,
         }
     };
-    Pick { region: Some(region), message }
+    Pick {
+        region: Some(region),
+        message,
+    }
 }
 
 #[cfg(test)]
@@ -456,15 +505,31 @@ mod tests {
         assert_eq!(capture_option_name("DP-1|x1080"), None);
         assert_eq!(capture_option_name("DP-1|1920x1080 x"), None);
         assert_eq!(capture_option_name("region"), None);
-        assert_eq!(parse_capture_options("DP-1|1x1\n DP-1 |2x2\n\u{a0}E\u{a0}|3x3\n"), ["DP-1", "E"]);
+        assert_eq!(
+            parse_capture_options("DP-1|1x1\n DP-1 |2x2\n\u{a0}E\u{a0}|3x3\n"),
+            ["DP-1", "E"]
+        );
     }
 
     #[test]
     fn rectangles_parse_like_slurp_prints_them() {
-        assert_eq!(parse_rect("10,20 300x200"), Some((10.0, 20.0, 300.0, 200.0)));
-        assert_eq!(parse_rect("10,20\n300x200\n"), Some((10.0, 20.0, 300.0, 200.0)));
+        assert_eq!(
+            parse_rect("10,20 300x200"),
+            Some((10.0, 20.0, 300.0, 200.0))
+        );
+        assert_eq!(
+            parse_rect("10,20\n300x200\n"),
+            Some((10.0, 20.0, 300.0, 200.0))
+        );
         assert_eq!(parse_rect("-1.5,-0 0.25x2"), Some((-1.5, -0.0, 0.25, 2.0)));
-        for bad in ["10,20300x200", "5.,1 2x3", "10,20 -3x2", "+1,2 3x4", "1,2 3x4 x", ""] {
+        for bad in [
+            "10,20300x200",
+            "5.,1 2x3",
+            "10,20 -3x2",
+            "+1,2 3x4",
+            "1,2 3x4 x",
+            "",
+        ] {
             assert_eq!(parse_rect(bad), None, "{bad:?}");
         }
         assert_eq!(lround_int(2.5), 3);

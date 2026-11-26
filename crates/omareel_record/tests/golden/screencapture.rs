@@ -30,7 +30,13 @@ fn size_from(value: &Value) -> Size {
 }
 
 fn rect_text(rect: &Rect) -> String {
-    format!("{},{} {}x{}", rect.x(), rect.y(), rect.width(), rect.height())
+    format!(
+        "{},{} {}x{}",
+        rect.x(),
+        rect.y(),
+        rect.width(),
+        rect.height()
+    )
 }
 
 fn size_text(size: Size) -> String {
@@ -38,7 +44,10 @@ fn size_text(size: Size) -> String {
 }
 
 fn row_text(row: &CaptureRowCopy) -> String {
-    format!("{}:{}:{}", row.source_offset, row.destination_offset, row.bytes)
+    format!(
+        "{}:{}:{}",
+        row.source_offset, row.destination_offset, row.bytes
+    )
 }
 
 fn hex_bytes(bytes: &[u8]) -> String {
@@ -73,18 +82,31 @@ fn capture_ring(cases: &Object) -> String {
                 "markQueued" => boolean(ring.mark_queued(slot)).to_owned(),
                 "takeQueued" => ring.take_queued().to_string(),
                 "release" => boolean(ring.release(slot)).to_owned(),
-                "state" => ring_states(&ring, slot + 1).chars().last().map(String::from).unwrap_or_default(),
+                "state" => ring_states(&ring, slot + 1)
+                    .chars()
+                    .last()
+                    .map(String::from)
+                    .unwrap_or_default(),
                 other => panic!("unknown ring operation {other}"),
             };
             out.row([
                 name,
-                if op.len() > 1 { slot.to_string() } else { "-".into() },
+                if op.len() > 1 {
+                    slot.to_string()
+                } else {
+                    "-".into()
+                },
                 result,
                 ring_states(&ring, shown),
                 ring.drops().to_string(),
-                [SlotState::Available, SlotState::Capturing, SlotState::Queued, SlotState::Writing]
-                    .map(|state| ring.count(state).to_string())
-                    .join(" "),
+                [
+                    SlotState::Available,
+                    SlotState::Capturing,
+                    SlotState::Queued,
+                    SlotState::Writing,
+                ]
+                .map(|state| ring.count(state).to_string())
+                .join(" "),
             ]);
         }
     }
@@ -99,9 +121,18 @@ fn capture_crops(cases: &Object) -> String {
         let stride = input.value("stride").to_int(0);
         let crop = rect_from(input.value("crop"));
         let rows = capture_crop_rows(size, stride, crop);
-        let mut cells = vec![size_text(size), stride.to_string(), rect_text(&crop), rows.len().to_string()];
+        let mut cells = vec![
+            size_text(size),
+            stride.to_string(),
+            rect_text(&crop),
+            rows.len().to_string(),
+        ];
         let sums = rows.iter().fold((0i64, 0i64, 0i64), |(s, d, b), row| {
-            (s + row.source_offset, d + row.destination_offset, b + row.bytes)
+            (
+                s + row.source_offset,
+                d + row.destination_offset,
+                b + row.bytes,
+            )
         });
         cells.push(format!("sums={}:{}:{}", sums.0, sums.1, sums.2));
         for (index, row) in rows.iter().enumerate() {
@@ -151,7 +182,10 @@ fn ring_crop_rows_and_matroska_headers_txt() {
         [
             ("screencapture/capture-ring.txt", capture_ring(&cases)),
             ("screencapture/capture-crop-rows.txt", capture_crops(&cases)),
-            ("screencapture/matroska-headers.txt", capture_headers(&cases)),
+            (
+                "screencapture/matroska-headers.txt",
+                capture_headers(&cases),
+            ),
         ]
         .iter()
         .filter_map(|(name, text)| difference(name, &read_expected(name), text.as_bytes()))
@@ -170,7 +204,13 @@ fn start_txt() {
         let requested = rect_from(input.value("crop"));
         let mut crop = CaptureCrop::default();
         // The oracle set the error to "<untouched>"; only a failure sets it.
-        let (ok, error) = match trim_capture_crop(size.width, size.height, size.width * 4, requested, &mut crop) {
+        let (ok, error) = match trim_capture_crop(
+            size.width,
+            size.height,
+            size.width * 4,
+            requested,
+            &mut crop,
+        ) {
             Ok(()) => (true, "<untouched>".to_owned()),
             Err(error) => (false, error),
         };
@@ -190,8 +230,12 @@ fn start_txt() {
         let mut environment = ScopedEnvironment::new(&h);
         environment.unset("OMAREEL_NATIVE_CONVERSION");
         environment.unset("OMAREEL_NATIVE_ENCODER");
-        let conversion = input.contains("conversion").then(|| input.value("conversion").to_string_or(""));
-        let encoder = input.contains("encoder").then(|| input.value("encoder").to_string_or(""));
+        let conversion = input
+            .contains("conversion")
+            .then(|| input.value("conversion").to_string_or(""));
+        let encoder = input
+            .contains("encoder")
+            .then(|| input.value("encoder").to_string_or(""));
         if let Some(value) = &conversion {
             environment.set("OMAREEL_NATIVE_CONVERSION", value);
         }
@@ -205,8 +249,12 @@ fn start_txt() {
             gpu_conversion: input.value("gpuConversion").to_bool(false),
             cached: false,
         };
-        let encoder_arguments =
-            encoder_arguments_from_environment(size, fps, &probes, "/recordings/Recording.omareel/screen-video.mp4");
+        let encoder_arguments = encoder_arguments_from_environment(
+            size,
+            fps,
+            &probes,
+            "/recordings/Recording.omareel/screen-video.mp4",
+        );
         out.row([
             "encoder".to_owned(),
             size_text(size),
@@ -296,10 +344,17 @@ fn encoder_probe_txt() {
     ];
     let cache_file = format!("{cache}/omareel/encoder-probe.json");
     let mut out = Text::new();
-    out.row(["encoderProbeCachePath".to_owned(), quote(&h.sanitize(&encoder_probe_cache_path()))]);
+    out.row([
+        "encoderProbeCachePath".to_owned(),
+        quote(&h.sanitize(&encoder_probe_cache_path())),
+    ]);
     out.row([
         "encoderProbeKey".to_owned(),
-        mask_driver(&h, &Value::Object(encoder_probe_key()).to_json(Format::Compact), &driver),
+        mask_driver(
+            &h,
+            &Value::Object(encoder_probe_key()).to_json(Format::Compact),
+            &driver,
+        ),
     ]);
     struct Scenario {
         label: &'static str,
@@ -335,11 +390,20 @@ fn encoder_probe_txt() {
         scenario("no cache, only the conversion probe passes", None, 1, 0),
         scenario("cache matches", matching.clone(), 0, 0),
         scenario("cache with wrong types", stringy, 0, 0),
-        Scenario { mtime: 1700000001, ..scenario("cache key differs (ffmpeg updated)", matching, 1, 0) },
+        Scenario {
+            mtime: 1700000001,
+            ..scenario("cache key differs (ffmpeg updated)", matching, 1, 0)
+        },
         scenario("cache is not JSON", Some("{".into()), 0, 0),
         scenario("cache is an array", Some("[]".into()), 0, 1),
-        Scenario { cache_writable: false, ..scenario("cache directory not writable", None, 0, 0) },
-        Scenario { ffmpeg_on_path: false, ..scenario("ffmpeg not on PATH", None, 0, 0) },
+        Scenario {
+            cache_writable: false,
+            ..scenario("cache directory not writable", None, 0, 0)
+        },
+        Scenario {
+            ffmpeg_on_path: false,
+            ..scenario("ffmpeg not on PATH", None, 0, 0)
+        },
     ];
     for scenario in &scenarios {
         let _ = std::fs::remove_dir_all(&cache);
@@ -355,7 +419,12 @@ fn encoder_probe_txt() {
             environment.set("PATH", shim_directory(&scratch, "empty", &[]));
         }
         let mut replay = Replay::new(&format!("{scratch}/replay"));
-        replay.answer("ffmpeg", &preferred_probe, &Answer::status(scenario.preferred_status), 0);
+        replay.answer(
+            "ffmpeg",
+            &preferred_probe,
+            &Answer::status(scenario.preferred_status),
+            0,
+        );
         let gpu = Answer {
             status: scenario.gpu_status,
             read_stdin: true,
@@ -371,7 +440,11 @@ fn encoder_probe_txt() {
         out.section(scenario.label);
         out.row([
             "key".to_owned(),
-            mask_driver(&h, &Value::Object(encoder_probe_key()).to_json(Format::Compact), &driver),
+            mask_driver(
+                &h,
+                &Value::Object(encoder_probe_key()).to_json(Format::Compact),
+                &driver,
+            ),
         ]);
         let results = encoder_probe_results();
         out.row([
@@ -386,11 +459,15 @@ fn encoder_probe_txt() {
         for call in &calls {
             out.row(["  call".to_owned(), quote_list(call)]);
         }
-        let stdin_bytes: usize =
-            (0..calls.len()).map(|index| replay.standard_input(index).map_or(0, |b| b.len())).sum();
+        let stdin_bytes: usize = (0..calls.len())
+            .map(|index| replay.standard_input(index).map_or(0, |b| b.len()))
+            .sum();
         out.row(["  stdin bytes".to_owned(), stdin_bytes.to_string()]);
-        let cache_bytes =
-            if std::path::Path::new(&cache_file).is_file() { std::fs::read(&cache_file).ok() } else { None };
+        let cache_bytes = if std::path::Path::new(&cache_file).is_file() {
+            std::fs::read(&cache_file).ok()
+        } else {
+            None
+        };
         out.row([
             "  cache".to_owned(),
             cache_bytes.map_or("-".into(), |bytes| {
@@ -398,7 +475,10 @@ fn encoder_probe_txt() {
             }),
             octal_mode(&cache_file),
         ]);
-        out.row(["cachedPreferredEncoderAvailable".to_owned(), boolean(cached_preferred_encoder_available()).into()]);
+        out.row([
+            "cachedPreferredEncoderAvailable".to_owned(),
+            boolean(cached_preferred_encoder_available()).into(),
+        ]);
         chmod(&format!("{cache}/omareel"), 0o700);
         if !scenario.ffmpeg_on_path {
             environment.set("PATH", &bin);
@@ -437,7 +517,11 @@ fn writer_loop_txt() {
         let _ = std::fs::remove_dir_all(&files);
         std::fs::create_dir_all(&files).expect("mkpath writer");
         let size = size_from(input.value("size"));
-        let stride = if input.contains("stride") { input.value("stride").to_int(0) } else { size.width * 4 };
+        let stride = if input.contains("stride") {
+            input.value("stride").to_int(0)
+        } else {
+            size.width * 4
+        };
         let fps = input.value("fps").to_int(0).max(1);
         let timestamp_name = if input.contains("timestampPath") {
             input.value("timestampPath").to_string_or("")
@@ -445,7 +529,11 @@ fn writer_loop_txt() {
             "screen.mp4.ts".into()
         };
         let timestamp_path = format!("{files}/{timestamp_name}");
-        let crop = if input.contains("crop") { rect_from(input.value("crop")) } else { Rect::from_size(size) };
+        let crop = if input.contains("crop") {
+            rect_from(input.value("crop"))
+        } else {
+            Rect::from_size(size)
+        };
         let config = WriterConfig {
             fps,
             timestamp_path: timestamp_path.clone(),
@@ -459,7 +547,11 @@ fn writer_loop_txt() {
             let path = std::ffi::CString::new(stream.clone()).expect("path");
             // SAFETY: a valid NUL-terminated path.
             unsafe {
-                libc::open(path.as_ptr(), libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC | libc::O_CLOEXEC, 0o644)
+                libc::open(
+                    path.as_ptr(),
+                    libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC | libc::O_CLOEXEC,
+                    0o644,
+                )
             }
         };
         let queue = Arc::new(FrameQueue::new(SLOT_COUNT));
@@ -467,11 +559,20 @@ fn writer_loop_txt() {
             queue.set_writer_abort();
         }
         let slot_bytes = (stride * size.height) as usize;
-        let memory = Arc::new(TestSlots((0..SLOT_COUNT).map(|_| Mutex::new(vec![0u8; slot_bytes])).collect()));
+        let memory = Arc::new(TestSlots(
+            (0..SLOT_COUNT)
+                .map(|_| Mutex::new(vec![0u8; slot_bytes]))
+                .collect(),
+        ));
         let finished = Arc::new(AtomicBool::new(false));
         let before = realtime_now_us();
         let start_writer = || {
-            let (queue, memory, config, finished) = (queue.clone(), memory.clone(), config.clone(), finished.clone());
+            let (queue, memory, config, finished) = (
+                queue.clone(),
+                memory.clone(),
+                config.clone(),
+                finished.clone(),
+            );
             std::thread::spawn(move || {
                 writer_loop(&queue, &config, &*memory, &mut FdSink(encoder_fd));
                 finished.store(true, Ordering::SeqCst);
@@ -501,7 +602,9 @@ fn writer_loop_txt() {
                 break;
             }
             {
-                let mut bytes = memory.0[slot as usize].lock().unwrap_or_else(PoisonError::into_inner);
+                let mut bytes = memory.0[slot as usize]
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner);
                 for (offset, byte) in bytes.iter_mut().enumerate() {
                     *byte = ((16 * queued as usize + offset) & 0xff) as u8;
                 }
@@ -527,7 +630,11 @@ fn writer_loop_txt() {
             size_text(size),
             stride.to_string(),
             rect_text(&crop),
-            if time_list.is_empty() { "-".into() } else { time_list.join(",") },
+            if time_list.is_empty() {
+                "-".into()
+            } else {
+                time_list.join(",")
+            },
             stop_us.to_string(),
             queued.to_string(),
         ]);
@@ -540,13 +647,23 @@ fn writer_loop_txt() {
             format!("failed={}", boolean(queue.writer_failed())),
             format!("error={}", quote(&queue.writer_error())),
         ]);
-        out.row(["ring".to_owned(), ring_states(&queue.ring(), SLOT_COUNT), queue.drops().to_string()]);
+        out.row([
+            "ring".to_owned(),
+            ring_states(&queue.ring(), SLOT_COUNT),
+            queue.drops().to_string(),
+        ]);
         out.row([
             "timestamp".to_owned(),
-            std::fs::read(&timestamp_path).map_or("-".into(), |ts| quote_bytes(&mask_realtime(&ts, before, after))),
+            std::fs::read(&timestamp_path).map_or("-".into(), |ts| {
+                quote_bytes(&mask_realtime(&ts, before, after))
+            }),
         ]);
         match std::fs::read(&stream) {
-            Ok(bytes) => out.row(["stream".to_owned(), bytes.len().to_string(), hex_bytes(&bytes)]),
+            Ok(bytes) => out.row([
+                "stream".to_owned(),
+                bytes.len().to_string(),
+                hex_bytes(&bytes),
+            ]),
             Err(_) => out.row(["stream", "-", "-"]),
         }
     }

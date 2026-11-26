@@ -15,7 +15,12 @@ use std::collections::HashMap;
 /// The members of `CompositionState` the oracle printed, as the variants Qt holds them in.
 fn state_cells(first: String, state: &CompositionState) -> Vec<String> {
     use Variant::*;
-    let map = |entries: Vec<(&str, Variant)>| Map(entries.into_iter().map(|(k, v)| (k.to_owned(), v)).collect());
+    let map = |entries: Vec<(&str, Variant)>| {
+        Map(entries
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v))
+            .collect())
+    };
     let zoom = &state.zoom;
     let cursor = &state.cursor;
     let media = &state.media;
@@ -23,7 +28,13 @@ fn state_cells(first: String, state: &CompositionState) -> Vec<String> {
         state
             .ripples
             .iter()
-            .map(|r| map(vec![("x", Double(r.x)), ("y", Double(r.y)), ("progress", Double(r.progress))]))
+            .map(|r| {
+                map(vec![
+                    ("x", Double(r.x)),
+                    ("y", Double(r.y)),
+                    ("progress", Double(r.progress)),
+                ])
+            })
             .collect(),
     );
     let pills = List(
@@ -48,7 +59,10 @@ fn state_cells(first: String, state: &CompositionState) -> Vec<String> {
             ("cy", Double(zoom.cy)),
             ("velocity", Double(zoom.velocity)),
         ])),
-        variant(&map(vec![("cameraFull", Double(state.layout.camera_full)), ("bubble", Double(state.layout.bubble))])),
+        variant(&map(vec![
+            ("cameraFull", Double(state.layout.camera_full)),
+            ("bubble", Double(state.layout.bubble)),
+        ])),
         variant(&map(vec![
             ("active", Bool(media.active)),
             ("ready", Bool(media.ready)),
@@ -116,7 +130,11 @@ fn exporter_txt() {
         }
         let timeline = ClipTimeline::new(project.clips.clone());
         // The camera's MediaInfo is {1280, 720, duration, 30, false} with a camera, {} without.
-        let (camera_width, camera_duration) = if camera.is_object() { (1280, camera_duration) } else { (0, 0.0) };
+        let (camera_width, camera_duration) = if camera.is_object() {
+            (1280, camera_duration)
+        } else {
+            (0, 0.0)
+        };
         let sources = Sources {
             timeline: &timeline,
             project: &project,

@@ -13,7 +13,11 @@ const VAAPI_KERNEL_DRIVERS: [&str; 4] = ["i915", "xe", "amdgpu", "radeon"];
 fn kernel_driver(drm: &Path, node: &str) -> String {
     std::fs::read_link(drm.join(node).join("device/driver"))
         .ok()
-        .and_then(|target| target.file_name().map(|name| name.to_string_lossy().into_owned()))
+        .and_then(|target| {
+            target
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+        })
         .unwrap_or_default()
 }
 
@@ -50,7 +54,9 @@ pub fn vaapi_device_in(drm: &Path, libva_driver: Option<&str>) -> Option<String>
 
 /// This machine's VA-API device, if it has one export may use.
 pub fn vaapi_device() -> Option<String> {
-    let libva_driver = std::env::var("LIBVA_DRIVER_NAME").ok().filter(|driver| !driver.is_empty());
+    let libva_driver = std::env::var("LIBVA_DRIVER_NAME")
+        .ok()
+        .filter(|driver| !driver.is_empty());
     vaapi_device_in(Path::new("/sys/class/drm"), libva_driver.as_deref())
         .filter(|device| Path::new(device).exists())
 }
@@ -74,7 +80,12 @@ impl HwAccel {
         match self {
             HwAccel::Cuda => vec!["-hwaccel".into(), "cuda".into()],
             HwAccel::Vaapi(device) => {
-                vec!["-hwaccel".into(), "vaapi".into(), "-hwaccel_device".into(), device.clone()]
+                vec![
+                    "-hwaccel".into(),
+                    "vaapi".into(),
+                    "-hwaccel_device".into(),
+                    device.clone(),
+                ]
             }
         }
     }
@@ -125,7 +136,11 @@ mod tests {
         for (node, driver) in nodes {
             let device = root.join(node).join("device");
             std::fs::create_dir_all(&device).unwrap();
-            symlink(format!("../../../bus/pci/drivers/{driver}"), device.join("driver")).unwrap();
+            symlink(
+                format!("../../../bus/pci/drivers/{driver}"),
+                device.join("driver"),
+            )
+            .unwrap();
         }
         std::fs::create_dir_all(root.join("card0")).unwrap();
         root
@@ -133,14 +148,29 @@ mod tests {
 
     #[test]
     fn vaapi_skips_nvidia_render_nodes() {
-        let hybrid = drm("hybrid", &[("renderD128", "nvidia"), ("renderD129", "i915")]);
-        assert_eq!(vaapi_device_in(&hybrid, None).as_deref(), Some("/dev/dri/renderD129"));
-        assert_eq!(vaapi_device_in(&hybrid, Some("iHD")).as_deref(), Some("/dev/dri/renderD129"));
+        let hybrid = drm(
+            "hybrid",
+            &[("renderD128", "nvidia"), ("renderD129", "i915")],
+        );
+        assert_eq!(
+            vaapi_device_in(&hybrid, None).as_deref(),
+            Some("/dev/dri/renderD129")
+        );
+        assert_eq!(
+            vaapi_device_in(&hybrid, Some("iHD")).as_deref(),
+            Some("/dev/dri/renderD129")
+        );
         assert_eq!(vaapi_device_in(&hybrid, Some("nvidia")), None);
-        let nvidia = drm("nvidia", &[("renderD128", "nvidia"), ("renderD129", "nouveau")]);
+        let nvidia = drm(
+            "nvidia",
+            &[("renderD128", "nvidia"), ("renderD129", "nouveau")],
+        );
         assert_eq!(vaapi_device_in(&nvidia, None), None);
         let amd = drm("amd", &[("renderD130", "amdgpu"), ("renderD129", "xe")]);
-        assert_eq!(vaapi_device_in(&amd, None).as_deref(), Some("/dev/dri/renderD129"));
+        assert_eq!(
+            vaapi_device_in(&amd, None).as_deref(),
+            Some("/dev/dri/renderD129")
+        );
         assert_eq!(vaapi_device_in(Path::new("/nonexistent"), None), None);
         for root in [hybrid, nvidia, amd] {
             let _ = std::fs::remove_dir_all(root);
@@ -151,15 +181,29 @@ mod tests {
     fn decoders_use_cuda_and_vaapi_when_asked() {
         let intel = Some("/dev/dri/renderD128".to_string());
         assert_eq!(decode_accelerations_for("", false, intel.clone()), []);
-        assert_eq!(decode_accelerations_for("", true, intel.clone()), [HwAccel::Cuda]);
+        assert_eq!(
+            decode_accelerations_for("", true, intel.clone()),
+            [HwAccel::Cuda]
+        );
         assert_eq!(decode_accelerations_for("cuda", false, intel.clone()), []);
-        assert_eq!(decode_accelerations_for("vaapi", false, intel.clone()), [HwAccel::Vaapi("/dev/dri/renderD128".into())]);
-        assert_eq!(decode_accelerations_for("vaapi", true, intel.clone()), [HwAccel::Vaapi("/dev/dri/renderD128".into())]);
+        assert_eq!(
+            decode_accelerations_for("vaapi", false, intel.clone()),
+            [HwAccel::Vaapi("/dev/dri/renderD128".into())]
+        );
+        assert_eq!(
+            decode_accelerations_for("vaapi", true, intel.clone()),
+            [HwAccel::Vaapi("/dev/dri/renderD128".into())]
+        );
         assert_eq!(decode_accelerations_for("vaapi", true, None), []);
         assert_eq!(decode_accelerations_for("software", true, intel), []);
         assert_eq!(
             HwAccel::Vaapi("/dev/dri/renderD129".into()).arguments(),
-            ["-hwaccel", "vaapi", "-hwaccel_device", "/dev/dri/renderD129"]
+            [
+                "-hwaccel",
+                "vaapi",
+                "-hwaccel_device",
+                "/dev/dri/renderD129"
+            ]
         );
     }
 }

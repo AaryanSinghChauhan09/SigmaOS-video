@@ -62,23 +62,37 @@ impl Hermetic {
         ));
         let _ = std::fs::remove_dir_all(&base);
         std::fs::create_dir_all(&base).expect("scratch directory");
-        let run = std::fs::canonicalize(&base).expect("scratch directory").join("run");
+        let run = std::fs::canonicalize(&base)
+            .expect("scratch directory")
+            .join("run");
         let dir = |name: &str| -> String {
             let path = run.join(name);
             std::fs::create_dir_all(&path).expect("hermetic directory");
             path.to_str().expect("UTF-8 temporary directory").to_owned()
         };
-        let values: Vec<(&str, String)> =
-            ROOT_VARIABLES.iter().map(|&(variable, name)| (variable, dir(name))).collect();
-        std::fs::set_permissions(run.join("runtime"), std::fs::Permissions::from_mode(0o700)).expect("chmod runtime");
+        let values: Vec<(&str, String)> = ROOT_VARIABLES
+            .iter()
+            .map(|&(variable, name)| (variable, dir(name)))
+            .collect();
+        std::fs::set_permissions(run.join("runtime"), std::fs::Permissions::from_mode(0o700))
+            .expect("chmod runtime");
         let home = values[0].1.clone();
 
-        let mut roots: Vec<(String, String)> =
-            values.iter().map(|(variable, path)| (format!("${variable}"), path.clone())).collect();
-        roots.push(("$CORPUS".into(), corpus_root().to_str().expect("UTF-8 corpus path").to_owned()));
+        let mut roots: Vec<(String, String)> = values
+            .iter()
+            .map(|(variable, path)| (format!("${variable}"), path.clone()))
+            .collect();
+        roots.push((
+            "$CORPUS".into(),
+            corpus_root()
+                .to_str()
+                .expect("UTF-8 corpus path")
+                .to_owned(),
+        ));
         roots.sort_by_key(|(_, path)| std::cmp::Reverse(path.len()));
 
-        let shims = std::fs::canonicalize(Path::new(GOLDEN).join("shims")).expect("tests/golden/shims");
+        let shims =
+            std::fs::canonicalize(Path::new(GOLDEN).join("shims")).expect("tests/golden/shims");
         let saved_environment: Vec<(OsString, OsString)> = std::env::vars_os().collect();
         let saved_directory = std::env::current_dir().expect("working directory");
         // SAFETY: umask has no failure mode; the old mask is restored on drop.
@@ -99,10 +113,21 @@ impl Hermetic {
         for (variable, value) in &values {
             hermetic.set_env(variable, value);
         }
-        for (variable, value) in [("TZ", "UTC"), ("LC_ALL", "C"), ("LANG", "C"), ("QT_QPA_PLATFORM", "offscreen")] {
+        for (variable, value) in [
+            ("TZ", "UTC"),
+            ("LC_ALL", "C"),
+            ("LANG", "C"),
+            ("QT_QPA_PLATFORM", "offscreen"),
+        ] {
             hermetic.set_env(variable, value);
         }
-        hermetic.set_env("PATH", format!("{}:/usr/bin:/bin", shims.to_str().expect("UTF-8 shims path")));
+        hermetic.set_env(
+            "PATH",
+            format!(
+                "{}:/usr/bin:/bin",
+                shims.to_str().expect("UTF-8 shims path")
+            ),
+        );
         hermetic.set_env("OMAREEL_ORACLE_HERMETIC", "1");
         std::env::set_current_dir(&home).expect("enter $HOME");
         std::fs::create_dir_all(hermetic.scratch()).expect("scratch directory");
@@ -117,7 +142,11 @@ impl Hermetic {
     /// The value a hermetic variable was given (`HOME`, `XDG_CACHE_HOME`, ...).
     pub fn root(&self, variable: &str) -> String {
         let name = format!("${variable}");
-        self.roots.iter().find(|(n, _)| *n == name).map(|(_, path)| path.clone()).expect("a hermetic variable")
+        self.roots
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, path)| path.clone())
+            .expect("a hermetic variable")
     }
 
     /// `$HOME/oracle-scratch/<family>`, the oracle's `context.scratch`.
@@ -165,9 +194,14 @@ impl Drop for Hermetic {
 /// Gives the owner full access to every directory under `path`, so tests that leave read-only
 /// directories behind can still be cleaned up.
 fn make_removable(path: &Path) {
-    let Ok(meta) = std::fs::symlink_metadata(path) else { return };
+    let Ok(meta) = std::fs::symlink_metadata(path) else {
+        return;
+    };
     if meta.is_dir() {
-        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(meta.permissions().mode() | 0o700));
+        let _ = std::fs::set_permissions(
+            path,
+            std::fs::Permissions::from_mode(meta.permissions().mode() | 0o700),
+        );
         if let Ok(entries) = std::fs::read_dir(path) {
             for entry in entries.flatten() {
                 make_removable(&entry.path());
@@ -183,7 +217,8 @@ fn make_removable(path: &Path) {
 /// umask for a new file).
 pub fn write_file(path: &str, data: impl AsRef<[u8]>) {
     if let Some(parent) = Path::new(path).parent() {
-        std::fs::create_dir_all(parent).unwrap_or_else(|e| panic!("mkpath {}: {e}", parent.display()));
+        std::fs::create_dir_all(parent)
+            .unwrap_or_else(|e| panic!("mkpath {}: {e}", parent.display()));
     }
     std::fs::write(path, data).unwrap_or_else(|e| panic!("could not write {path}: {e}"));
 }
@@ -202,7 +237,8 @@ pub fn chmod(path: &str, mode: u32) {
 /// The oracle's `symlink`: creates the link's directory and replaces whatever is at `link`.
 pub fn make_symlink(target: &str, link: &str) {
     if let Some(parent) = Path::new(link).parent() {
-        std::fs::create_dir_all(parent).unwrap_or_else(|e| panic!("mkpath {}: {e}", parent.display()));
+        std::fs::create_dir_all(parent)
+            .unwrap_or_else(|e| panic!("mkpath {}: {e}", parent.display()));
     }
     let _ = std::fs::remove_file(link);
     symlink(target, link).unwrap_or_else(|e| panic!("symlink {link} -> {target} failed: {e}"));
@@ -211,11 +247,26 @@ pub fn make_symlink(target: &str, link: &str) {
 /// `utimensat(AT_FDCWD, path, {t, t}, AT_SYMLINK_NOFOLLOW)`.
 pub fn set_times(path: &str, seconds: i64, nanoseconds: i64) {
     let c = std::ffi::CString::new(path).expect("path without NUL");
-    let time = libc::timespec { tv_sec: seconds as libc::time_t, tv_nsec: nanoseconds as _ };
+    let time = libc::timespec {
+        tv_sec: seconds as libc::time_t,
+        tv_nsec: nanoseconds as _,
+    };
     let times = [time, time];
     // SAFETY: `c` is NUL-terminated and `times` holds the two timespecs utimensat reads.
-    let result = unsafe { libc::utimensat(libc::AT_FDCWD, c.as_ptr(), times.as_ptr(), libc::AT_SYMLINK_NOFOLLOW) };
-    assert_eq!(result, 0, "utimensat {path}: {}", std::io::Error::last_os_error());
+    let result = unsafe {
+        libc::utimensat(
+            libc::AT_FDCWD,
+            c.as_ptr(),
+            times.as_ptr(),
+            libc::AT_SYMLINK_NOFOLLOW,
+        )
+    };
+    assert_eq!(
+        result,
+        0,
+        "utimensat {path}: {}",
+        std::io::Error::last_os_error()
+    );
 }
 
 /// The oracle's `removePath`: a file or link removed, a directory removed with its contents.
@@ -248,7 +299,11 @@ fn process_state() -> (Vec<(OsString, OsString)>, PathBuf, libc::mode_t) {
         libc::umask(mask);
         mask
     };
-    (environment, std::env::current_dir().expect("working directory"), umask)
+    (
+        environment,
+        std::env::current_dir().expect("working directory"),
+        umask,
+    )
 }
 
 #[test]
@@ -261,7 +316,10 @@ fn hermetic_world_is_the_oracles_and_is_put_back() {
     {
         let h = Hermetic::new("hermetic");
         let (environment, directory, umask) = process_state();
-        let names: Vec<&str> = environment.iter().map(|(name, _)| name.to_str().expect("UTF-8 name")).collect();
+        let names: Vec<&str> = environment
+            .iter()
+            .map(|(name, _)| name.to_str().expect("UTF-8 name"))
+            .collect();
         assert_eq!(
             names,
             [
@@ -280,21 +338,38 @@ fn hermetic_world_is_the_oracles_and_is_put_back() {
                 "XDG_STATE_HOME",
             ]
         );
-        assert_eq!(directory.to_str(), Some(h.in_home("").trim_end_matches('/')));
+        assert_eq!(
+            directory.to_str(),
+            Some(h.in_home("").trim_end_matches('/'))
+        );
         assert_eq!(umask, 0o022);
         let home = h.root("HOME");
         let run = Path::new(&home).parent().expect("run directory").to_owned();
         for (variable, name) in ROOT_VARIABLES {
-            assert_eq!(std::env::var(variable).ok(), run.join(name).to_str().map(str::to_owned), "{variable}");
+            assert_eq!(
+                std::env::var(variable).ok(),
+                run.join(name).to_str().map(str::to_owned),
+                "{variable}"
+            );
         }
-        assert_eq!(std::fs::metadata(run.join("runtime")).expect("runtime").permissions().mode() & 0o777, 0o700);
+        assert_eq!(
+            std::fs::metadata(run.join("runtime"))
+                .expect("runtime")
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
         assert!(Path::new(&h.scratch()).is_dir());
         // A path only counts when no letter, digit, ".", "_" or "-" follows it.
         assert_eq!(
             h.sanitize(&format!("{home}/a {}/b {home}", h.root("XDG_CACHE_HOME"))),
             "$HOME/a $XDG_CACHE_HOME/b $HOME"
         );
-        assert_eq!(h.sanitize(&format!("{home}x {home}-y {home}.z")), format!("{home}x {home}-y {home}.z"));
+        assert_eq!(
+            h.sanitize(&format!("{home}x {home}-y {home}.z")),
+            format!("{home}x {home}-y {home}.z")
+        );
         // A directory the test leaves unwritable is still cleaned up.
         std::fs::create_dir_all(h.in_home("locked/inner")).expect("mkpath");
         chmod(&h.in_home("locked"), 0o500);
@@ -302,5 +377,8 @@ fn hermetic_world_is_the_oracles_and_is_put_back() {
     }
     assert!(!scratch.exists(), "{} is left behind", scratch.display());
     let _lock = ENVIRONMENT.lock().unwrap_or_else(PoisonError::into_inner);
-    assert!(process_state() == before, "the environment, working directory or umask was not put back");
+    assert!(
+        process_state() == before,
+        "the environment, working directory or umask was not put back"
+    );
 }

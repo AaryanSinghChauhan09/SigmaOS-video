@@ -102,7 +102,10 @@ fn default_webcam() -> Object {
             .into(),
         ),
         ("scaleDuringZoom", 0.7.into()),
-        ("offset", object(vec![("x", 0.035.into()), ("y", 0.035.into())]).into()),
+        (
+            "offset",
+            object(vec![("x", 0.035.into()), ("y", 0.035.into())]).into(),
+        ),
     ])
 }
 
@@ -137,20 +140,27 @@ impl RecordingPreferences {
                 read_path = legacy_path;
             }
         }
-        let Ok(bytes) = qfile::read_all(&read_path) else { return preferences };
+        let Ok(bytes) = qfile::read_all(&read_path) else {
+            return preferences;
+        };
         let root = object_or_empty(&bytes);
         preferences.system_audio = root.value("systemAudio").to_bool(true);
         preferences.microphone = root.value("microphone").to_bool(true);
-        preferences.microphone_device = root.value("microphoneDevice").to_string_or("default_input");
+        preferences.microphone_device =
+            root.value("microphoneDevice").to_string_or("default_input");
         preferences.self_view_enabled = root.value("selfViewEnabled").to_bool(true);
         let self_view_size = qstring::to_upper(&root.value("selfViewSize").to_string_or("M"));
-        preferences.self_view_size =
-            if self_view_size == "S" || self_view_size == "L" { self_view_size } else { "M".into() };
+        preferences.self_view_size = if self_view_size == "S" || self_view_size == "L" {
+            self_view_size
+        } else {
+            "M".into()
+        };
         let self_view_position = root.value("selfViewPosition").to_object();
         preferences.self_view_x = q_bound(0.0, self_view_position.value("x").to_double(1.0), 1.0);
         preferences.self_view_y = q_bound(0.0, self_view_position.value("y").to_double(1.0), 1.0);
         preferences.capture_backend = root.value("captureBackend").to_string_or("auto");
-        preferences.countdown_before_recording = root.value("countdownBeforeRecording").to_bool(false);
+        preferences.countdown_before_recording =
+            root.value("countdownBeforeRecording").to_bool(false);
         if root.value("webcam").is_object() {
             preferences.webcam = root.value("webcam").to_object();
             let webcam = &mut preferences.webcam;
@@ -160,13 +170,19 @@ impl RecordingPreferences {
             }
             preferences.webcam_enabled = webcam.value("enabled").to_bool(false);
             preferences.webcam_device = webcam.value("device").to_string_or("/dev/video2");
-            preferences.webcam_chosen_device = webcam.value("chosenDevice").to_string_or(&preferences.webcam_device);
+            preferences.webcam_chosen_device = webcam
+                .value("chosenDevice")
+                .to_string_or(&preferences.webcam_device);
             preferences.webcam_height = webcam.value("captureHeight").to_int(1080);
             if preferences.webcam_height != 720 {
                 preferences.webcam_height = 1080;
             }
             let rotation = webcam.value("rotation").to_int(0);
-            preferences.webcam_rotation = if matches!(rotation, 90 | 180 | 270) { rotation } else { 0 };
+            preferences.webcam_rotation = if matches!(rotation, 90 | 180 | 270) {
+                rotation
+            } else {
+                0
+            };
             preferences.webcam_flip_horizontal = if webcam.contains("flipHorizontal") {
                 webcam.value("flipHorizontal").to_bool(false)
             } else {
@@ -182,7 +198,10 @@ impl RecordingPreferences {
         saved_webcam.insert("enabled", self.webcam_enabled);
         saved_webcam.insert("device", self.webcam_device.as_str());
         saved_webcam.insert("chosenDevice", self.webcam_chosen_device.as_str());
-        saved_webcam.insert("captureHeight", if self.webcam_height == 720 { 720 } else { 1080 });
+        saved_webcam.insert(
+            "captureHeight",
+            if self.webcam_height == 720 { 720 } else { 1080 },
+        );
         saved_webcam.insert("rotation", self.webcam_rotation);
         saved_webcam.insert("flipHorizontal", self.webcam_flip_horizontal);
         let root = object(vec![
@@ -200,7 +219,10 @@ impl RecordingPreferences {
                 .into(),
             ),
             ("captureBackend", self.capture_backend.as_str().into()),
-            ("countdownBeforeRecording", self.countdown_before_recording.into()),
+            (
+                "countdownBeforeRecording",
+                self.countdown_before_recording.into(),
+            ),
             ("webcam", saved_webcam.into()),
         ]);
         Value::Object(root).to_json(Format::Indented)

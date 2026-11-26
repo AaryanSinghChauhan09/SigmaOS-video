@@ -33,9 +33,25 @@ struct RawStream {
 }
 
 unsafe extern "C" {
-    fn omr_stream_open(path: *const c_char, vaapi_device: *const c_char, width: c_int, height: c_int, threads: c_int) -> *mut RawStream;
-    fn omr_stream_seek(stream: *mut RawStream, start: c_double, fps: c_double, preview: c_int) -> c_int;
-    fn omr_stream_next(stream: *mut RawStream, y: *mut u8, uv: *mut u8, time: *mut c_double) -> c_int;
+    fn omr_stream_open(
+        path: *const c_char,
+        vaapi_device: *const c_char,
+        width: c_int,
+        height: c_int,
+        threads: c_int,
+    ) -> *mut RawStream;
+    fn omr_stream_seek(
+        stream: *mut RawStream,
+        start: c_double,
+        fps: c_double,
+        preview: c_int,
+    ) -> c_int;
+    fn omr_stream_next(
+        stream: *mut RawStream,
+        y: *mut u8,
+        uv: *mut u8,
+        time: *mut c_double,
+    ) -> c_int;
     fn omr_stream_close(stream: *mut RawStream);
     fn omr_probe(path: *const c_char, info: *mut RawInfo) -> c_int;
     fn omr_frame_times(path: *const c_char, times: *mut *mut c_double) -> c_long;
@@ -85,11 +101,19 @@ fn c_path(path: &str) -> Option<CString> {
 }
 
 fn rate(num: c_int, den: c_int) -> f64 {
-    if den != 0 { f64::from(num) / f64::from(den) } else { 0.0 }
+    if den != 0 {
+        f64::from(num) / f64::from(den)
+    } else {
+        0.0
+    }
 }
 
 fn text(chars: &[c_char]) -> String {
-    let bytes: Vec<u8> = chars.iter().take_while(|&&c| c != 0).map(|&c| c as u8).collect();
+    let bytes: Vec<u8> = chars
+        .iter()
+        .take_while(|&&c| c != 0)
+        .map(|&c| c as u8)
+        .collect();
     String::from_utf8_lossy(&bytes).into_owned()
 }
 
@@ -104,14 +128,24 @@ pub fn probe(path: &str) -> Result<Probe, String> {
     let color_space = {
         // SAFETY: omr_color_space_name gives a static string or null.
         let name = unsafe { omr_color_space_name(raw.color_space) };
-        if name.is_null() { "unknown".to_owned() } else { unsafe { CStr::from_ptr(name) }.to_string_lossy().into_owned() }
+        if name.is_null() {
+            "unknown".to_owned()
+        } else {
+            unsafe { CStr::from_ptr(name) }
+                .to_string_lossy()
+                .into_owned()
+        }
     };
     Ok(Probe {
         has_video: raw.has_video != 0,
         has_audio: raw.has_audio != 0,
         width: raw.width,
         height: raw.height,
-        sample_aspect: if raw.sar_num != 0 { rate(raw.sar_num, raw.sar_den) } else { 0.0 },
+        sample_aspect: if raw.sar_num != 0 {
+            rate(raw.sar_num, raw.sar_den)
+        } else {
+            0.0
+        },
         frame_rate: rate(raw.r_num, raw.r_den),
         average_frame_rate: rate(raw.avg_num, raw.avg_den),
         frame_rate_text: format!("{}/{}", raw.r_num, raw.r_den),
@@ -133,7 +167,11 @@ pub fn frame_times(path: &str) -> Option<Vec<f64>> {
     if count < 0 || (count > 0 && times.is_null()) {
         return None;
     }
-    let result = if count == 0 { Vec::new() } else { unsafe { std::slice::from_raw_parts(times, count as usize) }.to_vec() };
+    let result = if count == 0 {
+        Vec::new()
+    } else {
+        unsafe { std::slice::from_raw_parts(times, count as usize) }.to_vec()
+    };
     unsafe { omr_free(times.cast()) };
     Some(result)
 }
@@ -159,7 +197,11 @@ pub fn keyframe_times(path: &str) -> Option<Vec<f64>> {
     if count < 0 || (count > 0 && times.is_null()) {
         return None;
     }
-    let result = if count == 0 { Vec::new() } else { unsafe { std::slice::from_raw_parts(times, count as usize) }.to_vec() };
+    let result = if count == 0 {
+        Vec::new()
+    } else {
+        unsafe { std::slice::from_raw_parts(times, count as usize) }.to_vec()
+    };
     unsafe { omr_free(times.cast()) };
     Some(result)
 }
@@ -169,8 +211,17 @@ pub fn keyframe_times(path: &str) -> Option<Vec<f64>> {
 ///
 /// It decodes on a thread of its own at a lower priority (nice 10, which its decoding threads
 /// inherit): the filmstrip fills on whatever the editor and its players leave.
-pub fn thumbnail(path: &str, at: f64, size: (i32, i32), quality: i32, threads: usize, output: &str) -> bool {
-    let (Some(path), Some(output)) = (c_path(path), c_path(output)) else { return false };
+pub fn thumbnail(
+    path: &str,
+    at: f64,
+    size: (i32, i32),
+    quality: i32,
+    threads: usize,
+    output: &str,
+) -> bool {
+    let (Some(path), Some(output)) = (c_path(path), c_path(output)) else {
+        return false;
+    };
     let threads = c_int::try_from(threads).unwrap_or(1);
     std::thread::scope(|scope| {
         scope
@@ -179,7 +230,15 @@ pub fn thumbnail(path: &str, at: f64, size: (i32, i32), quality: i32, threads: u
                 // to it); both strings outlive the call.
                 unsafe {
                     libc::setpriority(libc::PRIO_PROCESS, libc::gettid() as libc::id_t, 10);
-                    omr_thumbnail(path.as_ptr(), at, size.0, size.1, quality, threads, output.as_ptr()) == 0
+                    omr_thumbnail(
+                        path.as_ptr(),
+                        at,
+                        size.0,
+                        size.1,
+                        quality,
+                        threads,
+                        output.as_ptr(),
+                    ) == 0
                 }
             })
             .join()
@@ -204,14 +263,28 @@ impl VideoStream {
     /// in software with `threads` threads.
     /// NV12 needs an even size (its colour plane is half the width, in pairs): an odd one is
     /// rounded down, and `width` and `height` say what the frames are.
-    pub fn open(path: &str, vaapi_device: Option<&str>, width: u32, height: u32, threads: usize) -> Option<VideoStream> {
+    pub fn open(
+        path: &str,
+        vaapi_device: Option<&str>,
+        width: u32,
+        height: u32,
+        threads: usize,
+    ) -> Option<VideoStream> {
         let (width, height) = ((width & !1).max(2), (height & !1).max(2));
         let path = c_path(path)?;
         let device = vaapi_device.map(c_path).unwrap_or(None);
         let threads = c_int::try_from(threads).unwrap_or(1);
         let (w, h) = (c_int::try_from(width).ok()?, c_int::try_from(height).ok()?);
         // SAFETY: the strings outlive the call; a null device means software decoding.
-        let raw = unsafe { omr_stream_open(path.as_ptr(), device.as_ref().map_or(std::ptr::null(), |d| d.as_ptr()), w, h, threads) };
+        let raw = unsafe {
+            omr_stream_open(
+                path.as_ptr(),
+                device.as_ref().map_or(std::ptr::null(), |d| d.as_ptr()),
+                w,
+                h,
+                threads,
+            )
+        };
         (!raw.is_null()).then_some(VideoStream { raw, width, height })
     }
 
@@ -232,7 +305,8 @@ impl VideoStream {
         }
         let mut time = 0.0;
         // SAFETY: both buffers hold what the C side writes (checked above).
-        (unsafe { omr_stream_next(self.raw, y.as_mut_ptr(), uv.as_mut_ptr(), &mut time) } == 1).then_some(time)
+        (unsafe { omr_stream_next(self.raw, y.as_mut_ptr(), uv.as_mut_ptr(), &mut time) } == 1)
+            .then_some(time)
     }
 }
 

@@ -39,7 +39,11 @@ impl Document {
         if self.clip_is_media(clip) {
             return String::new();
         }
-        let at = cpp::clamp(self.output_to_source(output_time), 0.0, self.recording.source_duration);
+        let at = cpp::clamp(
+            self.output_to_source(output_time),
+            0.0,
+            self.recording.source_duration,
+        );
         let mut lower = 0.0;
         let mut upper = self.recording.source_duration;
         for zoom in &self.project.zooms {
@@ -53,7 +57,11 @@ impl Document {
             }
         }
         let end = cpp::min(upper, at + cpp::max(1.0, length));
-        let start = if end - at < 1.0 { cpp::max(lower, end - 1.0) } else { at };
+        let start = if end - at < 1.0 {
+            cpp::max(lower, end - 1.0)
+        } else {
+            at
+        };
         if end - start < 1.0 {
             return String::new();
         }
@@ -68,7 +76,10 @@ impl Document {
         };
         let id = zoom.id.clone();
         self.project.zooms.push(zoom);
-        qdir::std_sort(&mut self.project.zooms, &|a: &ZoomSegment, b: &ZoomSegment| a.start < b.start);
+        qdir::std_sort(
+            &mut self.project.zooms,
+            &|a: &ZoomSegment, b: &ZoomSegment| a.start < b.start,
+        );
         self.selected_zoom_id = id.clone();
         self.selected_zoom_ids = vec![id.clone()];
         self.changed(true);
@@ -87,8 +98,11 @@ impl Document {
         let zooms = &self.project.zooms;
         let length = zooms[i].end - zooms[i].start;
         let lower = if i > 0 { zooms[i - 1].end } else { 0.0 };
-        let upper =
-            if i + 1 < zooms.len() { zooms[i + 1].start - length } else { self.recording.source_duration - length };
+        let upper = if i + 1 < zooms.len() {
+            zooms[i + 1].start - length
+        } else {
+            self.recording.source_duration - length
+        };
         let source_start = cpp::clamp(source_start, lower, cpp::max(lower, upper));
         self.snapshot(&format!("move-{id}"));
         self.project.zooms[i].start = source_start;
@@ -107,7 +121,11 @@ impl Document {
         let i = index as usize;
         let zooms = &self.project.zooms;
         let lower = if i > 0 { zooms[i - 1].end } else { 0.0 };
-        let upper = if i + 1 < zooms.len() { zooms[i + 1].start } else { self.recording.source_duration };
+        let upper = if i + 1 < zooms.len() {
+            zooms[i + 1].start
+        } else {
+            self.recording.source_duration
+        };
         let source_start = cpp::clamp(source_start, lower, upper);
         let source_end = cpp::clamp(source_end, lower, upper);
         if source_end - source_start < 1.0 {
@@ -126,7 +144,11 @@ impl Document {
         if index < 0 {
             return false;
         }
-        self.snapshot(&if coalesce { format!("level-{id}") } else { String::new() });
+        self.snapshot(&if coalesce {
+            format!("level-{id}")
+        } else {
+            String::new()
+        });
         self.project.zooms[index as usize].level = cpp::clamp(level, 1.0, 4.0);
         self.changed(true);
         true
@@ -175,7 +197,9 @@ impl Document {
         self.selected_zoom_id = if self.project.zooms.is_empty() {
             String::new()
         } else {
-            self.project.zooms[i.min(self.project.zooms.len() - 1)].id.clone()
+            self.project.zooms[i.min(self.project.zooms.len() - 1)]
+                .id
+                .clone()
         };
         if !self.selected_zoom_id.is_empty() {
             self.selected_zoom_ids = vec![self.selected_zoom_id.clone()];
@@ -189,11 +213,24 @@ impl Document {
     /// selected.
     pub fn regenerate_zooms(&mut self) {
         self.snapshot("");
-        let clicks: Vec<f64> = self.input.click_downs(true).iter().map(|click| click.time).collect();
+        let clicks: Vec<f64> = self
+            .input
+            .click_downs(true)
+            .iter()
+            .map(|click| click.time)
+            .collect();
         self.project.zooms = zoom_timeline::generate(&clicks, self.recording.source_duration);
-        self.selected_zoom_id = self.project.zooms.first().map(|zoom| zoom.id.clone()).unwrap_or_default();
-        self.selected_zoom_ids =
-            if self.selected_zoom_id.is_empty() { Vec::new() } else { vec![self.selected_zoom_id.clone()] };
+        self.selected_zoom_id = self
+            .project
+            .zooms
+            .first()
+            .map(|zoom| zoom.id.clone())
+            .unwrap_or_default();
+        self.selected_zoom_ids = if self.selected_zoom_id.is_empty() {
+            Vec::new()
+        } else {
+            vec![self.selected_zoom_id.clone()]
+        };
         self.changed(true);
         self.emit(Effect::SelectionChanged);
     }
@@ -201,8 +238,11 @@ impl Document {
     /// `selectZoomsInOutputRange(start, end)`: every zoom whose output span (both ends still
     /// shown) touches the range.
     pub fn select_zooms_in_output_range(&mut self, output_start: f64, output_end: f64) {
-        let (output_start, output_end) =
-            if output_start > output_end { (output_end, output_start) } else { (output_start, output_end) };
+        let (output_start, output_end) = if output_start > output_end {
+            (output_end, output_start)
+        } else {
+            (output_start, output_end)
+        };
         let ids: Vec<String> = self
             .project
             .zooms
@@ -276,7 +316,9 @@ impl Document {
         let selected: HashSet<String> = self.selected_zoom_ids.iter().cloned().collect();
         let before = self.project.zooms.len();
         self.snapshot("");
-        self.project.zooms.retain(|zoom| !selected.contains(&zoom.id));
+        self.project
+            .zooms
+            .retain(|zoom| !selected.contains(&zoom.id));
         self.selected_zoom_id.clear();
         self.selected_zoom_ids.clear();
         self.changed(true);

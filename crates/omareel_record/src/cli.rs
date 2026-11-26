@@ -44,7 +44,14 @@ pub fn record_command(arguments: &[String], out: &mut dyn Write, err: &mut dyn W
         let outcome = state::stop_existing(cancel);
         if outcome.code == 0 {
             let bundle = outcome.bundle_path.unwrap_or_default();
-            line(out, if cancel { "Recording discarded" } else { &bundle });
+            line(
+                out,
+                if cancel {
+                    "Recording discarded"
+                } else {
+                    &bundle
+                },
+            );
         } else {
             line(err, &format!("omareel: {}", outcome.error));
         }
@@ -57,9 +64,13 @@ pub fn record_command(arguments: &[String], out: &mut dyn Write, err: &mut dyn W
     if has("--with-webcam") && has("--no-webcam") {
         return usage(err, "--with-webcam cannot be combined with --no-webcam");
     }
-    let mut options = RecordOptions { output_directory: omarchy_paths::recordings_directory(), ..RecordOptions::default() };
+    let mut options = RecordOptions {
+        output_directory: omarchy_paths::recordings_directory(),
+        ..RecordOptions::default()
+    };
     let preferences = RecordingPreferences::load();
-    let explicit_audio = has("--with-desktop-audio") || has("--with-microphone-audio") || has("--no-audio");
+    let explicit_audio =
+        has("--with-desktop-audio") || has("--with-microphone-audio") || has("--no-audio");
     if !explicit_audio {
         options.desktop_audio = preferences.system_audio;
         options.microphone_audio = preferences.microphone;
@@ -106,16 +117,23 @@ pub fn record_command(arguments: &[String], out: &mut dyn Write, err: &mut dyn W
             "--no-selfview" => options.self_view = false,
             _ if argument.starts_with("--webcam-device=") => {
                 // QString::section('=', 1): everything after the first '='.
-                options.webcam_device = argument.split_once('=').map_or("", |(_, rest)| rest).to_owned();
+                options.webcam_device = argument
+                    .split_once('=')
+                    .map_or("", |(_, rest)| rest)
+                    .to_owned();
                 options.webcam = true;
             }
             "--webcam-device" => {
-                let Some(device) = value() else { return usage(err, "--webcam-device requires a value") };
+                let Some(device) = value() else {
+                    return usage(err, "--webcam-device requires a value");
+                };
                 options.webcam_device = device;
                 options.webcam = true;
             }
             "--webcam-height" => {
-                let Some(height) = value() else { return usage(err, "--webcam-height requires a value") };
+                let Some(height) = value() else {
+                    return usage(err, "--webcam-height requires a value");
+                };
                 options.webcam_height = to_int(&height);
                 options.webcam = true;
             }
@@ -124,13 +142,17 @@ pub fn record_command(arguments: &[String], out: &mut dyn Write, err: &mut dyn W
                 options.microphone_audio = false;
             }
             "--microphone-device" => {
-                let Some(device) = value() else { return usage(err, "--microphone-device requires a value") };
+                let Some(device) = value() else {
+                    return usage(err, "--microphone-device requires a value");
+                };
                 options.microphone_device = device;
             }
             "--no-open" => options.no_open = true,
             "--no-bar" => options.no_bar = true,
             "--fps" | "--dir" => {
-                let Some(given) = value() else { return usage(err, &format!("{argument} requires a value")) };
+                let Some(given) = value() else {
+                    return usage(err, &format!("{argument} requires a value"));
+                };
                 if argument == "--fps" {
                     options.fps = to_int(&given);
                 } else {
@@ -150,9 +172,14 @@ pub fn record_command(arguments: &[String], out: &mut dyn Write, err: &mut dyn W
     if options.fps <= 0 || options.fps > 240 {
         return usage(err, "fps must be between 1 and 240");
     }
-    if options.webcam && !options.webcam_device.starts_with("/dev/video") && !options.webcam_device.starts_with("/dev/v4l/")
+    if options.webcam
+        && !options.webcam_device.starts_with("/dev/video")
+        && !options.webcam_device.starts_with("/dev/v4l/")
     {
-        return usage(err, "webcam device must be a /dev/video device or a /dev/v4l link");
+        return usage(
+            err,
+            "webcam device must be a /dev/video device or a /dev/v4l link",
+        );
     }
     if options.webcam_height != 720 && options.webcam_height != 1080 {
         return usage(err, "webcam height must be 720 or 1080");
@@ -167,10 +194,15 @@ pub fn record_command(arguments: &[String], out: &mut dyn Write, err: &mut dyn W
 
 /// `omareel __selfview-ipc <command>`: the command into the standby self-view host's file.
 pub fn self_view_ipc(arguments: &[String]) -> i32 {
-    if arguments.len() == 1 && state::send_host_command(&arguments[0]) { 0 } else { 2 }
+    if arguments.len() == 1 && state::send_host_command(&arguments[0]) {
+        0
+    } else {
+        2
+    }
 }
 
-const RECORD_BAR_IPC_USAGE: &str = "__record-bar-ipc requires rotate|flip|selfview hide|show|move|drag-sim";
+const RECORD_BAR_IPC_USAGE: &str =
+    "__record-bar-ipc requires rotate|flip|selfview hide|show|move|drag-sim";
 
 /// `omareel __record-bar-ipc rotate|flip|selfview hide|show|selfview move X Y|selfview drag-sim
 /// X0 Y0 X1 Y1`: tells the recording bar what to do through the recording's state file.
@@ -179,7 +211,10 @@ pub fn record_bar_ipc(arguments: &[String], err: &mut dyn Write) -> i32 {
         return usage(err, RECORD_BAR_IPC_USAGE);
     }
     let next_sequence = || {
-        state::recording_state().value("recording_bar_command_sequence").to_variant_long_long().wrapping_add(1)
+        state::recording_state()
+            .value("recording_bar_command_sequence")
+            .to_variant_long_long()
+            .wrapping_add(1)
     };
     let words: Vec<&str> = arguments.iter().map(String::as_str).collect();
     let mut values = Object::new();
@@ -188,7 +223,9 @@ pub fn record_bar_ipc(arguments: &[String], err: &mut dyn Write) -> i32 {
             values.insert("recording_bar_command", *command);
             values.insert("recording_bar_command_sequence", next_sequence());
         }
-        ["selfview", visibility @ ("hide" | "show")] => values.insert("selfview", *visibility == "show"),
+        ["selfview", visibility @ ("hide" | "show")] => {
+            values.insert("selfview", *visibility == "show")
+        }
         ["selfview", "move", x, y] => {
             let (Some(x), Some(y)) = (qnumber::to_int(x), qnumber::to_int(y)) else {
                 return usage(err, "__record-bar-ipc selfview move requires integer x y");
@@ -197,9 +234,15 @@ pub fn record_bar_ipc(arguments: &[String], err: &mut dyn Write) -> i32 {
             values.insert("selfview_y", y);
         }
         ["selfview", "drag-sim", x0, y0, x1, y1] => {
-            let positions: Vec<Option<i32>> = [x0, y0, x1, y1].iter().map(|text| qnumber::to_int(text)).collect();
+            let positions: Vec<Option<i32>> = [x0, y0, x1, y1]
+                .iter()
+                .map(|text| qnumber::to_int(text))
+                .collect();
             let [Some(x0), Some(y0), Some(x1), Some(y1)] = positions[..] else {
-                return usage(err, "__record-bar-ipc selfview drag-sim requires integer x0 y0 x1 y1");
+                return usage(
+                    err,
+                    "__record-bar-ipc selfview drag-sim requires integer x0 y0 x1 y1",
+                );
             };
             values.insert("recording_bar_command", "drag-sim");
             values.insert("recording_bar_command_sequence", next_sequence());

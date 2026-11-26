@@ -52,7 +52,8 @@ fn link(target: &str, link: &str) {
         std::fs::create_dir_all(parent).expect("mkpath link directory");
     }
     let _ = std::fs::remove_file(link);
-    std::os::unix::fs::symlink(target, link).unwrap_or_else(|e| panic!("could not link {link}: {e}"));
+    std::os::unix::fs::symlink(target, link)
+        .unwrap_or_else(|e| panic!("could not link {link}: {e}"));
 }
 
 #[test]
@@ -85,13 +86,20 @@ fn stable_camera_path_txt() {
             for (name, target) in state.value("links").to_object().iter() {
                 link(&at(&target.to_string_or("")), &at(name));
             }
-            out.section(&format!("{tree}: {}", state.value("label").to_string_or("")));
+            out.section(&format!(
+                "{tree}: {}",
+                state.value("label").to_string_or("")
+            ));
             for query in state.value("queries").to_array() {
                 let query = query.to_string_or("");
                 let path = at(&query);
                 out.row([
                     quote(&query),
-                    quote(&h.sanitize(&stable_camera_path_in(&path, &format!("{root}/dev"), &format!("{root}/sys")))),
+                    quote(&h.sanitize(&stable_camera_path_in(
+                        &path,
+                        &format!("{root}/dev"),
+                        &format!("{root}/sys"),
+                    ))),
                     quote(&h.sanitize(&camera_node_path(&path))),
                 ]);
             }
@@ -109,7 +117,10 @@ fn camera_id_node_txt() {
         let id = id.to_string_or("");
         out.row([quote(&id), quote(&camera_id_node(id.as_bytes()))]);
     }
-    out.row(["<bytes \\xff/dev/video3>".to_owned(), quote(&camera_id_node(b"\xff/dev/video3"))]);
+    out.row([
+        "<bytes \\xff/dev/video3>".to_owned(),
+        quote(&camera_id_node(b"\xff/dev/video3")),
+    ]);
     assert_golden("camera/camera-id-node.txt", &out.into_string());
 }
 
@@ -120,7 +131,10 @@ fn first_frame_timestamp_txt() {
     std::fs::create_dir_all(format!("{files}/directory.ts")).expect("mkpath");
     let mut out = Text::new();
     let show = |out: &mut Text, path: &str| {
-        let bytes = std::path::Path::new(path).is_file().then(|| std::fs::read(path).ok()).flatten();
+        let bytes = std::path::Path::new(path)
+            .is_file()
+            .then(|| std::fs::read(path).ok())
+            .flatten();
         out.row([
             "  file".to_owned(),
             quote(&h.sanitize(path)),
@@ -128,16 +142,17 @@ fn first_frame_timestamp_txt() {
             octal_mode(path),
         ]);
     };
-    let arrive = |out: &mut Text, timestamp: &mut FirstFrameTimestamp, monotonic: i64, realtime: i64| {
-        let ok = timestamp.record_frame_arrival(monotonic, realtime);
-        out.row([
-            "recordFrameArrival".to_owned(),
-            monotonic.to_string(),
-            realtime.to_string(),
-            boolean(ok).into(),
-            timestamp.first_frame_us().to_string(),
-        ]);
-    };
+    let arrive =
+        |out: &mut Text, timestamp: &mut FirstFrameTimestamp, monotonic: i64, realtime: i64| {
+            let ok = timestamp.record_frame_arrival(monotonic, realtime);
+            out.row([
+                "recordFrameArrival".to_owned(),
+                monotonic.to_string(),
+                realtime.to_string(),
+                boolean(ok).into(),
+                timestamp.first_frame_us().to_string(),
+            ]);
+        };
     {
         out.section("the tag's test");
         let path = format!("{files}/camera.mp4.ts");
@@ -147,7 +162,11 @@ fn first_frame_timestamp_txt() {
         show(&mut out, &path);
         let next = format!("{files}/next.ts");
         timestamp.set_path(next.clone());
-        out.row(["setPath".to_owned(), quote(&h.sanitize(&next)), timestamp.first_frame_us().to_string()]);
+        out.row([
+            "setPath".to_owned(),
+            quote(&h.sanitize(&next)),
+            timestamp.first_frame_us().to_string(),
+        ]);
         arrive(&mut out, &mut timestamp, 42, 43);
         show(&mut out, &next);
         show(&mut out, &path);
@@ -171,7 +190,10 @@ fn first_frame_timestamp_txt() {
         timestamp.set_path("");
         arrive(&mut out, &mut timestamp, 1, 1);
     }
-    for (label, name) in [("missing directory", "missing/camera.mp4.ts"), ("path is a directory", "directory.ts")] {
+    for (label, name) in [
+        ("missing directory", "missing/camera.mp4.ts"),
+        ("path is a directory", "directory.ts"),
+    ] {
         out.section(label);
         let path = format!("{files}/{name}");
         let mut timestamp = FirstFrameTimestamp::new(path.clone());
@@ -201,9 +223,15 @@ fn selected_format_and_device_for_path_txt() {
         let device = camera(b"/dev/video0", name, formats);
         let mut cells = vec![name.to_owned()];
         for height in [1080, 720, 0, 480] {
-            cells.push(format!("{height}={}", format_cells(selected_format(&device, height))));
+            cells.push(format!(
+                "{height}={}",
+                format_cells(selected_format(&device, height))
+            ));
         }
-        cells.push(format!("cameraCanRecord={}", boolean(camera_can_record(&device))));
+        cells.push(format!(
+            "cameraCanRecord={}",
+            boolean(camera_can_record(&device))
+        ));
         out.row(cells);
     }
     let null = CameraDevice::default();
@@ -216,15 +244,23 @@ fn selected_format_and_device_for_path_txt() {
     // cameraDeviceForPath compares the id's /dev/videoN with the path's canonical node, which is
     // a real /dev entry or nothing; only paths that resolve to nothing are hermetic.
     let mut paths = Text::new();
-    let formats = omareel_core::compat::qjson::from_json(br#"[["Jpeg", 1920, 1080, 30, 30]]"#).expect("formats");
-    let cameras = [camera(b"/dev/video0", "A", &formats), camera(b"v4l2 /dev/video2", "B", &formats)];
-    for path in
-        [String::new(), "/dev/oracle-camera-that-does-not-exist".into(), format!("{}/missing/video0", h.scratch())]
-    {
+    let formats = omareel_core::compat::qjson::from_json(br#"[["Jpeg", 1920, 1080, 30, 30]]"#)
+        .expect("formats");
+    let cameras = [
+        camera(b"/dev/video0", "A", &formats),
+        camera(b"v4l2 /dev/video2", "B", &formats),
+    ];
+    for path in [
+        String::new(),
+        "/dev/oracle-camera-that-does-not-exist".into(),
+        format!("{}/missing/video0", h.scratch()),
+    ] {
         let device = camera_device_for_path(&cameras, &path);
         paths.row([
             quote(&h.sanitize(&path)),
-            device.map_or("null".to_owned(), |device| quote(&String::from_utf8_lossy(&device.id))),
+            device.map_or("null".to_owned(), |device| {
+                quote(&String::from_utf8_lossy(&device.id))
+            }),
         ]);
     }
     assert_no_differences(

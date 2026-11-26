@@ -14,7 +14,10 @@ use crate::project::Clip;
 
 /// The even size an encoder needs: odd dimensions grow by one.
 pub fn padded_even_size(width: i32, height: i32) -> (i32, i32) {
-    (width.wrapping_add((width % 2).abs()), height.wrapping_add((height % 2).abs()))
+    (
+        width.wrapping_add((width % 2).abs()),
+        height.wrapping_add((height % 2).abs()),
+    )
 }
 
 /// What the exporter's own ffprobe call reports for the recording and the webcam video.
@@ -95,7 +98,13 @@ pub fn probe(path: &str) -> (MediaInfo, String) {
     }
     let root = qjson::object_from_json(&process.read_all_standard_output()).unwrap_or_default();
     let mut result = MediaInfo {
-        duration: to_double(&root.value("format").to_object().value("duration").to_string_or("")),
+        duration: to_double(
+            &root
+                .value("format")
+                .to_object()
+                .value("duration")
+                .to_string_or(""),
+        ),
         ..MediaInfo::default()
     };
     let mut error = String::new();
@@ -136,7 +145,10 @@ pub fn output_aspect(aspect: &str, source_width: i32, source_height: i32, crop: 
         "9:16" => 9.0 / 16.0,
         "3:4" => 3.0 / 4.0,
         "4:5" => 4.0 / 5.0,
-        _ => (f64::from(source_width) * crop.width) / cpp::max(1.0, f64::from(source_height) * crop.height),
+        _ => {
+            (f64::from(source_width) * crop.width)
+                / cpp::max(1.0, f64::from(source_height) * crop.height)
+        }
     }
 }
 
@@ -196,7 +208,13 @@ pub fn silent_segment(length: f64) -> String {
 /// The `-filter_complex` that mixes the clips' audio (`segments`, one chain per clip in output
 /// order, or none when no clip has audio) with a click sound from input `click_input` at each
 /// of `clicks`, padded or cut to the output's length.
-pub fn audio_filter(segments: &[String], volume: f64, clicks: &[f64], click_input: i32, output_duration: f64) -> String {
+pub fn audio_filter(
+    segments: &[String],
+    volume: f64,
+    clicks: &[f64],
+    click_input: i32,
+    output_duration: f64,
+) -> String {
     let mut filter = String::new();
     let mut mix_labels: Vec<String> = Vec::new();
     if !segments.is_empty() {
@@ -262,9 +280,18 @@ pub enum VideoEncoder {
 const BT709_CONVERSION: &str = "scale=out_color_matrix=bt709:out_range=tv";
 /// The frames say so, and so does the file. ffmpeg takes the encoder's tags from the frames,
 /// and only the matrix and range would get there by themselves.
-const BT709_FRAMES: &str = "setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv";
-const BT709_TAGS: [&str; 8] =
-    ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"];
+const BT709_FRAMES: &str =
+    "setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv";
+const BT709_TAGS: [&str; 8] = [
+    "-colorspace",
+    "bt709",
+    "-color_primaries",
+    "bt709",
+    "-color_trc",
+    "bt709",
+    "-color_range",
+    "tv",
+];
 
 impl VideoEncoder {
     /// ffmpeg's name for it.
@@ -324,7 +351,11 @@ impl VideoEncoder {
 /// The encoders to try, best first: NVENC unless `nvenc_disabled` (`OMAREEL_DISABLE_NVENC`),
 /// VA-API on `vaapi_device` when there is one, and libx264. `choice` (`OMAREEL_EXPORT_ENCODER`)
 /// "nvenc", "vaapi" or "x264" keeps only that one and libx264.
-pub fn video_encoders(choice: &str, nvenc_disabled: bool, vaapi_device: Option<String>) -> Vec<VideoEncoder> {
+pub fn video_encoders(
+    choice: &str,
+    nvenc_disabled: bool,
+    vaapi_device: Option<String>,
+) -> Vec<VideoEncoder> {
     let mut encoders = Vec::new();
     if !nvenc_disabled && matches!(choice, "nvenc" | "") {
         encoders.push(VideoEncoder::Nvenc);
@@ -381,13 +412,22 @@ pub fn bitrate_multiplier(quality: &str) -> f64 {
 /// An inserted clip decodes at the size that covers the output, never larger than itself.
 pub fn insert_decode_size(width: i32, height: i32, info: &VideoInfo) -> (i32, i32) {
     let scale = cpp::clamp(
-        cpp::max(f64::from(width) / f64::from(info.width), f64::from(height) / f64::from(info.height)),
+        cpp::max(
+            f64::from(width) / f64::from(info.width),
+            f64::from(height) / f64::from(info.height),
+        ),
         0.01,
         1.0,
     );
     (
-        cpp::max(2, q_round(f64::from(info.width) * scale / 2.0).wrapping_mul(2)),
-        cpp::max(2, q_round(f64::from(info.height) * scale / 2.0).wrapping_mul(2)),
+        cpp::max(
+            2,
+            q_round(f64::from(info.width) * scale / 2.0).wrapping_mul(2),
+        ),
+        cpp::max(
+            2,
+            q_round(f64::from(info.height) * scale / 2.0).wrapping_mul(2),
+        ),
     )
 }
 
@@ -454,7 +494,10 @@ mod tests {
         assert_eq!(atempo(1.0), "atempo=1");
         assert_eq!(atempo(0.75), "atempo=0.75");
         assert_eq!(atempo(8.0), "atempo=2,atempo=2,atempo=2");
-        assert_eq!(atempo(24.0), "atempo=2,atempo=2,atempo=2,atempo=2,atempo=1.5");
+        assert_eq!(
+            atempo(24.0),
+            "atempo=2,atempo=2,atempo=2,atempo=2,atempo=1.5"
+        );
         assert_eq!(atempo(0.2), "atempo=0.5,atempo=0.5,atempo=0.8");
         assert_eq!(atempo(1.4), "atempo=1.4");
     }
@@ -492,59 +535,142 @@ mod tests {
             ["low", "medium", "high", "best", "studio", "x"].map(normalized_quality),
             ["web-low", "web-high", "social", "studio", "studio", "x"]
         );
-        assert_eq!(["web-low", "web-high", "social", "studio", ""].map(bitrate_multiplier), [0.0075, 0.0175, 0.05, 0.3, 0.05]);
-        assert_eq!(output_aspect("auto", 640, 360, &RectF::new(0.0, 0.0, 0.5, 1.0)), 320.0 / 360.0);
-        assert_eq!(output_aspect("9:16", 640, 360, &RectF::new(0.0, 0.0, 1.0, 1.0)), 9.0 / 16.0);
+        assert_eq!(
+            ["web-low", "web-high", "social", "studio", ""].map(bitrate_multiplier),
+            [0.0075, 0.0175, 0.05, 0.3, 0.05]
+        );
+        assert_eq!(
+            output_aspect("auto", 640, 360, &RectF::new(0.0, 0.0, 0.5, 1.0)),
+            320.0 / 360.0
+        );
+        assert_eq!(
+            output_aspect("9:16", 640, 360, &RectF::new(0.0, 0.0, 1.0, 1.0)),
+            9.0 / 16.0
+        );
     }
 
     #[test]
     fn gif_arguments_flip_only_opengl_frames() {
-        let args = gif_arguments(480, 270, 12, "/run/raw.rgba", "studio", false, true, "/out.gif");
-        assert_eq!(&args[12..], ["/run/raw.rgba", "-vf",
-            "vflip,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
-            "-loop", "0", "/out.gif"]);
-        assert_eq!(&gif_arguments(4, 2, 1, "r", "social", true, false, "o")[12..], ["r", "-loop", "-1", "o"]);
-        assert_eq!(&gif_arguments(4, 2, 1, "r", "social", false, false, "o")[13..], ["-vf", "vflip", "-loop", "-1", "o"]);
+        let args = gif_arguments(
+            480,
+            270,
+            12,
+            "/run/raw.rgba",
+            "studio",
+            false,
+            true,
+            "/out.gif",
+        );
+        assert_eq!(
+            &args[12..],
+            [
+                "/run/raw.rgba",
+                "-vf",
+                "vflip,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
+                "-loop",
+                "0",
+                "/out.gif"
+            ]
+        );
+        assert_eq!(
+            &gif_arguments(4, 2, 1, "r", "social", true, false, "o")[12..],
+            ["r", "-loop", "-1", "o"]
+        );
+        assert_eq!(
+            &gif_arguments(4, 2, 1, "r", "social", false, false, "o")[13..],
+            ["-vf", "vflip", "-loop", "-1", "o"]
+        );
     }
 
     #[test]
     fn encoders_go_nvenc_vaapi_x264() {
         let intel = || Some("/dev/dri/renderD128".to_string());
         let vaapi = VideoEncoder::Vaapi("/dev/dri/renderD128".into());
-        assert_eq!(video_encoders("", false, intel()), [VideoEncoder::Nvenc, vaapi.clone(), VideoEncoder::X264]);
-        assert_eq!(video_encoders("", true, intel()), [vaapi.clone(), VideoEncoder::X264]);
-        assert_eq!(video_encoders("", false, None), [VideoEncoder::Nvenc, VideoEncoder::X264]);
-        assert_eq!(video_encoders("vaapi", false, intel()), [vaapi, VideoEncoder::X264]);
+        assert_eq!(
+            video_encoders("", false, intel()),
+            [VideoEncoder::Nvenc, vaapi.clone(), VideoEncoder::X264]
+        );
+        assert_eq!(
+            video_encoders("", true, intel()),
+            [vaapi.clone(), VideoEncoder::X264]
+        );
+        assert_eq!(
+            video_encoders("", false, None),
+            [VideoEncoder::Nvenc, VideoEncoder::X264]
+        );
+        assert_eq!(
+            video_encoders("vaapi", false, intel()),
+            [vaapi, VideoEncoder::X264]
+        );
         assert_eq!(video_encoders("vaapi", false, None), [VideoEncoder::X264]);
-        assert_eq!(video_encoders("nvenc", false, intel()), [VideoEncoder::Nvenc, VideoEncoder::X264]);
+        assert_eq!(
+            video_encoders("nvenc", false, intel()),
+            [VideoEncoder::Nvenc, VideoEncoder::X264]
+        );
         assert_eq!(video_encoders("nvenc", true, intel()), [VideoEncoder::X264]);
         assert_eq!(video_encoders("x264", false, intel()), [VideoEncoder::X264]);
     }
 
     #[test]
     fn encoders_convert_with_bt709_and_say_so() {
-        let tags = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"];
-        let rate = ["-b:v", "1000", "-maxrate", "1200", "-bufsize", "2000", "-profile:v", "high"];
+        let tags = [
+            "-colorspace",
+            "bt709",
+            "-color_primaries",
+            "bt709",
+            "-color_trc",
+            "bt709",
+            "-color_range",
+            "tv",
+        ];
+        let rate = [
+            "-b:v",
+            "1000",
+            "-maxrate",
+            "1200",
+            "-bufsize",
+            "2000",
+            "-profile:v",
+            "high",
+        ];
         let x264 = VideoEncoder::X264.video_arguments(true, 1000);
-        assert_eq!(&x264[..2], ["-vf",
-            "vflip,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,\
-             setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv"]);
+        assert_eq!(
+            &x264[..2],
+            [
+                "-vf",
+                "vflip,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,\
+             setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv"
+            ]
+        );
         assert_eq!(&x264[2..6], ["-c:v", "libx264", "-preset", "medium"]);
         assert_eq!(&x264[6..14], rate);
         assert_eq!(&x264[14..], tags);
         let nvenc = VideoEncoder::Nvenc.video_arguments(false, 1000);
-        assert_eq!(&nvenc[..2], ["-vf",
-            "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,\
-             setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv"]);
+        assert_eq!(
+            &nvenc[..2],
+            [
+                "-vf",
+                "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,\
+             setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv"
+            ]
+        );
         assert_eq!(&nvenc[2..6], ["-c:v", "h264_nvenc", "-preset", "p5"]);
         assert_eq!(&nvenc[14..], tags);
         let vaapi = VideoEncoder::Vaapi("/dev/dri/renderD129".into());
-        assert_eq!(vaapi.device_arguments(), ["-vaapi_device", "/dev/dri/renderD129"]);
+        assert_eq!(
+            vaapi.device_arguments(),
+            ["-vaapi_device", "/dev/dri/renderD129"]
+        );
         assert!(VideoEncoder::X264.device_arguments().is_empty());
         let args = vaapi.video_arguments(true, 1000);
-        assert_eq!(&args[..2], ["-vf",
-            "vflip,scale=out_color_matrix=bt709:out_range=tv,format=nv12,\
-             setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,hwupload"]);
+        assert_eq!(
+            &args[..2],
+            [
+                "-vf",
+                "vflip,scale=out_color_matrix=bt709:out_range=tv,format=nv12,\
+             setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,hwupload"
+            ]
+        );
         assert_eq!(&args[2..6], ["-c:v", "h264_vaapi", "-rc_mode", "VBR"]);
         assert_eq!(&args[6..14], rate);
         assert_eq!(&args[14..], tags);
@@ -555,8 +681,17 @@ mod tests {
     fn round_trip(encoder: &VideoEncoder, colour: &str, path: &str) -> Option<[u8; 3]> {
         let mut args: Vec<String> = ["-y", "-v", "error"].map(String::from).into();
         args.extend(encoder.device_arguments());
-        args.extend(["-f", "lavfi", "-i", &format!("color=c={colour}:size=256x144:rate=30,format=rgba"), "-frames:v", "5"]
-            .map(String::from));
+        args.extend(
+            [
+                "-f",
+                "lavfi",
+                "-i",
+                &format!("color=c={colour}:size=256x144:rate=30,format=rgba"),
+                "-frames:v",
+                "5",
+            ]
+            .map(String::from),
+        );
         args.extend(encoder.video_arguments(false, 1_000_000));
         args.push(path.into());
         let args: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -565,11 +700,27 @@ mod tests {
         }
         let decoded = crate::compat::qprocess::run(
             "ffmpeg",
-            &["-v", "error", "-i", path, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+            &[
+                "-v",
+                "error",
+                "-i",
+                path,
+                "-frames:v",
+                "1",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "rgb24",
+                "-",
+            ],
             30000,
         )?;
         let centre = (72 * 256 + 128) * 3;
-        Some([decoded.stdout[centre], decoded.stdout[centre + 1], decoded.stdout[centre + 2]])
+        Some([
+            decoded.stdout[centre],
+            decoded.stdout[centre + 1],
+            decoded.stdout[centre + 2],
+        ])
     }
 
     #[test]
@@ -579,7 +730,8 @@ mod tests {
             eprintln!("ffmpeg/ffprobe unavailable");
             return;
         }
-        let dir = std::env::temp_dir().join(format!("omareel-export-colour-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("omareel-export-colour-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let mut encoders = vec![VideoEncoder::X264];
         // The GPU encoders this machine has: they have to agree too.
@@ -590,24 +742,51 @@ mod tests {
             }
         }
         for encoder in &encoders {
-            let path = dir.join(format!("{}.mp4", encoder.name())).to_string_lossy().into_owned();
-            for (colour, rgb) in [("0xff0000", [255, 0, 0]), ("0x00ff00", [0, 255, 0]), ("0x0000ff", [0, 0, 255]),
-                                  ("0xff8020", [255, 128, 32]), ("0x808080", [128, 128, 128])] {
+            let path = dir
+                .join(format!("{}.mp4", encoder.name()))
+                .to_string_lossy()
+                .into_owned();
+            for (colour, rgb) in [
+                ("0xff0000", [255, 0, 0]),
+                ("0x00ff00", [0, 255, 0]),
+                ("0x0000ff", [0, 0, 255]),
+                ("0xff8020", [255, 128, 32]),
+                ("0x808080", [128, 128, 128]),
+            ] {
                 let Some(got) = round_trip(encoder, colour, &path) else {
                     panic!("{} could not encode {colour}", encoder.name());
                 };
                 // Within a couple of code values: BT.601 instead turns red into (255, 23, 0).
-                assert!(got.iter().zip(rgb).all(|(a, b)| (i32::from(*a) - b).abs() <= 3),
-                        "{}: {colour} came back as {got:?}", encoder.name());
+                assert!(
+                    got.iter()
+                        .zip(rgb)
+                        .all(|(a, b)| (i32::from(*a) - b).abs() <= 3),
+                    "{}: {colour} came back as {got:?}",
+                    encoder.name()
+                );
             }
             let probe = crate::compat::qprocess::run(
                 "ffprobe",
-                &["-v", "error", "-select_streams", "v:0", "-show_entries",
-                  "stream=pix_fmt,color_space,color_primaries,color_transfer,color_range", "-of", "compact=p=0:nk=1", &path],
+                &[
+                    "-v",
+                    "error",
+                    "-select_streams",
+                    "v:0",
+                    "-show_entries",
+                    "stream=pix_fmt,color_space,color_primaries,color_transfer,color_range",
+                    "-of",
+                    "compact=p=0:nk=1",
+                    &path,
+                ],
                 15000,
             )
             .unwrap();
-            assert_eq!(String::from_utf8_lossy(&probe.stdout).trim(), "yuv420p|tv|bt709|bt709|bt709", "{}", encoder.name());
+            assert_eq!(
+                String::from_utf8_lossy(&probe.stdout).trim(),
+                "yuv420p|tv|bt709|bt709|bt709",
+                "{}",
+                encoder.name()
+            );
         }
         let _ = std::fs::remove_dir_all(dir);
     }

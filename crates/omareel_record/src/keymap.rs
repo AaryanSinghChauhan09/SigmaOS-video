@@ -47,7 +47,11 @@ struct XkbRuleNames {
 unsafe extern "C" {
     fn xkb_context_new(flags: c_int) -> *mut XkbContext;
     fn xkb_context_unref(context: *mut XkbContext);
-    fn xkb_keymap_new_from_names(context: *mut XkbContext, names: *const XkbRuleNames, flags: c_int) -> *mut XkbKeymap;
+    fn xkb_keymap_new_from_names(
+        context: *mut XkbContext,
+        names: *const XkbRuleNames,
+        flags: c_int,
+    ) -> *mut XkbKeymap;
     fn xkb_keymap_unref(keymap: *mut XkbKeymap);
     fn xkb_keymap_num_layouts(keymap: *mut XkbKeymap) -> u32;
     fn xkb_keymap_layout_get_name(keymap: *mut XkbKeymap, layout: u32) -> *const c_char;
@@ -133,7 +137,6 @@ mod keysyms {
 }
 use keysyms::*;
 
-
 /// The keymap names of a keyboard, and which of its layouts is active and which locks are on.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct KeyboardNames {
@@ -156,8 +159,19 @@ impl KeyboardNames {
     /// Whether `other` compiles to the same keymap: the same rules, model, layouts, variants and
     /// options.
     fn same_keymap(&self, other: &KeyboardNames) -> bool {
-        (&self.rules, &self.model, &self.layout, &self.variant, &self.options)
-            == (&other.rules, &other.model, &other.layout, &other.variant, &other.options)
+        (
+            &self.rules,
+            &self.model,
+            &self.layout,
+            &self.variant,
+            &self.options,
+        ) == (
+            &other.rules,
+            &other.model,
+            &other.layout,
+            &other.variant,
+            &other.options,
+        )
     }
 }
 
@@ -172,7 +186,9 @@ pub struct Keyboards {
 /// The keyboards in `hyprctl devices -j`'s answer: the one marked main (else the first) and the
 /// other keymaps. `None` when the answer has no keyboards.
 pub fn keyboards_from_devices(json: &[u8]) -> Option<Keyboards> {
-    let Ok(Value::Object(devices)) = qjson::from_json(json) else { return None };
+    let Ok(Value::Object(devices)) = qjson::from_json(json) else {
+        return None;
+    };
     let keyboards: Vec<(bool, KeyboardNames)> = devices
         .value("keyboards")
         .to_array()
@@ -208,7 +224,9 @@ pub fn keyboards_from_devices(json: &[u8]) -> Option<Keyboards> {
 
 /// What `hyprctl` printed when it succeeded within a second.
 fn hyprctl(arguments: &[&str]) -> Option<Vec<u8>> {
-    qprocess::run("hyprctl", arguments, 1000).filter(qprocess::Finished::succeeded).map(|finished| finished.stdout)
+    qprocess::run("hyprctl", arguments, 1000)
+        .filter(qprocess::Finished::succeeded)
+        .map(|finished| finished.stdout)
 }
 
 /// The keyboards Hyprland has ([`keyboards_from_devices`]). `None` without an answer from
@@ -267,8 +285,13 @@ impl Drop for Layout {
 /// The keymap `names` describe, compiled in `context`; null when libxkbcommon cannot.
 fn compile(context: *mut XkbContext, names: &KeyboardNames) -> *mut XkbKeymap {
     let text = |value: &str| CString::new(value).unwrap_or_default();
-    let (rules, model, layout, variant, options) =
-        (text(&names.rules), text(&names.model), text(&names.layout), text(&names.variant), text(&names.options));
+    let (rules, model, layout, variant, options) = (
+        text(&names.rules),
+        text(&names.model),
+        text(&names.layout),
+        text(&names.variant),
+        text(&names.options),
+    );
     let rule_names = XkbRuleNames {
         rules: rules.as_ptr(),
         model: model.as_ptr(),
@@ -283,7 +306,10 @@ fn compile(context: *mut XkbContext, names: &KeyboardNames) -> *mut XkbKeymap {
 impl Layout {
     /// One keyboard's layout ([`Layout::for_keyboards`]).
     pub fn new(names: &KeyboardNames) -> Option<Layout> {
-        Layout::for_keyboards(&Keyboards { main: names.clone(), others: Vec::new() })
+        Layout::for_keyboards(&Keyboards {
+            main: names.clone(),
+            others: Vec::new(),
+        })
     }
 
     /// Compiles every keyboard's keymap, the main one starting at its active layout (by index,
@@ -297,8 +323,16 @@ impl Layout {
         }
         let keymap = compile(context, &keyboards.main);
         // SAFETY: a live keymap, or null, which xkb_state_new is not given.
-        let state = if keymap.is_null() { std::ptr::null_mut() } else { unsafe { xkb_state_new(keymap) } };
-        let others: Vec<*mut XkbKeymap> = keyboards.others.iter().map(|names| compile(context, names)).collect();
+        let state = if keymap.is_null() {
+            std::ptr::null_mut()
+        } else {
+            unsafe { xkb_state_new(keymap) }
+        };
+        let others: Vec<*mut XkbKeymap> = keyboards
+            .others
+            .iter()
+            .map(|names| compile(context, names))
+            .collect();
         if state.is_null() || others.iter().any(|other| other.is_null()) {
             // SAFETY: what was made above, each released once (unref ignores null).
             unsafe {
@@ -311,11 +345,24 @@ impl Layout {
             }
             return None;
         }
-        let result = Layout { main_keyboard_name: keyboards.main.name.clone(), context, keymap, state, others };
+        let result = Layout {
+            main_keyboard_name: keyboards.main.name.clone(),
+            context,
+            keymap,
+            state,
+            others,
+        };
         let names = &keyboards.main;
-        let active = names.active_layout.or_else(|| result.layout_named(&names.active_keymap)).unwrap_or(0);
+        let active = names
+            .active_layout
+            .or_else(|| result.layout_named(&names.active_keymap))
+            .unwrap_or(0);
         // SAFETY: a live keymap.
-        let active = if active < unsafe { xkb_keymap_num_layouts(keymap) } { active } else { 0 };
+        let active = if active < unsafe { xkb_keymap_num_layouts(keymap) } {
+            active
+        } else {
+            0
+        };
         let mut locked = 0;
         for (on, name) in [(names.caps_lock, c"Lock"), (names.num_lock, c"Mod2")] {
             // SAFETY: a live keymap and a NUL-terminated name.
@@ -355,14 +402,29 @@ impl Layout {
     /// Switches to the main keymap's layout described as `name` (a Hyprland `activelayout`
     /// event), keeping the modifiers as they are; false when it has no such layout.
     pub fn follow_layout(&mut self, name: &str) -> bool {
-        let Some(index) = self.layout_named(name) else { return false };
+        let Some(index) = self.layout_named(name) else {
+            return false;
+        };
         // SAFETY: a live state; the masks are its own.
         unsafe {
             let mods = |component| xkb_state_serialize_mods(self.state, component);
-            let (depressed, latched, locked) = (mods(XKB_STATE_MODS_DEPRESSED), mods(XKB_STATE_MODS_LATCHED), mods(XKB_STATE_MODS_LOCKED));
-            let depressed_layout = xkb_state_serialize_layout(self.state, XKB_STATE_LAYOUT_DEPRESSED);
+            let (depressed, latched, locked) = (
+                mods(XKB_STATE_MODS_DEPRESSED),
+                mods(XKB_STATE_MODS_LATCHED),
+                mods(XKB_STATE_MODS_LOCKED),
+            );
+            let depressed_layout =
+                xkb_state_serialize_layout(self.state, XKB_STATE_LAYOUT_DEPRESSED);
             let latched_layout = xkb_state_serialize_layout(self.state, XKB_STATE_LAYOUT_LATCHED);
-            xkb_state_update_mask(self.state, depressed, latched, locked, depressed_layout, latched_layout, index);
+            xkb_state_update_mask(
+                self.state,
+                depressed,
+                latched,
+                locked,
+                depressed_layout,
+                latched_layout,
+                index,
+            );
         }
         true
     }
@@ -371,7 +433,8 @@ impl Layout {
     fn syms(&self, keymap: *mut XkbKeymap, keycode: u32, layout: u32, level: u32) -> &[u32] {
         let mut syms: *const u32 = std::ptr::null();
         // SAFETY: a live keymap and a place for the keymap's own array.
-        let count = unsafe { xkb_keymap_key_get_syms_by_level(keymap, keycode, layout, level, &mut syms) };
+        let count =
+            unsafe { xkb_keymap_key_get_syms_by_level(keymap, keycode, layout, level, &mut syms) };
         if count <= 0 || syms.is_null() {
             return &[];
         }
@@ -390,7 +453,10 @@ impl Layout {
         let base = if layout == XKB_INVALID {
             NO_SYMBOL
         } else {
-            self.syms(self.keymap, keycode, layout, 0).first().copied().unwrap_or(NO_SYMBOL)
+            self.syms(self.keymap, keycode, layout, 0)
+                .first()
+                .copied()
+                .unwrap_or(NO_SYMBOL)
         };
         let mut typing = keysym_is_typing(current);
         let mut modifier: Option<&'static str> = None;
@@ -417,8 +483,18 @@ impl Layout {
             keysym_label(base)
         };
         // SAFETY: a live state.
-        unsafe { xkb_state_update_key(self.state, keycode, if down { XKB_KEY_DOWN } else { XKB_KEY_UP }) };
-        Key { label, typing, modifier: if agreed { modifier.unwrap_or("") } else { "" } }
+        unsafe {
+            xkb_state_update_key(
+                self.state,
+                keycode,
+                if down { XKB_KEY_DOWN } else { XKB_KEY_UP },
+            )
+        };
+        Key {
+            label,
+            typing,
+            modifier: if agreed { modifier.unwrap_or("") } else { "" },
+        }
     }
 }
 
@@ -437,7 +513,9 @@ fn keysym_name(keysym: u32) -> String {
         return String::new();
     }
     // SAFETY: NUL-terminated within the buffer (truncated names are too).
-    unsafe { CStr::from_ptr(buffer.as_ptr()) }.to_string_lossy().into_owned()
+    unsafe { CStr::from_ptr(buffer.as_ptr()) }
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// Whether a keysym is part of typing text: a printable character (space included); a dead key
@@ -447,7 +525,10 @@ fn keysym_name(keysym: u32) -> String {
 pub fn keysym_is_typing(keysym: u32) -> bool {
     (DEAD_FIRST..=DEAD_LAST).contains(&keysym)
         || (ISO_LEVEL_FIRST..=ISO_LEVEL_LAST).contains(&keysym)
-        || matches!(keysym, MULTI_KEY | MODE_SWITCH | NUM_LOCK | SHIFT_L | SHIFT_R | CAPS_LOCK | SHIFT_LOCK)
+        || matches!(
+            keysym,
+            MULTI_KEY | MODE_SWITCH | NUM_LOCK | SHIFT_L | SHIFT_R | CAPS_LOCK | SHIFT_LOCK
+        )
         || keysym_char(keysym).is_some_and(|c| !c.is_control())
 }
 
@@ -532,8 +613,16 @@ pub fn keysym_label(keysym: u32) -> String {
         "XF86MonBrightnessDown" => "Brightness Down",
         _ => "",
     };
-    let label = if named.is_empty() { name_in_words(name.strip_prefix("XF86").unwrap_or(name)) } else { named.to_owned() };
-    if label.is_empty() { label } else { format!("{prefix}{label}") }
+    let label = if named.is_empty() {
+        name_in_words(name.strip_prefix("XF86").unwrap_or(name))
+    } else {
+        named.to_owned()
+    };
+    if label.is_empty() {
+        label
+    } else {
+        format!("{prefix}{label}")
+    }
 }
 
 /// A keysym name in words: underscores as spaces, and a space where a lower-case letter meets an
@@ -586,7 +675,8 @@ mod tests {
             options: options.into(),
             ..KeyboardNames::default()
         };
-        Layout::new(&names).expect("libxkbcommon compiles the keymap (xkeyboard-config is installed)")
+        Layout::new(&names)
+            .expect("libxkbcommon compiles the keymap (xkeyboard-config is installed)")
     }
 
     /// A press and release of `code`, what the press gave.
@@ -627,13 +717,24 @@ mod tests {
 
     #[test]
     fn text_keysyms() {
-        for keysym in [0x61, 0x20, 0xe9, 0xffb1, 0xff80, DEAD_ACUTE, 0xfe5c, MULTI_KEY, 0x10020ac] {
+        for keysym in [
+            0x61, 0x20, 0xe9, 0xffb1, 0xff80, DEAD_ACUTE, 0xfe5c, MULTI_KEY, 0x10020ac,
+        ] {
             assert!(keysym_is_typing(keysym), "{keysym:#x}");
         }
-        for keysym in [SHIFT_R, CAPS_LOCK, NUM_LOCK, ISO_LEVEL3_SHIFT, 0xfe08, MODE_SWITCH] {
+        for keysym in [
+            SHIFT_R,
+            CAPS_LOCK,
+            NUM_LOCK,
+            ISO_LEVEL3_SHIFT,
+            0xfe08,
+            MODE_SWITCH,
+        ] {
             assert!(keysym_is_typing(keysym), "{keysym:#x}");
         }
-        for keysym in [0xff0d, 0xff09, 0xff08, 0xffff, 0xff1b, 0xff95, 0xffbe, CONTROL_L, ALT_L, SUPER_R, 0] {
+        for keysym in [
+            0xff0d, 0xff09, 0xff08, 0xffff, 0xff1b, 0xff95, 0xffbe, CONTROL_L, ALT_L, SUPER_R, 0,
+        ] {
             assert!(!keysym_is_typing(keysym), "{keysym:#x}");
         }
         assert_eq!(keysym_modifier(META_L), "alt");
@@ -644,22 +745,89 @@ mod tests {
     #[test]
     fn us_keys() {
         let mut us = layout("us", "", "");
-        assert_eq!(tap(&mut us, KEY_A), Key { label: "A".into(), typing: true, modifier: "" });
-        assert_eq!(tap(&mut us, KEY_SPACE), Key { label: "Space".into(), typing: true, modifier: "" });
-        assert_eq!(tap(&mut us, KEY_ENTER), Key { label: "Enter".into(), typing: false, modifier: "" });
-        assert_eq!(tap(&mut us, KEY_HOME), Key { label: "Home".into(), typing: false, modifier: "" });
-        assert_eq!(tap(&mut us, KEY_VOLUMEUP), Key { label: "Volume Up".into(), typing: false, modifier: "" });
+        assert_eq!(
+            tap(&mut us, KEY_A),
+            Key {
+                label: "A".into(),
+                typing: true,
+                modifier: ""
+            }
+        );
+        assert_eq!(
+            tap(&mut us, KEY_SPACE),
+            Key {
+                label: "Space".into(),
+                typing: true,
+                modifier: ""
+            }
+        );
+        assert_eq!(
+            tap(&mut us, KEY_ENTER),
+            Key {
+                label: "Enter".into(),
+                typing: false,
+                modifier: ""
+            }
+        );
+        assert_eq!(
+            tap(&mut us, KEY_HOME),
+            Key {
+                label: "Home".into(),
+                typing: false,
+                modifier: ""
+            }
+        );
+        assert_eq!(
+            tap(&mut us, KEY_VOLUMEUP),
+            Key {
+                label: "Volume Up".into(),
+                typing: false,
+                modifier: ""
+            }
+        );
         assert_eq!(tap(&mut us, KEY_LEFTMETA).modifier, "meta");
-        assert_eq!(tap(&mut us, KEY_LEFTSHIFT), Key { label: "Shift".into(), typing: true, modifier: "shift" });
-        assert_eq!(tap(&mut us, KEY_CAPSLOCK), Key { label: "Caps Lock".into(), typing: true, modifier: "" });
-        assert_eq!(tap(&mut us, KEY_LEFTCTRL), Key { label: "Ctrl".into(), typing: false, modifier: "ctrl" });
-        assert_eq!(tap(&mut us, KEY_RIGHTALT), Key { label: "Alt".into(), typing: false, modifier: "alt" });
+        assert_eq!(
+            tap(&mut us, KEY_LEFTSHIFT),
+            Key {
+                label: "Shift".into(),
+                typing: true,
+                modifier: "shift"
+            }
+        );
+        assert_eq!(
+            tap(&mut us, KEY_CAPSLOCK),
+            Key {
+                label: "Caps Lock".into(),
+                typing: true,
+                modifier: ""
+            }
+        );
+        assert_eq!(
+            tap(&mut us, KEY_LEFTCTRL),
+            Key {
+                label: "Ctrl".into(),
+                typing: false,
+                modifier: "ctrl"
+            }
+        );
+        assert_eq!(
+            tap(&mut us, KEY_RIGHTALT),
+            Key {
+                label: "Alt".into(),
+                typing: false,
+                modifier: "alt"
+            }
+        );
         // Keypad keys type digits with Num Lock on, so they are text either way.
         let kp7 = tap(&mut us, KEY_KP7);
         assert!(kp7.typing);
         assert_eq!(kp7.label, "Num Home");
-        let mut locked = Layout::new(&KeyboardNames { layout: "us".into(), num_lock: true, ..KeyboardNames::default() })
-            .expect("a us keymap");
+        let mut locked = Layout::new(&KeyboardNames {
+            layout: "us".into(),
+            num_lock: true,
+            ..KeyboardNames::default()
+        })
+        .expect("a us keymap");
         assert_eq!(tap(&mut locked, KEY_KP7).label, "Num 7");
     }
 
@@ -671,9 +839,23 @@ mod tests {
         assert_eq!(tap(&mut fr, KEY_A).label, "Q");
         assert_eq!(tap(&mut fr, KEY_M).label, ",");
         assert_eq!(tap(&mut fr, KEY_1).label, "&");
-        assert_eq!(tap(&mut fr, KEY_LEFTBRACE), Key { label: "^".into(), typing: true, modifier: "" });
+        assert_eq!(
+            tap(&mut fr, KEY_LEFTBRACE),
+            Key {
+                label: "^".into(),
+                typing: true,
+                modifier: ""
+            }
+        );
         // Right Alt is AltGr there, not Alt: AltGr and AltGr+key are typing, not shortcuts.
-        assert_eq!(tap(&mut fr, KEY_RIGHTALT), Key { label: "AltGr".into(), typing: true, modifier: "" });
+        assert_eq!(
+            tap(&mut fr, KEY_RIGHTALT),
+            Key {
+                label: "AltGr".into(),
+                typing: true,
+                modifier: ""
+            }
+        );
         // Shift held: the label stays the base level's.
         fr.key(KEY_LEFTSHIFT, true);
         assert_eq!(tap(&mut fr, KEY_1).label, "&");
@@ -686,9 +868,23 @@ mod tests {
     #[test]
     fn options_move_modifiers() {
         let mut nocaps = layout("us", "", "ctrl:nocaps");
-        assert_eq!(tap(&mut nocaps, KEY_CAPSLOCK), Key { label: "Ctrl".into(), typing: false, modifier: "ctrl" });
+        assert_eq!(
+            tap(&mut nocaps, KEY_CAPSLOCK),
+            Key {
+                label: "Ctrl".into(),
+                typing: false,
+                modifier: "ctrl"
+            }
+        );
         let mut caps = layout("us", "", "compose:caps");
-        assert_eq!(tap(&mut caps, KEY_CAPSLOCK), Key { label: "Compose".into(), typing: true, modifier: "" });
+        assert_eq!(
+            tap(&mut caps, KEY_CAPSLOCK),
+            Key {
+                label: "Compose".into(),
+                typing: true,
+                modifier: ""
+            }
+        );
         assert_eq!(tap(&mut caps, KEY_LEFTCTRL).modifier, "ctrl");
     }
 
@@ -700,10 +896,22 @@ mod tests {
             active_keymap: active_keymap.into(),
             ..KeyboardNames::default()
         };
-        assert_eq!(tap(&mut Layout::new(&names(None, "")).unwrap(), KEY_Q).label, "Q");
-        assert_eq!(tap(&mut Layout::new(&names(Some(1), "")).unwrap(), KEY_Q).label, "A");
-        assert_eq!(tap(&mut Layout::new(&names(None, "French")).unwrap(), KEY_Q).label, "A");
-        assert_eq!(tap(&mut Layout::new(&names(Some(7), "")).unwrap(), KEY_Q).label, "Q");
+        assert_eq!(
+            tap(&mut Layout::new(&names(None, "")).unwrap(), KEY_Q).label,
+            "Q"
+        );
+        assert_eq!(
+            tap(&mut Layout::new(&names(Some(1), "")).unwrap(), KEY_Q).label,
+            "A"
+        );
+        assert_eq!(
+            tap(&mut Layout::new(&names(None, "French")).unwrap(), KEY_Q).label,
+            "A"
+        );
+        assert_eq!(
+            tap(&mut Layout::new(&names(Some(7), "")).unwrap(), KEY_Q).label,
+            "Q"
+        );
     }
 
     #[test]
@@ -737,10 +945,24 @@ mod tests {
             active_keymap: "English (US)".into(),
             ..KeyboardNames::default()
         };
-        assert_eq!(keyboards_from_devices(devices), Some(Keyboards { main, others: vec![us] }));
-        let unmarked = br#"{"keyboards": [{"layout": "de", "active_keymap": "German"}, {"layout": "us"}]}"#;
+        assert_eq!(
+            keyboards_from_devices(devices),
+            Some(Keyboards {
+                main,
+                others: vec![us]
+            })
+        );
+        let unmarked =
+            br#"{"keyboards": [{"layout": "de", "active_keymap": "German"}, {"layout": "us"}]}"#;
         let first = keyboards_from_devices(unmarked).unwrap();
-        assert_eq!((first.main.layout.as_str(), first.main.active_layout, first.main.active_keymap.as_str()), ("de", None, "German"));
+        assert_eq!(
+            (
+                first.main.layout.as_str(),
+                first.main.active_layout,
+                first.main.active_keymap.as_str()
+            ),
+            ("de", None, "German")
+        );
         assert_eq!(first.others.len(), 1);
         assert_eq!(keyboards_from_devices(br#"{"keyboards": []}"#), None);
         assert_eq!(keyboards_from_devices(b"not json"), None);
@@ -754,8 +976,14 @@ mod tests {
 
     /// Keyboards with the `layouts` given, the first the main one.
     fn keyboards(layouts: &[&str]) -> Layout {
-        let names = |layout: &&str| KeyboardNames { layout: (*layout).into(), ..KeyboardNames::default() };
-        let keyboards = Keyboards { main: names(&layouts[0]), others: layouts[1..].iter().map(names).collect() };
+        let names = |layout: &&str| KeyboardNames {
+            layout: (*layout).into(),
+            ..KeyboardNames::default()
+        };
+        let keyboards = Keyboards {
+            main: names(&layouts[0]),
+            others: layouts[1..].iter().map(names).collect(),
+        };
         Layout::for_keyboards(&keyboards).expect("libxkbcommon compiles the keymaps")
     }
 
@@ -763,25 +991,63 @@ mod tests {
     fn every_keyboard_and_layout_is_consulted() {
         // A French keyboard beside a US main one, or French as a second layout: Right Alt may be
         // AltGr, so it is typing and makes no shortcut, though the labels stay the main layout's.
-        for mut layout in [keyboards(&["us", "fr"]), keyboards(&["us,fr"]), keyboards(&["fr", "us"])] {
+        for mut layout in [
+            keyboards(&["us", "fr"]),
+            keyboards(&["us,fr"]),
+            keyboards(&["fr", "us"]),
+        ] {
             assert_eq!(tap(&mut layout, KEY_RIGHTALT).modifier, "");
             assert!(tap(&mut layout, KEY_RIGHTALT).typing);
-            assert_eq!(tap(&mut layout, KEY_LEFTCTRL), Key { label: "Ctrl".into(), typing: false, modifier: "ctrl" });
-            assert_eq!(tap(&mut layout, KEY_ENTER), Key { label: "Enter".into(), typing: false, modifier: "" });
+            assert_eq!(
+                tap(&mut layout, KEY_LEFTCTRL),
+                Key {
+                    label: "Ctrl".into(),
+                    typing: false,
+                    modifier: "ctrl"
+                }
+            );
+            assert_eq!(
+                tap(&mut layout, KEY_ENTER),
+                Key {
+                    label: "Enter".into(),
+                    typing: false,
+                    modifier: ""
+                }
+            );
         }
         assert_eq!(tap(&mut keyboards(&["us", "fr"]), KEY_Q).label, "Q");
         assert_eq!(tap(&mut keyboards(&["fr", "us"]), KEY_Q).label, "A");
         // Caps Lock as Ctrl on one keyboard only is no modifier, and is typing (Caps Lock).
         let mut mixed = Layout::for_keyboards(&Keyboards {
-            main: KeyboardNames { layout: "us".into(), options: "ctrl:nocaps".into(), ..KeyboardNames::default() },
-            others: vec![KeyboardNames { layout: "us".into(), ..KeyboardNames::default() }],
+            main: KeyboardNames {
+                layout: "us".into(),
+                options: "ctrl:nocaps".into(),
+                ..KeyboardNames::default()
+            },
+            others: vec![KeyboardNames {
+                layout: "us".into(),
+                ..KeyboardNames::default()
+            }],
         })
         .unwrap();
-        assert_eq!(tap(&mut mixed, KEY_CAPSLOCK), Key { label: "Ctrl".into(), typing: true, modifier: "" });
+        assert_eq!(
+            tap(&mut mixed, KEY_CAPSLOCK),
+            Key {
+                label: "Ctrl".into(),
+                typing: true,
+                modifier: ""
+            }
+        );
         // A keyboard whose keymap does not compile leaves no layout at all.
         let broken = Keyboards {
-            main: KeyboardNames { layout: "us".into(), ..KeyboardNames::default() },
-            others: vec![KeyboardNames { layout: "no-such-layout".into(), ..KeyboardNames::default() }],
+            main: KeyboardNames {
+                layout: "us".into(),
+                ..KeyboardNames::default()
+            },
+            others: vec![KeyboardNames {
+                layout: "no-such-layout".into(),
+                ..KeyboardNames::default()
+            }],
         };
         assert!(Layout::for_keyboards(&broken).is_none());
     }

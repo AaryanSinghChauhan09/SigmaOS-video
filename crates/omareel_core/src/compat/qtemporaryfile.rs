@@ -72,7 +72,11 @@ impl TemplateName {
             let fallback = (i * 31 + std::process::id() as usize) as u8;
             let r = if filled { random[i % 64] } else { fallback };
             let v = (u32::from(r) * 52) >> 8;
-            self.path[self.pos + i] = if v < 26 { b'A' + v as u8 } else { b'a' + (v - 26) as u8 };
+            self.path[self.pos + i] = if v < 26 {
+                b'A' + v as u8
+            } else {
+                b'a' + (v - 26) as u8
+            };
         }
         self.path.clone()
     }
@@ -106,7 +110,9 @@ pub(crate) fn have_procfs() -> bool {
 
 /// `qt_safe_open`: `open` with `O_CLOEXEC`, retried on EINTR.
 pub(crate) fn open_raw(path: &[u8], flags: libc::c_int, mode: u32) -> Result<libc::c_int, i32> {
-    let Ok(c) = CString::new(path) else { return Err(libc::EINVAL) };
+    let Ok(c) = CString::new(path) else {
+        return Err(libc::EINVAL);
+    };
     loop {
         // SAFETY: `c` is a valid NUL-terminated string.
         let fd = unsafe { libc::open(c.as_ptr(), flags | libc::O_CLOEXEC, mode as libc::c_uint) };
@@ -126,13 +132,15 @@ pub(crate) fn linkat_fd(fd: libc::c_int, target: &[u8]) -> Result<(), i32> {
     // SAFETY: both are valid NUL-terminated strings.
     let rc = unsafe {
         let follow = libc::AT_SYMLINK_FOLLOW;
-        libc::linkat(libc::AT_FDCWD, src.as_ptr(), libc::AT_FDCWD, dst.as_ptr(), follow)
+        libc::linkat(
+            libc::AT_FDCWD,
+            src.as_ptr(),
+            libc::AT_FDCWD,
+            dst.as_ptr(),
+            follow,
+        )
     };
-    if rc == 0 {
-        Ok(())
-    } else {
-        Err(errno())
-    }
+    if rc == 0 { Ok(()) } else { Err(errno()) }
 }
 
 pub(crate) fn rename_raw(from: &[u8], to: &[u8]) -> Result<(), i32> {
@@ -145,7 +153,6 @@ pub(crate) fn rename_raw(from: &[u8], to: &[u8]) -> Result<(), i32> {
         Err(errno())
     }
 }
-
 
 /// `QTemporaryFileEngine::open` for `template` with the given creation mode: the descriptor,
 /// and the path when the file could not be unnamed.
@@ -191,7 +198,12 @@ pub struct TemporaryFile {
 impl TemporaryFile {
     /// `QTemporaryFile(templateName)`; nothing is created before `open`.
     pub fn new(template: &str) -> TemporaryFile {
-        TemporaryFile { template: template.to_string(), fd: -1, named: None, error_string: String::new() }
+        TemporaryFile {
+            template: template.to_string(),
+            fd: -1,
+            named: None,
+            error_string: String::new(),
+        }
     }
 
     /// `QTemporaryFile::open()`. Opening an open file does nothing (Qt only seeks back).
@@ -216,7 +228,11 @@ impl TemporaryFile {
 
     /// `QIODevice::errorString()`: the last error, "Unknown error" when there is none.
     pub fn error_string(&self) -> String {
-        if self.error_string.is_empty() { "Unknown error".into() } else { self.error_string.clone() }
+        if self.error_string.is_empty() {
+            "Unknown error".into()
+        } else {
+            self.error_string.clone()
+        }
     }
 
     /// `QTemporaryFile::fileName()`. An unnamed file is linked in under a fresh name from the
@@ -233,7 +249,10 @@ impl TemporaryFile {
                 }
             }
         }
-        self.named.as_deref().map(qdir::decode_name).unwrap_or_default()
+        self.named
+            .as_deref()
+            .map(qdir::decode_name)
+            .unwrap_or_default()
     }
 
     /// `QFile::write`: the bytes written, or -1 (with the error) when nothing could be.
@@ -314,13 +333,22 @@ mod tests {
     #[test]
     fn temporary_name_template() {
         let t = TemplateName::new("/a/b.json");
-        assert_eq!((t.path.as_slice(), t.pos, t.len), (&b"/a/b.json.XXXXXX"[..], 10, 6));
+        assert_eq!(
+            (t.path.as_slice(), t.pos, t.len),
+            (&b"/a/b.json.XXXXXX"[..], 10, 6)
+        );
         assert_eq!(t.dir(), b"/a");
         let t = TemplateName::new("fooXXXXXXXbar");
-        assert_eq!((t.path.as_slice(), t.pos, t.len), (&b"fooXXXXXXXbar"[..], 3, 7));
+        assert_eq!(
+            (t.path.as_slice(), t.pos, t.len),
+            (&b"fooXXXXXXXbar"[..], 3, 7)
+        );
         assert_eq!(t.dir(), b".");
         let t = TemplateName::new("XXXXXX/x");
-        assert_eq!((t.path.as_slice(), t.pos, t.len), (&b"XXXXXX/x.XXXXXX"[..], 9, 6));
+        assert_eq!(
+            (t.path.as_slice(), t.pos, t.len),
+            (&b"XXXXXX/x.XXXXXX"[..], 9, 6)
+        );
         let t = TemplateName::new("/f");
         assert_eq!(t.dir(), b"/");
         let t = TemplateName::new("a/../b");
@@ -342,11 +370,20 @@ mod tests {
         let name = file.file_name();
         assert_eq!(name, file.file_name());
         let prefix = dir.join("omareel-export-");
-        assert!(name.starts_with(&prefix) && name.ends_with(".rgba"), "{name}");
+        assert!(
+            name.starts_with(&prefix) && name.ends_with(".rgba"),
+            "{name}"
+        );
         let letters = &name[prefix.len()..name.len() - 5];
-        assert!(letters.len() == 6 && letters.bytes().all(|c| c.is_ascii_alphabetic()), "{letters}");
+        assert!(
+            letters.len() == 6 && letters.bytes().all(|c| c.is_ascii_alphabetic()),
+            "{letters}"
+        );
         assert_eq!(std::fs::read(&name).unwrap(), b"abc");
-        assert_eq!(std::fs::metadata(&name).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            std::fs::metadata(&name).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
         file.close();
         assert_eq!(listing(), 1);
         drop(file);

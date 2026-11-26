@@ -12,8 +12,13 @@ use std::io::Read;
 
 fn main() {
     let mut arguments = std::env::args().skip(1);
-    let monitor = arguments.next().expect("usage: cursor_probe <monitor> [fps]");
-    let fps = arguments.next().and_then(|fps| fps.parse().ok()).unwrap_or(60);
+    let monitor = arguments
+        .next()
+        .expect("usage: cursor_probe <monitor> [fps]");
+    let fps = arguments
+        .next()
+        .and_then(|fps| fps.parse().ok())
+        .unwrap_or(60);
     let mut sampler = CursorSampler::new();
     if let Err(error) = sampler.start(&monitor, fps) {
         eprintln!("cursor_probe: {error}");
@@ -41,7 +46,12 @@ fn main() {
     let samples: Vec<String> = sampler
         .samples()
         .iter()
-        .map(|sample| format!("[{}, {}, {}]", sample.monotonic_us, sample.logical_position.x, sample.logical_position.y))
+        .map(|sample| {
+            format!(
+                "[{}, {}, {}]",
+                sample.monotonic_us, sample.logical_position.x, sample.logical_position.y
+            )
+        })
         .collect();
     println!(
         "{{\"first_source\": \"{first}\", \"source\": \"{source}\", \"seconds\": {}, \"ipc_requests\": {}, \"samples\": [{}]}}",

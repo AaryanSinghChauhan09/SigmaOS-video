@@ -45,7 +45,10 @@ pub fn lines(bytes: &[u8]) -> impl Iterator<Item = &[u8]> {
 pub fn trimmed(bytes: &[u8]) -> &[u8] {
     let space = |b: &u8| matches!(b, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r');
     let start = bytes.iter().position(|b| !space(b)).unwrap_or(bytes.len());
-    let end = bytes.iter().rposition(|b| !space(b)).map_or(start, |i| i + 1);
+    let end = bytes
+        .iter()
+        .rposition(|b| !space(b))
+        .map_or(start, |i| i + 1);
     &bytes[start..end]
 }
 
@@ -77,10 +80,19 @@ pub fn set_permissions(path: &str, mode: u32) -> bool {
 /// rejects that flag, a hard link and unlink, then plain `rename` for the errors link(2) gives
 /// that don't rule it out.
 fn rename_file(source: &str, target: &str) -> bool {
-    let (Some(from), Some(to)) = (c_path(source), c_path(target)) else { return false };
+    let (Some(from), Some(to)) = (c_path(source), c_path(target)) else {
+        return false;
+    };
     // SAFETY: both are valid NUL-terminated strings.
     unsafe {
-        if libc::renameat2(libc::AT_FDCWD, from.as_ptr(), libc::AT_FDCWD, to.as_ptr(), libc::RENAME_NOREPLACE) == 0 {
+        if libc::renameat2(
+            libc::AT_FDCWD,
+            from.as_ptr(),
+            libc::AT_FDCWD,
+            to.as_ptr(),
+            libc::RENAME_NOREPLACE,
+        ) == 0
+        {
             return true;
         }
         if errno() != libc::EINVAL {
@@ -94,7 +106,12 @@ fn rename_file(source: &str, target: &str) -> bool {
             return false;
         }
         match errno() {
-            libc::EACCES | libc::EEXIST | libc::ENAMETOOLONG | libc::ENOENT | libc::ENOTDIR | libc::EROFS
+            libc::EACCES
+            | libc::EEXIST
+            | libc::ENAMETOOLONG
+            | libc::ENOENT
+            | libc::ENOTDIR
+            | libc::EROFS
             | libc::EXDEV => false,
             _ => libc::rename(from.as_ptr(), to.as_ptr()) == 0,
         }
@@ -129,7 +146,11 @@ fn copy_then_remove(old_name: &str, new_name: &str) -> bool {
     use std::io::Write;
     let copied = (|| -> io::Result<()> {
         let mut source = File::open(old_name)?;
-        let mut target = std::fs::OpenOptions::new().write(true).create(true).truncate(true).open(new_name)?;
+        let mut target = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(new_name)?;
         io::copy(&mut source, &mut target)?;
         target.flush()
     })();
@@ -160,7 +181,9 @@ pub fn copy(file_name: &str, new_name: &str) -> bool {
         return false;
     }
     // QFSFileEngine::copy is not implemented on Linux, so QFile copies the data itself.
-    let Ok(mut source) = open_read(file_name) else { return false };
+    let Ok(mut source) = open_read(file_name) else {
+        return false;
+    };
     let mut out = crate::compat::qsavefile::SaveFile::new(new_name);
     out.set_direct_write_fallback(true);
     if !out.open() {
@@ -190,7 +213,10 @@ mod tests {
 
     #[test]
     fn errors_read_like_qt() {
-        assert_eq!(open_read("/nonexistent/omareel").unwrap_err(), "No such file or directory");
+        assert_eq!(
+            open_read("/nonexistent/omareel").unwrap_err(),
+            "No such file or directory"
+        );
         assert_eq!(open_read("/").unwrap_err(), "file to open is a directory");
         assert_eq!(open_read("").unwrap_err(), "No file name specified");
     }
@@ -213,7 +239,12 @@ mod tests {
         std::os::unix::fs::symlink(&target, &link).unwrap();
         assert!(rename(b, link.to_str().unwrap()));
         assert_eq!(std::fs::read(&target).unwrap(), b"a");
-        assert!(std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+        assert!(
+            std::fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -228,7 +259,10 @@ mod tests {
         std::fs::set_permissions(path("a"), std::fs::Permissions::from_mode(0o640)).unwrap();
         assert!(copy(&path("a"), &path("b")));
         assert_eq!(std::fs::read(path("b")).unwrap(), b"contents");
-        assert_eq!(std::fs::metadata(path("b")).unwrap().permissions().mode() & 0o7777, 0o640);
+        assert_eq!(
+            std::fs::metadata(path("b")).unwrap().permissions().mode() & 0o7777,
+            0o640
+        );
         // Never over an existing file; a dangling symlink is followed and its target created.
         std::fs::write(path("c"), "old").unwrap();
         assert!(!copy(&path("a"), &path("c")));
@@ -236,7 +270,12 @@ mod tests {
         std::os::unix::fs::symlink("target", path("sub/link")).unwrap();
         assert!(copy(&path("a"), &path("sub/link")));
         assert_eq!(std::fs::read(path("sub/target")).unwrap(), b"contents");
-        assert!(std::fs::symlink_metadata(path("sub/link")).unwrap().file_type().is_symlink());
+        assert!(
+            std::fs::symlink_metadata(path("sub/link"))
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
         // A directory or a missing file is not copied; a missing destination directory fails.
         assert!(!copy(&path("sub"), &path("d")));
         assert!(!copy(&path("missing"), &path("d")));

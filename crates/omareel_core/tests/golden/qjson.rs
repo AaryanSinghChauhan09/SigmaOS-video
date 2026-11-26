@@ -24,7 +24,12 @@ fn error_code(kind: ParseErrorKind) -> i32 {
 }
 
 fn error_cells(error: &ParseError) -> [String; 4] {
-    ["error".into(), error_code(error.kind).to_string(), error.offset.to_string(), quote(error.error_string())]
+    [
+        "error".into(),
+        error_code(error.kind).to_string(),
+        error.offset.to_string(),
+        quote(error.error_string()),
+    ]
 }
 
 /// What a successful parse leaves in `QJsonParseError`.
@@ -88,7 +93,11 @@ struct Documents {
 
 fn documents() -> Documents {
     let directory = corpus_path("qjson/docs");
-    let mut documents = Documents { parse: Text::new(), typed: Text::new(), files: Vec::new() };
+    let mut documents = Documents {
+        parse: Text::new(),
+        typed: Text::new(),
+        files: Vec::new(),
+    };
     for file in sorted_entries(&directory, false) {
         let name = file.strip_suffix(".json").expect("a .json file").to_owned();
         let bytes = std::fs::read(directory.join(&file)).expect("corpus document");
@@ -101,12 +110,24 @@ fn documents() -> Documents {
             }
             Ok(root) => root,
         };
-        documents.parse.row([name.clone(), "ok".into(), kind(&root).into(), "0".into(), quote(NO_ERROR)]);
-        documents.files.push((format!("{name}.compact.json"), root.to_json(Format::Compact)));
+        documents.parse.row([
+            name.clone(),
+            "ok".into(),
+            kind(&root).into(),
+            "0".into(),
+            quote(NO_ERROR),
+        ]);
+        documents.files.push((
+            format!("{name}.compact.json"),
+            root.to_json(Format::Compact),
+        ));
         if depth(&root) > MAX_DUMP_DEPTH {
             continue;
         }
-        documents.files.push((format!("{name}.indented.json"), root.to_json(Format::Indented)));
+        documents.files.push((
+            format!("{name}.indented.json"),
+            root.to_json(Format::Indented),
+        ));
         documents.typed.section(&name);
         dump_typed(&mut documents.typed, "", &root);
     }
@@ -174,17 +195,26 @@ fn literals(corpus: &str) -> String {
 
 #[test]
 fn number_literals_txt() {
-    assert_golden("qjson/number-literals.txt", &literals("qjson/number-literals.txt"));
+    assert_golden(
+        "qjson/number-literals.txt",
+        &literals("qjson/number-literals.txt"),
+    );
 }
 
 #[test]
 fn string_literals_txt() {
-    assert_golden_qjson("qjson/string-literals.txt", &literals("qjson/string-literals.txt"));
+    assert_golden_qjson(
+        "qjson/string-literals.txt",
+        &literals("qjson/string-literals.txt"),
+    );
 }
 
 /// The first element of a one-element array document.
 fn parse_back(json: &str) -> Value {
-    qjson::from_json(json.as_bytes()).expect("Qt's own output parses").to_array().remove(0)
+    qjson::from_json(json.as_bytes())
+        .expect("Qt's own output parses")
+        .to_array()
+        .remove(0)
 }
 
 #[test]
@@ -209,7 +239,10 @@ fn int64_txt() {
     let mut out = Text::new();
     for line in corpus_lines("numbers/int64.txt") {
         let text = std::str::from_utf8(&line).expect("ASCII");
-        let value: i64 = text.trim().parse().unwrap_or_else(|_| panic!("bad int64 corpus line {text:?}"));
+        let value: i64 = text
+            .trim()
+            .parse()
+            .unwrap_or_else(|_| panic!("bad int64 corpus line {text:?}"));
         let json = wrapped(&Value::from(value));
         let back = parse_back(&json);
         out.row([
@@ -268,16 +301,29 @@ fn built_documents() -> Vec<(&'static str, Value)> {
     let undefined_array = vec![Value::Undefined, Value::from(1), Value::Undefined];
     documents.push(("undefined-in-array", Value::array(undefined_array)));
     let undefined_nested = Object::from_iter([
-        ("o", Value::Object(Object::from_iter([("u", Value::Undefined)]))),
+        (
+            "o",
+            Value::Object(Object::from_iter([("u", Value::Undefined)])),
+        ),
         ("a", Value::array(vec![Value::Undefined])),
     ]);
-    documents.push(("undefined-initializer-list", Value::Object(undefined_nested)));
+    documents.push((
+        "undefined-initializer-list",
+        Value::Object(undefined_nested),
+    ));
 
     let mut nested = Object::new();
-    nested.insert("z", Object::from_iter([("b", Value::from(1)), ("a", Value::Array(vec![]))]));
+    nested.insert(
+        "z",
+        Object::from_iter([("b", Value::from(1)), ("a", Value::Array(vec![]))]),
+    );
     nested.insert(
         "y",
-        vec![Value::Object(Object::new()), Value::Array(vec![]), Value::Array(vec![Value::Array(vec![])])],
+        vec![
+            Value::Object(Object::new()),
+            Value::Array(vec![]),
+            Value::Array(vec![Value::Array(vec![])]),
+        ],
     );
     let deepest = vec![Value::from(1), Value::from(2.5), Value::from("s")];
     let deeper = Object::from_iter([("deepest", deepest)]);
@@ -348,8 +394,11 @@ fn built_documents() -> Vec<(&'static str, Value)> {
     documents.push((NULL_DOCUMENT, Value::Undefined));
     documents.push(("empty-object", Value::Object(Object::new())));
     documents.push(("empty-array", Value::Array(vec![])));
-    let empty_nested =
-        vec![Value::Array(vec![]), Value::Object(Object::new()), Value::Array(vec![Value::Object(Object::new())])];
+    let empty_nested = vec![
+        Value::Array(vec![]),
+        Value::Object(Object::new()),
+        Value::Array(vec![Value::Object(Object::new())]),
+    ];
     documents.push(("empty-nested", Value::Array(empty_nested)));
     documents
 }
@@ -383,12 +432,28 @@ fn built_typed(keep: impl Fn(&str) -> bool) -> String {
 #[test]
 fn built() {
     let mut files = Vec::new();
-    for (name, document) in built_documents().into_iter().filter(|(name, _)| !NO_FILES.contains(name)) {
-        files.push((format!("{name}.compact.json"), document.to_json(Format::Compact)));
-        files.push((format!("{name}.indented.json"), document.to_json(Format::Indented)));
+    for (name, document) in built_documents()
+        .into_iter()
+        .filter(|(name, _)| !NO_FILES.contains(name))
+    {
+        files.push((
+            format!("{name}.compact.json"),
+            document.to_json(Format::Compact),
+        ));
+        files.push((
+            format!("{name}.indented.json"),
+            document.to_json(Format::Indented),
+        ));
     }
-    let skipped: Vec<String> =
-        NO_FILES.iter().flat_map(|name| [format!("{name}.compact.json"), format!("{name}.indented.json")]).collect();
+    let skipped: Vec<String> = NO_FILES
+        .iter()
+        .flat_map(|name| {
+            [
+                format!("{name}.compact.json"),
+                format!("{name}.indented.json"),
+            ]
+        })
+        .collect();
     let skipped: Vec<&str> = skipped.iter().map(String::as_str).collect();
     assert_directory("qjson/built", &files, &skipped);
 }
@@ -396,15 +461,26 @@ fn built() {
 #[test]
 fn built_typed_txt() {
     let keep = |name: &str| name != FROM_VARIANT_MAP && !UNDEFINED_ARRAY_ELEMENTS.contains(&name);
-    let expected = keep_sections(&lone_surrogates_as_replacement(&read_expected("qjson/built-typed.txt")), keep);
-    assert_same("qjson/built-typed.txt (Rust-buildable sections)", &expected, built_typed(keep).as_bytes());
+    let expected = keep_sections(
+        &lone_surrogates_as_replacement(&read_expected("qjson/built-typed.txt")),
+        keep,
+    );
+    assert_same(
+        "qjson/built-typed.txt (Rust-buildable sections)",
+        &expected,
+        built_typed(keep).as_bytes(),
+    );
 }
 
 #[test]
 fn built_typed_txt_undefined_array_elements() {
     let keep = |name: &str| UNDEFINED_ARRAY_ELEMENTS.contains(&name);
     let expected = keep_sections(&read_expected("qjson/built-typed.txt"), keep);
-    assert_same("qjson/built-typed.txt (undefined array elements)", &expected, built_typed(keep).as_bytes());
+    assert_same(
+        "qjson/built-typed.txt (undefined array elements)",
+        &expected,
+        built_typed(keep).as_bytes(),
+    );
 }
 
 /// `builtValues()` of `qjson.cpp` with a Rust counterpart: everything but the
@@ -448,7 +524,10 @@ fn built_values() -> Vec<(&'static str, Value)> {
         ("string true", Value::from("true")),
         ("string 1.5", Value::from("1.5")),
         ("string  7 ", Value::from(" 7 ")),
-        ("string 9223372036854775808", Value::from("9223372036854775808")),
+        (
+            "string 9223372036854775808",
+            Value::from("9223372036854775808"),
+        ),
         ("latin1 abc", Value::from("abc")),
         ("array empty", Value::Array(vec![])),
         ("array [1]", Value::Array(vec![Value::from(1)])),
@@ -463,8 +542,14 @@ fn values_txt() {
     for (label, value) in built_values() {
         out.row([label.to_owned(), typed(&value), wrapped(&value)]);
     }
-    let expected = keep_lines(&read_expected("qjson/values.txt"), |line| !line.starts_with(b"fromVariant("));
-    assert_same("qjson/values.txt (without the fromVariant rows)", &expected, out.into_string().as_bytes());
+    let expected = keep_lines(&read_expected("qjson/values.txt"), |line| {
+        !line.starts_with(b"fromVariant(")
+    });
+    assert_same(
+        "qjson/values.txt (without the fromVariant rows)",
+        &expected,
+        out.into_string().as_bytes(),
+    );
 }
 
 #[test]
@@ -472,5 +557,8 @@ fn lone_surrogate_normalisation() {
     // A JSON escape, a str escape, and the same text behind an escaped backslash.
     let golden = br#"["\ud800a"]	"\u{dc00}\u{d800}"	"\\ud800"	"\\u{d800}"	"\u{d83d}x\u{41}""#;
     let expected = "[\"\u{fffd}a\"]\t\"\u{fffd}\u{fffd}\"\t\"\\\\ud800\"\t\"\\\\u{d800}\"\t\"\u{fffd}x\\u{41}\"";
-    assert_eq!(String::from_utf8(lone_surrogates_as_replacement(golden)).unwrap(), expected);
+    assert_eq!(
+        String::from_utf8(lone_surrogates_as_replacement(golden)).unwrap(),
+        expected
+    );
 }

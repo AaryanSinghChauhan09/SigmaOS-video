@@ -14,13 +14,16 @@
 
 use core::pin::Pin;
 use cxx_qt::{CxxQtType, Threading};
-use cxx_qt_lib::{QList, QMap, QMapPair_QString_QVariant, QPointF, QString, QStringList, QUrl, QVariant};
+use cxx_qt_lib::{
+    QList, QMap, QMapPair_QString_QVariant, QPointF, QString, QStringList, QUrl, QVariant,
+};
 use omareel_core::compat::qdir;
 use omareel_core::compat::qenv;
 use omareel_core::compat::qjson::{self, Value};
 use omareel_core::editor::{
-    self, containing_folder, format_time, preview_stats_line, takes_local_file, trace_input_line, Document, Effect,
-    ExportDialogSettings, NextClipKind, Player, Probes, Transport, ZoomTarget,
+    self, Document, Effect, ExportDialogSettings, NextClipKind, Player, Probes, Transport,
+    ZoomTarget, containing_folder, format_time, preview_stats_line, takes_local_file,
+    trace_input_line,
 };
 use omareel_core::media_probe;
 use omareel_core::project::Project;
@@ -80,7 +83,12 @@ pub mod qobject {
         #[cxx_name = "zoomTarget"]
         fn zoom_target(target: &QVariant, x: &mut f64, y: &mut f64) -> bool;
         #[cxx_name = "exportSettings"]
-        fn export_settings(settings: &QMap_QString_QVariant, fps: &mut i32, height: &mut i32, quality: &mut QString);
+        fn export_settings(
+            settings: &QMap_QString_QVariant,
+            fps: &mut i32,
+            height: &mut i32,
+            quality: &mut QString,
+        );
         #[cxx_name = "softwareRendering"]
         fn software_rendering() -> bool;
         #[cxx_name = "copyToClipboard"]
@@ -88,7 +96,8 @@ pub mod qobject {
         #[cxx_name = "openFolder"]
         fn open_folder(directory: &QString);
         #[cxx_name = "generateWallpaperThumbnail"]
-        fn generate_wallpaper_thumbnail(wallpaper_path: &QString, thumbnail_path: &QString) -> bool;
+        fn generate_wallpaper_thumbnail(wallpaper_path: &QString, thumbnail_path: &QString)
+        -> bool;
     }
 
     #[namespace = "Omareel::ThemeFonts"]
@@ -279,7 +288,12 @@ pub mod qobject {
         fn set_project_value(self: Pin<&mut Editor>, path: &QString, value: &QVariant);
         #[qinvokable]
         #[cxx_name = "setProjectValue"]
-        fn set_project_value_coalescing(self: Pin<&mut Editor>, path: &QString, value: &QVariant, coalesce: bool);
+        fn set_project_value_coalescing(
+            self: Pin<&mut Editor>,
+            path: &QString,
+            value: &QVariant,
+            coalesce: bool,
+        );
         #[qinvokable]
         fn apply_gradient_preset(self: Pin<&mut Editor>, index: i32);
         #[qinvokable]
@@ -375,16 +389,30 @@ pub mod qobject {
         fn add_zoom_at(self: Pin<&mut Editor>, output_time: f64) -> QString;
         #[qinvokable]
         #[cxx_name = "addZoomAt"]
-        fn add_zoom_at_with_length(self: Pin<&mut Editor>, output_time: f64, length: f64) -> QString;
+        fn add_zoom_at_with_length(
+            self: Pin<&mut Editor>,
+            output_time: f64,
+            length: f64,
+        ) -> QString;
         #[qinvokable]
         fn move_zoom(self: Pin<&mut Editor>, id: &QString, source_start: f64) -> bool;
         #[qinvokable]
-        fn resize_zoom(self: Pin<&mut Editor>, id: &QString, source_start: f64, source_end: f64) -> bool;
+        fn resize_zoom(
+            self: Pin<&mut Editor>,
+            id: &QString,
+            source_start: f64,
+            source_end: f64,
+        ) -> bool;
         #[qinvokable]
         fn set_zoom_level(self: Pin<&mut Editor>, id: &QString, level: f64) -> bool;
         #[qinvokable]
         #[cxx_name = "setZoomLevel"]
-        fn set_zoom_level_coalescing(self: Pin<&mut Editor>, id: &QString, level: f64, coalesce: bool) -> bool;
+        fn set_zoom_level_coalescing(
+            self: Pin<&mut Editor>,
+            id: &QString,
+            level: f64,
+            coalesce: bool,
+        ) -> bool;
         #[qinvokable]
         fn set_zoom_target(self: Pin<&mut Editor>, id: &QString, target: &QVariant) -> bool;
         #[qinvokable]
@@ -394,7 +422,11 @@ pub mod qobject {
         #[qinvokable]
         fn select_zooms_in_output_range(self: Pin<&mut Editor>, output_start: f64, output_end: f64);
         #[qinvokable]
-        fn move_selected_zooms(self: Pin<&mut Editor>, anchor_id: &QString, source_start: f64) -> bool;
+        fn move_selected_zooms(
+            self: Pin<&mut Editor>,
+            anchor_id: &QString,
+            source_start: f64,
+        ) -> bool;
         #[qinvokable]
         fn remove_selected_zooms(self: Pin<&mut Editor>) -> i32;
         #[qinvokable]
@@ -409,7 +441,11 @@ pub mod qobject {
         fn export_to(self: Pin<&mut Editor>, path: &QString);
         #[qinvokable]
         #[cxx_name = "exportTo"]
-        fn export_to_with_settings(self: Pin<&mut Editor>, path: &QString, settings: &QMap_QString_QVariant);
+        fn export_to_with_settings(
+            self: Pin<&mut Editor>,
+            path: &QString,
+            settings: &QMap_QString_QVariant,
+        );
         #[qinvokable]
         fn default_export_path(self: &Editor, format: &QString) -> QString;
         #[qinvokable]
@@ -477,7 +513,13 @@ pub mod qobject {
         #[inherit]
         fn playback_set_rate(self: Pin<&mut Editor>, player: i32, rate: f64);
         #[inherit]
-        fn playback_sync_camera(self: Pin<&mut Editor>, target_ms: i64, tolerance_ms: i64, force: bool, covered: bool);
+        fn playback_sync_camera(
+            self: Pin<&mut Editor>,
+            target_ms: i64,
+            tolerance_ms: i64,
+            force: bool,
+            covered: bool,
+        );
         #[inherit]
         fn playback_set_audio(self: Pin<&mut Editor>, player: i32, volume: f64, muted: bool);
         #[inherit]
@@ -563,7 +605,9 @@ fn string_list(items: &[String]) -> QStringList {
 }
 
 fn url_list(urls: &[String]) -> QList<QVariant> {
-    urls.iter().map(|url| QVariant::from(&qstring(url))).collect()
+    urls.iter()
+        .map(|url| QVariant::from(&qstring(url)))
+        .collect()
 }
 
 /// Wallpaper thumbnails waiting for a worker, and how many workers run: they share
@@ -673,7 +717,13 @@ impl cxx_qt::Constructor<(QString,)> for qobject::Editor {
     type InitializeArguments = ();
     type NewArguments = (QString,);
 
-    fn route_arguments(arguments: (QString,)) -> (Self::NewArguments, Self::BaseArguments, Self::InitializeArguments) {
+    fn route_arguments(
+        arguments: (QString,),
+    ) -> (
+        Self::NewArguments,
+        Self::BaseArguments,
+        Self::InitializeArguments,
+    ) {
         (arguments, (), ())
     }
 
@@ -702,9 +752,13 @@ impl qobject::Editor {
         }
         // A new project starts its autosave as it loads.
         self.as_mut().drain();
-        let Some(document) = self.document.as_ref() else { return };
+        let Some(document) = self.document.as_ref() else {
+            return;
+        };
         let video_path = qstring(document.video_path());
-        let camera_path = document.has_camera().then(|| qstring(document.camera_video_path()));
+        let camera_path = document
+            .has_camera()
+            .then(|| qstring(document.camera_video_path()));
         self.as_mut().playback_load_screen(&video_path);
         let stats = qenv::int_value_or_zero("OMAREEL_PREVIEW_STATS") == 1;
         self.as_mut().rust_mut().preview_stats_enabled = stats;
@@ -716,7 +770,8 @@ impl qobject::Editor {
         }
         self.start_frame_times();
         self.as_mut().rebuild_motion();
-        self.as_mut().call_later(RELEASE_THUMBNAILS_CALL, THUMBNAIL_HOLD_MS);
+        self.as_mut()
+            .call_later(RELEASE_THUMBNAILS_CALL, THUMBNAIL_HOLD_MS);
         self.as_mut().call_later(FINISH_LOADING_CALL, 1500);
     }
 
@@ -729,7 +784,9 @@ impl qobject::Editor {
 
     /// Performs the effects the document queued, in order.
     fn drain(mut self: Pin<&mut Self>) {
-        let Some(document) = self.document.as_ref() else { return };
+        let Some(document) = self.document.as_ref() else {
+            return;
+        };
         for effect in document.take_effects() {
             self.as_mut().perform(effect);
         }
@@ -737,7 +794,9 @@ impl qobject::Editor {
 
     fn perform(mut self: Pin<&mut Self>, effect: Effect) {
         match effect {
-            Effect::SetScreenAudio { volume, muted } => self.as_mut().playback_set_audio(SCREEN, volume, muted),
+            Effect::SetScreenAudio { volume, muted } => {
+                self.as_mut().playback_set_audio(SCREEN, volume, muted)
+            }
             Effect::UpdateInsertAudio => self.as_mut().update_insert_audio(),
             Effect::DirtyChanged => self.as_mut().dirty_changed(),
             Effect::StartAutosaveTimer => self.as_mut().start_editor_timer(AUTOSAVE_TIMER),
@@ -753,7 +812,9 @@ impl qobject::Editor {
             Effect::PresetsChanged => self.as_mut().presets_changed(),
             Effect::WallpapersChanged => self.as_mut().wallpapers_changed(),
             Effect::ImportingChanged => self.as_mut().importing_changed(),
-            Effect::VideoThumbnailRevisionChanged => self.as_mut().video_thumbnail_revision_changed(),
+            Effect::VideoThumbnailRevisionChanged => {
+                self.as_mut().video_thumbnail_revision_changed()
+            }
             Effect::ExportingChanged => self.as_mut().exporting_changed(),
             Effect::ExportProgressChanged => self.as_mut().export_progress_changed(),
             Effect::ExportErrorChanged => self.as_mut().export_error_changed(),
@@ -762,10 +823,15 @@ impl qobject::Editor {
             Effect::Autosaved(path) => self.as_mut().autosaved(qstring(&path)),
             Effect::Seek(output_time) => self.as_mut().seek(output_time),
             Effect::Pause => self.as_mut().pause(),
-            Effect::SyncCamera { screen_source_time, force } => self.as_mut().sync_camera(screen_source_time, force),
+            Effect::SyncCamera {
+                screen_source_time,
+                force,
+            } => self.as_mut().sync_camera(screen_source_time, force),
             Effect::StartNextVideoThumbnail => self.as_mut().start_next_video_thumbnail(),
             Effect::StartImport(source) => self.start_import(&source),
-            Effect::GenerateWallpaperThumbnail { path, thumbnail } => self.generate_wallpaper_thumbnail(path, thumbnail),
+            Effect::GenerateWallpaperThumbnail { path, thumbnail } => {
+                self.generate_wallpaper_thumbnail(path, thumbnail)
+            }
         }
     }
 
@@ -774,7 +840,9 @@ impl qobject::Editor {
 
     /// `probeFrameTimes(screen.mp4)` off the GUI thread.
     fn start_frame_times(&self) {
-        let Some(document) = self.document.as_ref() else { return };
+        let Some(document) = self.document.as_ref() else {
+            return;
+        };
         let video_path = document.video_path().to_owned();
         let thread = self.qt_thread();
         self.spawn(move || {
@@ -789,7 +857,15 @@ impl qobject::Editor {
 
     /// `rebuildMotion()`: builds the motion track off the GUI thread, unless a build runs.
     fn rebuild_motion(mut self: Pin<&mut Self>) {
-        let Some(job) = self.as_mut().rust_mut().document.as_mut().and_then(Document::motion_job) else { return };
+        let Some(job) = self
+            .as_mut()
+            .rust_mut()
+            .document
+            .as_mut()
+            .and_then(Document::motion_job)
+        else {
+            return;
+        };
         let thread = self.qt_thread();
         self.spawn(move || {
             let track = job.run();
@@ -801,7 +877,13 @@ impl qobject::Editor {
 
     /// `startCameraThumbnailBuild()`.
     fn start_camera_thumbnail_build(&self) {
-        let Some(job) = self.document.as_ref().and_then(Document::camera_thumbnail_job) else { return };
+        let Some(job) = self
+            .document
+            .as_ref()
+            .and_then(Document::camera_thumbnail_job)
+        else {
+            return;
+        };
         let thread = self.qt_thread();
         self.spawn(move || {
             let urls = job.run();
@@ -838,7 +920,13 @@ impl qobject::Editor {
 
     /// The import [`Effect::StartImport`] asks for, then `finishImport()`.
     fn start_import(&self, source: &str) {
-        let Some(job) = self.document.as_ref().map(|document| document.import_job(source)) else { return };
+        let Some(job) = self
+            .document
+            .as_ref()
+            .map(|document| document.import_job(source))
+        else {
+            return;
+        };
         let thread = self.qt_thread();
         self.spawn(move || {
             let imported = job.run();
@@ -852,7 +940,9 @@ impl qobject::Editor {
     fn generate_wallpaper_thumbnail(&self, path: String, thumbnail: String) {
         let queue = Arc::clone(&self.wallpaper_jobs);
         let start_worker = {
-            let Ok(mut state) = queue.state.lock() else { return };
+            let Ok(mut state) = queue.state.lock() else {
+                return;
+            };
             state.0.push_back((path, thumbnail));
             // Two decoders: one per core held a whole wallpaper's pixels on every thread at once.
             let start = state.1 < WALLPAPER_THUMBNAIL_WORKERS;
@@ -917,7 +1007,9 @@ impl qobject::Editor {
     /// `projectMap()`: the project's JSON as a map, with `renderTheme`, the resolved background
     /// image and the timeline's clip extras; kept until the document changes.
     fn project_map(&self) -> QMap<QMapPair_QString_QVariant> {
-        let Some(document) = self.document.as_ref() else { return QMap::default() };
+        let Some(document) = self.document.as_ref() else {
+            return QMap::default();
+        };
         let revision = document.project_map_revision();
         if let Some((cached, map)) = self.project_map.borrow().as_ref() {
             if *cached == revision {
@@ -927,7 +1019,10 @@ impl qobject::Editor {
         let mut result = json_map(&document.project_map());
         // A Theme built here used to set the application font as it loaded; the composition's
         // text without a theme of its own falls back to that font.
-        crate::theme::set_application_font(&qobject::interface_family(), crate::theme::body_text_size());
+        crate::theme::set_application_font(
+            &qobject::interface_family(),
+            crate::theme::body_text_size(),
+        );
         let (background, foreground) = document.render_theme();
         result.insert(
             qstring("renderTheme"),
@@ -971,7 +1066,9 @@ impl qobject::Editor {
     }
 
     fn source_duration(&self) -> f64 {
-        self.document.as_ref().map_or(0.0, Document::source_duration)
+        self.document
+            .as_ref()
+            .map_or(0.0, Document::source_duration)
     }
 
     fn source_width(&self) -> i32 {
@@ -995,11 +1092,15 @@ impl qobject::Editor {
     }
 
     fn has_desktop_audio(&self) -> bool {
-        self.document.as_ref().is_some_and(Document::has_desktop_audio)
+        self.document
+            .as_ref()
+            .is_some_and(Document::has_desktop_audio)
     }
 
     fn has_microphone_audio(&self) -> bool {
-        self.document.as_ref().is_some_and(Document::has_microphone_audio)
+        self.document
+            .as_ref()
+            .is_some_and(Document::has_microphone_audio)
     }
 
     fn has_camera(&self) -> bool {
@@ -1011,7 +1112,9 @@ impl qobject::Editor {
     }
 
     fn video_thumbnail_revision(&self) -> i32 {
-        self.document.as_ref().map_or(0, Document::video_thumbnail_revision)
+        self.document
+            .as_ref()
+            .map_or(0, Document::video_thumbnail_revision)
     }
 
     fn loading(&self) -> bool {
@@ -1023,11 +1126,17 @@ impl qobject::Editor {
     }
 
     fn import_error(&self) -> QString {
-        self.document.as_ref().map_or_else(QString::default, |document| qstring(document.import_error()))
+        self.document
+            .as_ref()
+            .map_or_else(QString::default, |document| {
+                qstring(document.import_error())
+            })
     }
 
     fn position(&self) -> f64 {
-        self.document.as_ref().map_or(0.0, Document::output_position)
+        self.document
+            .as_ref()
+            .map_or(0.0, Document::output_position)
     }
 
     fn playhead_position(&self) -> f64 {
@@ -1039,7 +1148,9 @@ impl qobject::Editor {
     }
 
     fn has_playback_range(&self) -> bool {
-        self.document.as_ref().is_some_and(Document::has_playback_range)
+        self.document
+            .as_ref()
+            .is_some_and(Document::has_playback_range)
     }
 
     fn can_undo(&self) -> bool {
@@ -1055,29 +1166,49 @@ impl qobject::Editor {
     }
 
     fn selected_clip_id(&self) -> QString {
-        self.document.as_ref().map_or_else(QString::default, |document| qstring(document.selected_clip_id()))
+        self.document
+            .as_ref()
+            .map_or_else(QString::default, |document| {
+                qstring(document.selected_clip_id())
+            })
     }
 
     fn selected_zoom_id(&self) -> QString {
-        self.document.as_ref().map_or_else(QString::default, |document| qstring(document.selected_zoom_id()))
+        self.document
+            .as_ref()
+            .map_or_else(QString::default, |document| {
+                qstring(document.selected_zoom_id())
+            })
     }
 
     fn selected_zoom_ids(&self) -> QStringList {
-        self.document.as_ref().map_or_else(QStringList::default, |document| string_list(document.selected_zoom_ids()))
+        self.document
+            .as_ref()
+            .map_or_else(QStringList::default, |document| {
+                string_list(document.selected_zoom_ids())
+            })
     }
 
     fn picking_zoom_target(&self) -> bool {
-        self.document.as_ref().is_some_and(Document::picking_zoom_target)
+        self.document
+            .as_ref()
+            .is_some_and(Document::picking_zoom_target)
     }
 
     fn preset_names(&self) -> QStringList {
-        self.document.as_ref().map_or_else(QStringList::default, |document| string_list(&document.preset_names()))
+        self.document
+            .as_ref()
+            .map_or_else(QStringList::default, |document| {
+                string_list(&document.preset_names())
+            })
     }
 
     /// `wallpaperGroups`: every theme's wallpapers; the picker thumbnails that are missing start
     /// generating as the list is read.
     fn wallpaper_groups(&self) -> QList<QVariant> {
-        let Some(document) = self.document.as_ref() else { return QList::default() };
+        let Some(document) = self.document.as_ref() else {
+            return QList::default();
+        };
         let groups = document.wallpaper_groups();
         let mut others = Vec::new();
         for effect in document.take_effects() {
@@ -1101,7 +1232,10 @@ impl qobject::Editor {
                             ("file", QVariant::from(&qstring(&wallpaper.file))),
                             ("path", QVariant::from(&qstring(&wallpaper.path))),
                             ("url", QVariant::from(&qstring(&wallpaper.url))),
-                            ("thumbnailUrl", QVariant::from(&qstring(&wallpaper.thumbnail_url))),
+                            (
+                                "thumbnailUrl",
+                                QVariant::from(&qstring(&wallpaper.thumbnail_url)),
+                            ),
                         ]))
                     })
                     .collect();
@@ -1118,34 +1252,51 @@ impl qobject::Editor {
     fn gradients(&self) -> QList<QVariant> {
         match self.document.as_ref() {
             Some(document) => document.gradients().iter().map(json_variant).collect(),
-            None => editor::gradient_presets().iter().map(json_variant).collect(),
+            None => editor::gradient_presets()
+                .iter()
+                .map(json_variant)
+                .collect(),
         }
     }
 
     fn export_progress(&self) -> f64 {
-        self.document.as_ref().map_or(0.0, |document| document.export_state().progress)
+        self.document
+            .as_ref()
+            .map_or(0.0, |document| document.export_state().progress)
     }
 
     fn exporting(&self) -> bool {
-        self.document.as_ref().is_some_and(|document| document.export_state().exporting)
+        self.document
+            .as_ref()
+            .is_some_and(|document| document.export_state().exporting)
     }
 
     fn export_error(&self) -> QString {
-        self.document.as_ref().map_or_else(QString::default, |document| qstring(&document.export_state().error))
+        self.document
+            .as_ref()
+            .map_or_else(QString::default, |document| {
+                qstring(&document.export_state().error)
+            })
     }
 
     fn export_fps(&self) -> f64 {
-        self.document.as_ref().map_or(0.0, |document| document.export_state().fps)
+        self.document
+            .as_ref()
+            .map_or(0.0, |document| document.export_state().fps)
     }
 
     fn export_eta_seconds(&self) -> i32 {
-        self.document.as_ref().map_or(0, |document| document.export_state().eta_seconds)
+        self.document
+            .as_ref()
+            .map_or(0, |document| document.export_state().eta_seconds)
     }
 
     fn exported_path(&self) -> QString {
         self.document
             .as_ref()
-            .map_or_else(QString::default, |document| qstring(&document.export_state().exported_path))
+            .map_or_else(QString::default, |document| {
+                qstring(&document.export_state().exported_path)
+            })
     }
 
     fn output_width(&self) -> i32 {
@@ -1157,11 +1308,15 @@ impl qobject::Editor {
     }
 
     fn source_position(&self) -> f64 {
-        self.document.as_ref().map_or(0.0, Document::source_position)
+        self.document
+            .as_ref()
+            .map_or(0.0, Document::source_position)
     }
 
     fn preview_zoom(&self) -> QMap<QMapPair_QString_QVariant> {
-        let Some(document) = self.document.as_ref() else { return QMap::default() };
+        let Some(document) = self.document.as_ref() else {
+            return QMap::default();
+        };
         let zoom = document.preview_zoom();
         map([
             ("scale", QVariant::from(&zoom.scale)),
@@ -1172,14 +1327,22 @@ impl qobject::Editor {
     }
 
     fn preview_layout(&self) -> QMap<QMapPair_QString_QVariant> {
-        let Some(document) = self.document.as_ref() else { return QMap::default() };
+        let Some(document) = self.document.as_ref() else {
+            return QMap::default();
+        };
         let layout = document.preview_layout();
-        map([("cameraFull", QVariant::from(&layout.camera_full)), ("bubble", QVariant::from(&layout.bubble))])
+        map([
+            ("cameraFull", QVariant::from(&layout.camera_full)),
+            ("bubble", QVariant::from(&layout.bubble)),
+        ])
     }
 
     fn preview_media(&self) -> QMap<QMapPair_QString_QVariant> {
-        let Some(document) = self.document.as_ref() else { return QMap::default() };
-        let media = document.preview_media(self.playback_media_frame_ready(), &self.media_player_source);
+        let Some(document) = self.document.as_ref() else {
+            return QMap::default();
+        };
+        let media =
+            document.preview_media(self.playback_media_frame_ready(), &self.media_player_source);
         map([
             ("active", QVariant::from(&media.active)),
             ("ready", QVariant::from(&media.ready)),
@@ -1191,7 +1354,9 @@ impl qobject::Editor {
     }
 
     fn preview_cursor(&self) -> QMap<QMapPair_QString_QVariant> {
-        let Some(document) = self.document.as_ref() else { return QMap::default() };
+        let Some(document) = self.document.as_ref() else {
+            return QMap::default();
+        };
         let cursor = document.preview_cursor();
         map([
             ("x", QVariant::from(&cursor.x)),
@@ -1204,7 +1369,9 @@ impl qobject::Editor {
     }
 
     fn preview_ripples(&self) -> QList<QVariant> {
-        let Some(document) = self.document.as_ref() else { return QList::default() };
+        let Some(document) = self.document.as_ref() else {
+            return QList::default();
+        };
         document
             .preview_ripples()
             .iter()
@@ -1219,7 +1386,9 @@ impl qobject::Editor {
     }
 
     fn preview_keystroke_pills(&self) -> QList<QVariant> {
-        let Some(document) = self.document.as_ref() else { return QList::default() };
+        let Some(document) = self.document.as_ref() else {
+            return QList::default();
+        };
         document
             .preview_keystroke_pills()
             .iter()
@@ -1238,11 +1407,15 @@ impl qobject::Editor {
     }
 
     fn camera_source_width(&self) -> i32 {
-        self.document.as_ref().map_or(0, Document::camera_source_width)
+        self.document
+            .as_ref()
+            .map_or(0, Document::camera_source_width)
     }
 
     fn camera_source_height(&self) -> i32 {
-        self.document.as_ref().map_or(0, Document::camera_source_height)
+        self.document
+            .as_ref()
+            .map_or(0, Document::camera_source_height)
     }
 
     fn camera_status(&self) -> QString {
@@ -1257,7 +1430,9 @@ impl qobject::Editor {
     }
 
     fn screen_frame_times_ready_for_tests(&self) -> bool {
-        self.document.as_ref().is_some_and(Document::screen_frame_times_ready)
+        self.document
+            .as_ref()
+            .is_some_and(Document::screen_frame_times_ready)
     }
 
     fn set_selected_clip_id(self: Pin<&mut Self>, id: &QString) {
@@ -1288,7 +1463,12 @@ impl qobject::Editor {
 
     /// `setProjectValue(path, value, coalesce)`: `value` goes through `QJsonValue::fromVariant`
     /// as it did in the C++ (a local file URL as its path for the background image paths).
-    fn set_project_value_coalescing(self: Pin<&mut Self>, path: &QString, value: &QVariant, coalesce: bool) {
+    fn set_project_value_coalescing(
+        self: Pin<&mut Self>,
+        path: &QString,
+        value: &QVariant,
+        coalesce: bool,
+    ) {
         let path = path.to_string();
         let json = qobject::project_value_json(value, takes_local_file(&path)).to_string();
         let value = match qjson::from_json(json.as_bytes()) {
@@ -1336,8 +1516,15 @@ impl qobject::Editor {
         qstring(&url.unwrap_or_default())
     }
 
-    fn video_thumbnail_url_for_clip(self: Pin<&mut Self>, source_time: f64, source_start: f64, source_end: f64) -> QString {
-        let url = self.edit(|document| document.video_thumbnail_url_for_clip(source_time, source_start, source_end));
+    fn video_thumbnail_url_for_clip(
+        self: Pin<&mut Self>,
+        source_time: f64,
+        source_start: f64,
+        source_end: f64,
+    ) -> QString {
+        let url = self.edit(|document| {
+            document.video_thumbnail_url_for_clip(source_time, source_start, source_end)
+        });
         qstring(&url.unwrap_or_default())
     }
 
@@ -1349,12 +1536,16 @@ impl qobject::Editor {
         source_end: f64,
     ) -> QString {
         let clip_id = clip_id.to_string();
-        let url = self.edit(|document| document.clip_thumbnail_url(&clip_id, source_time, source_start, source_end));
+        let url = self.edit(|document| {
+            document.clip_thumbnail_url(&clip_id, source_time, source_start, source_end)
+        });
         qstring(&url.unwrap_or_default())
     }
 
     fn output_to_source(&self, output_time: f64) -> f64 {
-        self.document.as_ref().map_or(0.0, |document| document.output_to_source(output_time))
+        self.document
+            .as_ref()
+            .map_or(0.0, |document| document.output_to_source(output_time))
     }
 
     fn source_to_output(&self, source_time: f64) -> f64 {
@@ -1362,14 +1553,15 @@ impl qobject::Editor {
     }
 
     fn source_to_output_in_clip(&self, source_time: f64, preferred_clip: i32) -> f64 {
-        self.document.as_ref().map_or(-1.0, |document| document.source_to_output(source_time, preferred_clip))
+        self.document.as_ref().map_or(-1.0, |document| {
+            document.source_to_output(source_time, preferred_clip)
+        })
     }
 
     fn source_range_to_output(&self, source_start: f64, source_end: f64) -> QPointF {
-        let (start, end) = self
-            .document
-            .as_ref()
-            .map_or((-1.0, -1.0), |document| document.source_range_to_output(source_start, source_end));
+        let (start, end) = self.document.as_ref().map_or((-1.0, -1.0), |document| {
+            document.source_range_to_output(source_start, source_end)
+        });
         QPointF::new(start, end)
     }
 
@@ -1379,22 +1571,29 @@ impl qobject::Editor {
 
     fn move_clip(self: Pin<&mut Self>, id: &QString, source_in: f64) -> bool {
         let id = id.to_string();
-        self.edit(|document| document.move_clip(&id, source_in)).unwrap_or(false)
+        self.edit(|document| document.move_clip(&id, source_in))
+            .unwrap_or(false)
     }
 
     fn trim_clip(self: Pin<&mut Self>, id: &QString, new_in: f64, new_out: f64) -> bool {
         let id = id.to_string();
-        self.edit(|document| document.trim_clip(&id, new_in, new_out)).unwrap_or(false)
+        self.edit(|document| document.trim_clip(&id, new_in, new_out))
+            .unwrap_or(false)
     }
 
     fn remove_clip(self: Pin<&mut Self>, id: &QString) -> bool {
         let id = id.to_string();
-        self.edit(|document| document.remove_clip(&id)).unwrap_or(false)
+        self.edit(|document| document.remove_clip(&id))
+            .unwrap_or(false)
     }
 
     /// `deleteOutputRange(from, to)`, pausing before the cut as the C++ did.
     fn delete_output_range(mut self: Pin<&mut Self>, from: f64, to: f64) -> bool {
-        let Some(cut) = self.as_mut().edit(|document| document.prepare_delete_output_range(from, to)).flatten() else {
+        let Some(cut) = self
+            .as_mut()
+            .edit(|document| document.prepare_delete_output_range(from, to))
+            .flatten()
+        else {
             return false;
         };
         self.as_mut().pause();
@@ -1404,33 +1603,42 @@ impl qobject::Editor {
 
     fn merge_clip(self: Pin<&mut Self>, id: &QString, direction: i32) -> bool {
         let id = id.to_string();
-        self.edit(|document| document.merge_clip(&id, direction)).unwrap_or(false)
+        self.edit(|document| document.merge_clip(&id, direction))
+            .unwrap_or(false)
     }
 
     fn reset_clip_trims(self: Pin<&mut Self>, id: &QString) -> bool {
         let id = id.to_string();
-        self.edit(|document| document.reset_clip_trims(&id)).unwrap_or(false)
+        self.edit(|document| document.reset_clip_trims(&id))
+            .unwrap_or(false)
     }
 
     fn set_clip_speed(self: Pin<&mut Self>, id: &QString, speed: f64) -> bool {
         let id = id.to_string();
-        self.edit(|document| document.set_clip_speed(&id, speed)).unwrap_or(false)
+        self.edit(|document| document.set_clip_speed(&id, speed))
+            .unwrap_or(false)
     }
 
     fn set_clip_layout(self: Pin<&mut Self>, id: &QString, layout: &QString) -> bool {
         let (id, layout) = (id.to_string(), layout.to_string());
-        self.edit(|document| document.set_clip_layout(&id, &layout)).unwrap_or(false)
+        self.edit(|document| document.set_clip_layout(&id, &layout))
+            .unwrap_or(false)
     }
 
     fn set_clip_fit(self: Pin<&mut Self>, id: &QString, fit: &QString) -> bool {
         let (id, fit) = (id.to_string(), fit.to_string());
-        self.edit(|document| document.set_clip_fit(&id, &fit)).unwrap_or(false)
+        self.edit(|document| document.set_clip_fit(&id, &fit))
+            .unwrap_or(false)
     }
 
     /// `reorderClip(id, direction)`, pausing before the move as the C++ did.
     fn reorder_clip(mut self: Pin<&mut Self>, id: &QString, direction: i32) -> bool {
         let id = id.to_string();
-        if !self.document.as_ref().is_some_and(|document| document.can_reorder_clip(&id, direction)) {
+        if !self
+            .document
+            .as_ref()
+            .is_some_and(|document| document.can_reorder_clip(&id, direction))
+        {
             return false;
         }
         self.as_mut().pause();
@@ -1441,7 +1649,11 @@ impl qobject::Editor {
     /// `insertMedia(url)`, pausing before the import starts as the C++ did.
     fn insert_media(mut self: Pin<&mut Self>, url: &QUrl) {
         let source = qobject::url_path(url).to_string();
-        if !self.document.as_ref().is_some_and(|document| document.can_insert_media(&source)) {
+        if !self
+            .document
+            .as_ref()
+            .is_some_and(|document| document.can_insert_media(&source))
+        {
             return;
         }
         self.as_mut().pause();
@@ -1457,42 +1669,61 @@ impl qobject::Editor {
     }
 
     fn add_zoom_at_with_length(self: Pin<&mut Self>, output_time: f64, length: f64) -> QString {
-        qstring(&self.edit(|document| document.add_zoom_at(output_time, length)).unwrap_or_default())
+        qstring(
+            &self
+                .edit(|document| document.add_zoom_at(output_time, length))
+                .unwrap_or_default(),
+        )
     }
 
     fn move_zoom(self: Pin<&mut Self>, id: &QString, source_start: f64) -> bool {
         let id = id.to_string();
-        self.edit(|document| document.move_zoom(&id, source_start)).unwrap_or(false)
+        self.edit(|document| document.move_zoom(&id, source_start))
+            .unwrap_or(false)
     }
 
     fn resize_zoom(self: Pin<&mut Self>, id: &QString, source_start: f64, source_end: f64) -> bool {
         let id = id.to_string();
-        self.edit(|document| document.resize_zoom(&id, source_start, source_end)).unwrap_or(false)
+        self.edit(|document| document.resize_zoom(&id, source_start, source_end))
+            .unwrap_or(false)
     }
 
     fn set_zoom_level(self: Pin<&mut Self>, id: &QString, level: f64) -> bool {
         self.set_zoom_level_coalescing(id, level, false)
     }
 
-    fn set_zoom_level_coalescing(self: Pin<&mut Self>, id: &QString, level: f64, coalesce: bool) -> bool {
+    fn set_zoom_level_coalescing(
+        self: Pin<&mut Self>,
+        id: &QString,
+        level: f64,
+        coalesce: bool,
+    ) -> bool {
         let id = id.to_string();
-        self.edit(|document| document.set_zoom_level(&id, level, coalesce)).unwrap_or(false)
+        self.edit(|document| document.set_zoom_level(&id, level, coalesce))
+            .unwrap_or(false)
     }
 
     fn set_zoom_target(self: Pin<&mut Self>, id: &QString, target: &QVariant) -> bool {
         let id = id.to_string();
         let (mut x, mut y) = (0.5, 0.5);
-        let target = if qobject::zoom_target(target, &mut x, &mut y) { ZoomTarget::Auto } else { ZoomTarget::Point(x, y) };
-        self.edit(|document| document.set_zoom_target(&id, target)).unwrap_or(false)
+        let target = if qobject::zoom_target(target, &mut x, &mut y) {
+            ZoomTarget::Auto
+        } else {
+            ZoomTarget::Point(x, y)
+        };
+        self.edit(|document| document.set_zoom_target(&id, target))
+            .unwrap_or(false)
     }
 
     fn set_zoom_target_from_preview(self: Pin<&mut Self>, x: f64, y: f64) -> bool {
-        self.edit(|document| document.set_zoom_target_from_preview(x, y)).unwrap_or(false)
+        self.edit(|document| document.set_zoom_target_from_preview(x, y))
+            .unwrap_or(false)
     }
 
     fn remove_zoom(self: Pin<&mut Self>, id: &QString) -> bool {
         let id = id.to_string();
-        self.edit(|document| document.remove_zoom(&id)).unwrap_or(false)
+        self.edit(|document| document.remove_zoom(&id))
+            .unwrap_or(false)
     }
 
     fn select_zooms_in_output_range(self: Pin<&mut Self>, output_start: f64, output_end: f64) {
@@ -1501,7 +1732,8 @@ impl qobject::Editor {
 
     fn move_selected_zooms(self: Pin<&mut Self>, anchor_id: &QString, source_start: f64) -> bool {
         let anchor_id = anchor_id.to_string();
-        self.edit(|document| document.move_selected_zooms(&anchor_id, source_start)).unwrap_or(false)
+        self.edit(|document| document.move_selected_zooms(&anchor_id, source_start))
+            .unwrap_or(false)
     }
 
     fn remove_selected_zooms(self: Pin<&mut Self>) -> i32 {
@@ -1539,18 +1771,32 @@ impl qobject::Editor {
     }
 
     /// `exportTo(path, settings)`: saves, then starts an exporter with the dialog's settings.
-    fn export_to_with_settings(mut self: Pin<&mut Self>, path: &QString, settings: &QMap<QMapPair_QString_QVariant>) {
-        if self.document.as_ref().is_none_or(|document| document.export_state().exporting) {
+    fn export_to_with_settings(
+        mut self: Pin<&mut Self>,
+        path: &QString,
+        settings: &QMap<QMapPair_QString_QVariant>,
+    ) {
+        if self
+            .document
+            .as_ref()
+            .is_none_or(|document| document.export_state().exporting)
+        {
             return;
         }
         self.as_mut().save_now();
         let path = qobject::text_url_path(path).to_string();
         let (mut fps, mut height, mut quality) = (0, 0, QString::default());
         qobject::export_settings(settings, &mut fps, &mut height, &mut quality);
-        let settings = ExportDialogSettings { fps, height, quality: quality.to_string() };
+        let settings = ExportDialogSettings {
+            fps,
+            height,
+            quality: quality.to_string(),
+        };
         let request = {
             let mut rust = self.as_mut().rust_mut();
-            let Some(document) = rust.document.as_mut() else { return };
+            let Some(document) = rust.document.as_mut() else {
+                return;
+            };
             document.begin_saved_export(&path, &settings)
         };
         if request.is_some() {
@@ -1573,7 +1819,11 @@ impl qobject::Editor {
 
     fn default_export_path(&self, format: &QString) -> QString {
         let format = format.to_string();
-        self.document.as_ref().map_or_else(QString::default, |document| qstring(&document.default_export_path(&format)))
+        self.document
+            .as_ref()
+            .map_or_else(QString::default, |document| {
+                qstring(&document.default_export_path(&format))
+            })
     }
 
     fn format_time(&self, seconds: f64) -> QString {
@@ -1594,12 +1844,20 @@ impl qobject::Editor {
         if std::env::var_os("OMAREEL_INPUT_TRACE").is_none_or(|value| value != "1") {
             return;
         }
-        print_error(&trace_input_line(&object_name.to_string(), &phase.to_string(), x, y));
+        print_error(&trace_input_line(
+            &object_name.to_string(),
+            &phase.to_string(),
+            x,
+            y,
+        ));
     }
 
     fn export_progressed(mut self: Pin<&mut Self>, frame: i32, total: i32) {
-        let elapsed_ms = self.export_timer.map_or(0, |timer| timer.elapsed().as_millis() as i64);
-        self.as_mut().edit(|document| document.export_progressed(frame, total, elapsed_ms));
+        let elapsed_ms = self
+            .export_timer
+            .map_or(0, |timer| timer.elapsed().as_millis() as i64);
+        self.as_mut()
+            .edit(|document| document.export_progressed(frame, total, elapsed_ms));
     }
 
     fn export_succeeded(self: Pin<&mut Self>, path: &QString) {
@@ -1632,7 +1890,10 @@ impl qobject::Editor {
         // pause on the first decoded frame must not stop playback asked for in the meantime.
         self.as_mut().playback_cancel_warm_up(SCREEN);
         self.as_mut().playback_cancel_warm_up(MEDIA);
-        let Some(active) = self.document.as_ref().map(|document| document.clip_for_output(document.output_position()).0)
+        let Some(active) = self
+            .document
+            .as_ref()
+            .map(|document| document.clip_for_output(document.output_position()).0)
         else {
             return;
         };
@@ -1660,23 +1921,35 @@ impl qobject::Editor {
 
     fn step_frames(mut self: Pin<&mut Self>, frames: i32) {
         self.as_mut().pause();
-        if let Some(target) = self.document.as_ref().map(|document| document.step_target(frames)) {
+        if let Some(target) = self
+            .document
+            .as_ref()
+            .map(|document| document.step_target(frames))
+        {
             self.seek(target);
         }
     }
 
     fn seek_boundary(self: Pin<&mut Self>, direction: i32) {
-        if let Some(target) = self.document.as_ref().map(|document| document.boundary_target(direction)) {
+        if let Some(target) = self
+            .document
+            .as_ref()
+            .map(|document| document.boundary_target(direction))
+        {
             self.seek(target);
         }
     }
 
     fn clips_empty(&self) -> bool {
-        self.document.as_ref().is_none_or(|document| document.project().clips.is_empty())
+        self.document
+            .as_ref()
+            .is_none_or(|document| document.project().clips.is_empty())
     }
 
     fn clip_is_media(&self, index: i32) -> bool {
-        self.document.as_ref().is_some_and(|document| document.clip_is_media(index))
+        self.document
+            .as_ref()
+            .is_some_and(|document| document.clip_is_media(index))
     }
 
     /// `Editor::seek(outputTime)`.
@@ -1687,7 +1960,11 @@ impl qobject::Editor {
         self.as_mut().stop_editor_timer(SCRUB_TIMER);
         self.as_mut().rust_mut().pending_scrub_position = -1.0;
         self.as_mut().rust_mut().transport.scrubbing = false;
-        let Some(target) = self.document.as_ref().map(|document| document.clamp_playback_position(output_time)) else {
+        let Some(target) = self
+            .document
+            .as_ref()
+            .map(|document| document.clamp_playback_position(output_time))
+        else {
             return;
         };
         self.as_mut().set_output_position(target);
@@ -1711,7 +1988,11 @@ impl qobject::Editor {
         if !self.transport.scrubbing {
             self.as_mut().begin_scrub();
         }
-        let Some(target) = self.document.as_ref().map(|document| document.clamp_playback_position(output_time)) else {
+        let Some(target) = self
+            .document
+            .as_ref()
+            .map(|document| document.clamp_playback_position(output_time))
+        else {
             return;
         };
         self.as_mut().set_output_position(target);
@@ -1743,7 +2024,12 @@ impl qobject::Editor {
 
     /// `setOutputPosition(outputTime)`.
     fn set_output_position(mut self: Pin<&mut Self>, output_time: f64) {
-        let Some(active) = self.as_mut().rust_mut().document.as_mut().map(|document| document.set_output_position(output_time))
+        let Some(active) = self
+            .as_mut()
+            .rust_mut()
+            .document
+            .as_mut()
+            .map(|document| document.set_output_position(output_time))
         else {
             return;
         };
@@ -1756,7 +2042,10 @@ impl qobject::Editor {
 
     fn set_playhead_position(mut self: Pin<&mut Self>, output_time: f64) {
         let current = self.transport.playhead_position;
-        let Some(position) = self.document.as_ref().and_then(|document| document.playhead_update(current, output_time))
+        let Some(position) = self
+            .document
+            .as_ref()
+            .and_then(|document| document.playhead_update(current, output_time))
         else {
             return;
         };
@@ -1771,20 +2060,32 @@ impl qobject::Editor {
     }
 
     fn update_playhead_position(self: Pin<&mut Self>) {
-        let Some(clock) = self.playhead_clock else { return };
+        let Some(clock) = self.playhead_clock else {
+            return;
+        };
         if !self.transport.playing || self.transport.scrubbing || self.clips_empty() {
             return;
         }
         let elapsed_ms = clock.elapsed().as_millis() as i64;
         let transport = self.transport;
-        if let Some(target) = self.document.as_ref().and_then(|document| document.playhead_advance(&transport, elapsed_ms)) {
+        if let Some(target) = self
+            .document
+            .as_ref()
+            .and_then(|document| document.playhead_advance(&transport, elapsed_ms))
+        {
             self.set_playhead_position(target);
         }
     }
 
     /// `seekMedia(outputTime)`: shows the clip there in its player.
     fn seek_media(mut self: Pin<&mut Self>, output_time: f64) {
-        let Some(seek) = self.document.as_ref().and_then(|document| document.media_seek(output_time)) else { return };
+        let Some(seek) = self
+            .document
+            .as_ref()
+            .and_then(|document| document.media_seek(output_time))
+        else {
+            return;
+        };
         self.as_mut().rust_mut().transport.internal_seek = true;
         // While playing, the clip's player starts before the other stops, so the picture never
         // waits on a paused pair.
@@ -1827,7 +2128,13 @@ impl qobject::Editor {
     /// `prepareNextClip()`: readies the next clip's player when the cut changes players.
     fn prepare_next_clip(mut self: Pin<&mut Self>) {
         let active = self.transport.active_clip;
-        let Some(next) = self.document.as_ref().and_then(|document| document.next_clip(active)) else { return };
+        let Some(next) = self
+            .document
+            .as_ref()
+            .and_then(|document| document.next_clip(active))
+        else {
+            return;
+        };
         match &next.kind {
             NextClipKind::IntoMedia(media) => {
                 // The inserted clip after this one opens and waits on its first frame, so the cut
@@ -1859,7 +2166,9 @@ impl qobject::Editor {
             return;
         }
         let active = self.transport.active_clip;
-        let Some(document) = self.document.as_ref() else { return };
+        let Some(document) = self.document.as_ref() else {
+            return;
+        };
         match document.advance_target(active) {
             Some(target) => self.seek(target),
             None => {
@@ -1875,7 +2184,11 @@ impl qobject::Editor {
     fn update_insert_audio(mut self: Pin<&mut Self>) {
         let warming = self.playback_warming(MEDIA);
         let active = self.transport.active_clip;
-        let Some((volume, muted)) = self.document.as_ref().map(|document| document.insert_audio(active, warming)) else {
+        let Some((volume, muted)) = self
+            .document
+            .as_ref()
+            .map(|document| document.insert_audio(active, warming))
+        else {
             return;
         };
         self.as_mut().playback_set_audio(MEDIA, volume, muted);
@@ -1914,7 +2227,11 @@ impl qobject::Editor {
 
     /// `syncCamera(screenSourceTime, force)`.
     fn sync_camera(self: Pin<&mut Self>, screen_source_time: f64, force: bool) {
-        let Some(sync) = self.document.as_ref().and_then(|document| document.camera_sync(screen_source_time)) else {
+        let Some(sync) = self
+            .document
+            .as_ref()
+            .and_then(|document| document.camera_sync(screen_source_time))
+        else {
             return;
         };
         self.playback_sync_camera(sync.target_ms, sync.tolerance_ms, force, sync.covered);
@@ -1923,7 +2240,10 @@ impl qobject::Editor {
     /// `handlePlayerPosition(milliseconds)`.
     fn handle_player_position(mut self: Pin<&mut Self>, milliseconds: i64) {
         let transport = self.transport;
-        let Some(step) = self.document.as_ref().and_then(|document| document.player_position(&transport, milliseconds))
+        let Some(step) = self
+            .document
+            .as_ref()
+            .and_then(|document| document.player_position(&transport, milliseconds))
         else {
             return;
         };
@@ -1951,7 +2271,9 @@ impl qobject::Editor {
     /// The preview timer's tick: follow the active player, then move the playhead.
     fn preview_tick(mut self: Pin<&mut Self>) {
         // While an inserted clip's file is still opening, its player has no position yet.
-        let player = self.document.as_ref().map_or(SCREEN, |document| player_index(document.player_for(self.transport.active_clip)));
+        let player = self.document.as_ref().map_or(SCREEN, |document| {
+            player_index(document.player_for(self.transport.active_clip))
+        });
         if self.playback_position_ready(player) {
             let position = self.playback_position(player);
             self.as_mut().handle_player_position(position);
@@ -1961,9 +2283,15 @@ impl qobject::Editor {
 
     /// `handlePreviewStats()`.
     fn handle_preview_stats(mut self: Pin<&mut Self>) {
-        let elapsed_ms = self.preview_stats_clock.map_or(0, |clock| clock.elapsed().as_millis() as i64);
-        let Some(line) = preview_stats_line(self.preview_stats_frames, self.preview_stats_cost_ns, elapsed_ms, self.fps())
-        else {
+        let elapsed_ms = self
+            .preview_stats_clock
+            .map_or(0, |clock| clock.elapsed().as_millis() as i64);
+        let Some(line) = preview_stats_line(
+            self.preview_stats_frames,
+            self.preview_stats_cost_ns,
+            elapsed_ms,
+            self.fps(),
+        ) else {
             return;
         };
         print_error(&line);
@@ -1995,9 +2323,9 @@ impl qobject::Editor {
     // What EditorBase reports.
 
     fn player_should_play(&self, player: i32) -> bool {
-        self.document
-            .as_ref()
-            .is_some_and(|document| document.player_should_play(player_from_index(player), &self.transport))
+        self.document.as_ref().is_some_and(|document| {
+            document.player_should_play(player_from_index(player), &self.transport)
+        })
     }
 
     fn screen_rest_position(&self) -> i64 {
@@ -2016,8 +2344,9 @@ impl qobject::Editor {
         }
         if player != Player::Camera {
             let transport = self.transport;
-            let anchor =
-                self.document.as_ref().and_then(|document| document.frame_anchor(player, &transport, start_time_us, live));
+            let anchor = self.document.as_ref().and_then(|document| {
+                document.frame_anchor(player, &transport, start_time_us, live)
+            });
             if let Some(anchor) = anchor {
                 let mut rust = self.as_mut().rust_mut();
                 rust.transport.playhead_clock_position = anchor;
@@ -2050,7 +2379,11 @@ impl qobject::Editor {
             if status == END_OF_MEDIA && self.transport.playing && !self.clip_is_media(active) {
                 self.call_later(ADVANCE_CLIP_CALL, 0);
             }
-        } else if player == MEDIA && status == END_OF_MEDIA && self.transport.playing && self.clip_is_media(active) {
+        } else if player == MEDIA
+            && status == END_OF_MEDIA
+            && self.transport.playing
+            && self.clip_is_media(active)
+        {
             self.call_later(ADVANCE_CLIP_CALL, 0);
         }
     }

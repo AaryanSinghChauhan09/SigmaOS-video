@@ -47,7 +47,9 @@ pub const MODIFIER_KEY_LABELS: [&str; 5] = ["Ctrl", "Shift", "Alt", "Super", "Al
 
 /// Whether `modifiers` (`mods` names) hold a modifier that makes a key a shortcut.
 pub fn makes_shortcut(modifiers: &[String]) -> bool {
-    modifiers.iter().any(|modifier| SHORTCUT_MODIFIERS.contains(&modifier.as_str()))
+    modifiers
+        .iter()
+        .any(|modifier| SHORTCUT_MODIFIERS.contains(&modifier.as_str()))
 }
 
 /// Whether a libevdev key name is part of typing on a US layout: a name of one character (after
@@ -203,11 +205,14 @@ const KEY_LEFTALT: i32 = 56;
 /// down (`left_alt_down`), from its own key down and up in the log.
 fn is_plain_typing(event: &InputEvent, left_alt_down: bool) -> bool {
     if event.key_label.is_empty() {
-        let shortcut = event.modifiers.iter().any(|modifier| match modifier.as_str() {
-            "ctrl" | "meta" => true,
-            "alt" => left_alt_down,
-            _ => false,
-        });
+        let shortcut = event
+            .modifiers
+            .iter()
+            .any(|modifier| match modifier.as_str() {
+                "ctrl" | "meta" => true,
+                "alt" => left_alt_down,
+                _ => false,
+            });
         !shortcut && is_typing_key_name(&event.key_name)
     } else {
         !makes_shortcut(&event.modifiers) && is_text_label(&event.key_label)
@@ -219,13 +224,18 @@ impl KeystrokeTrack {
     /// that pill's last press and the pill stays at six keys or fewer. Modifier keys alone and
     /// plain typing (`is_plain_typing`) are left out.
     pub fn build(events: &[InputEvent], settings: &Keystrokes) -> KeystrokeTrack {
-        let mut track = KeystrokeTrack { settings: settings.clone(), groups: Vec::new() };
+        let mut track = KeystrokeTrack {
+            settings: settings.clone(),
+            groups: Vec::new(),
+        };
         if !settings.enabled {
             return track;
         }
         let mut left_alt_down = false;
         for event in events {
-            if event.key_code == KEY_LEFTALT && matches!(event.kind, InputKind::KeyDown | InputKind::KeyUp) {
+            if event.key_code == KEY_LEFTALT
+                && matches!(event.kind, InputKind::KeyDown | InputKind::KeyUp)
+            {
                 left_alt_down = event.kind == InputKind::KeyDown;
             }
             if event.kind != InputKind::KeyDown
@@ -243,7 +253,11 @@ impl KeystrokeTrack {
                     keys.push(label.to_owned());
                 }
             }
-            let label = if event.key_label.is_empty() { key_label(&event.key_name) } else { event.key_label.clone() };
+            let label = if event.key_label.is_empty() {
+                key_label(&event.key_name)
+            } else {
+                event.key_label.clone()
+            };
             if !label.is_empty() {
                 keys.push(label);
             }
@@ -256,7 +270,11 @@ impl KeystrokeTrack {
                 Some(last) => event.time - last.last > 0.6 || last.keys.len() + keys.len() > 6,
             };
             if starts_group {
-                track.groups.push(Group { start: event.time, last: event.time, keys: Vec::new() });
+                track.groups.push(Group {
+                    start: event.time,
+                    last: event.time,
+                    keys: Vec::new(),
+                });
             }
             let group = track.groups.last_mut().expect("a group was just ensured");
             group.last = event.time;
@@ -285,7 +303,11 @@ impl KeystrokeTrack {
             } else {
                 cpp::clamp(1.0 - (time - group.last - hold) / FADE, 0.0, 1.0)
             };
-            result.push(KeystrokePill { keys: group.keys.clone(), text: group.keys.join(" + "), opacity });
+            result.push(KeystrokePill {
+                keys: group.keys.clone(),
+                text: group.keys.join(" + "),
+                opacity,
+            });
         }
         result
     }
@@ -321,18 +343,33 @@ mod tests {
     }
 
     fn labelled(time: f64, key_name: &str, key_label: &str, modifiers: &[&str]) -> InputEvent {
-        InputEvent { key_label: key_label.into(), ..key_down(time, 0, key_name, modifiers) }
+        InputEvent {
+            key_label: key_label.into(),
+            ..key_down(time, 0, key_name, modifiers)
+        }
     }
 
     fn key_up(time: f64, key_code: i32) -> InputEvent {
-        InputEvent { time, kind: InputKind::KeyUp, key_code, ..InputEvent::default() }
+        InputEvent {
+            time,
+            kind: InputKind::KeyUp,
+            key_code,
+            ..InputEvent::default()
+        }
     }
 
     // tests/test_keystroketrack.cpp, with F5 where the plain K it had is now hidden as typing.
     #[test]
     fn groups_consecutive_keys_and_fades_from_last_key() {
-        let settings = Keystrokes { enabled: true, hold_ms: 900, ..Keystrokes::default() };
-        let events = [key_down(1.0, 25, "KEY_P", &["ctrl", "shift"]), key_down(1.5, 63, "KEY_F5", &[])];
+        let settings = Keystrokes {
+            enabled: true,
+            hold_ms: 900,
+            ..Keystrokes::default()
+        };
+        let events = [
+            key_down(1.0, 25, "KEY_P", &["ctrl", "shift"]),
+            key_down(1.5, 63, "KEY_F5", &[]),
+        ];
         let track = KeystrokeTrack::build(&events, &settings);
         let grouped = track.sample(1.5);
         assert_eq!(grouped.len(), 1);
@@ -348,14 +385,22 @@ mod tests {
 
     #[test]
     fn shortcut_filter_and_six_key_limit() {
-        let settings = Keystrokes { enabled: true, ..Keystrokes::default() };
+        let settings = Keystrokes {
+            enabled: true,
+            ..Keystrokes::default()
+        };
         let mut events = vec![
             key_down(0.1, 30, "KEY_A", &[]),
             key_down(0.2, 28, "KEY_ENTER", &[]),
             key_down(0.3, 25, "KEY_P", &["ctrl"]),
         ];
         for i in 0..8 {
-            events.push(key_down(0.4 + f64::from(i) * 0.05, 59 + i, &format!("KEY_F{}", i + 1), &[]));
+            events.push(key_down(
+                0.4 + f64::from(i) * 0.05,
+                59 + i,
+                &format!("KEY_F{}", i + 1),
+                &[],
+            ));
         }
         let track = KeystrokeTrack::build(&events, &settings);
         let pills = track.sample(0.7);
@@ -370,7 +415,10 @@ mod tests {
     // Not in the C++ tests: older recordings kept every key, and their typing stays hidden.
     #[test]
     fn plain_typing_in_older_recordings_is_hidden() {
-        let settings = Keystrokes { enabled: true, ..Keystrokes::default() };
+        let settings = Keystrokes {
+            enabled: true,
+            ..Keystrokes::default()
+        };
         let events = [
             key_down(1.0, 30, "KEY_A", &["shift"]),
             key_down(1.1, 12, "KEY_MINUS", &[]),
@@ -383,14 +431,20 @@ mod tests {
             key_down(1.6, 57, "KEY_SPACE", &["meta"]),
         ];
         let track = KeystrokeTrack::build(&events, &settings);
-        assert_eq!(track.sample(1.6)[0].keys, ["Shift", "Tab", "Alt", "A", "Super", "Space"]);
+        assert_eq!(
+            track.sample(1.6)[0].keys,
+            ["Shift", "Tab", "Alt", "A", "Super", "Space"]
+        );
     }
 
     // Not in the C++ tests: the old recorder named Right Alt "alt" too, so AltGr typing in an
     // older recording looks like Alt; "alt" is only trusted while Left Alt is down.
     #[test]
     fn altgr_typing_in_older_recordings_is_hidden() {
-        let settings = Keystrokes { enabled: true, ..Keystrokes::default() };
+        let settings = Keystrokes {
+            enabled: true,
+            ..Keystrokes::default()
+        };
         let events = [
             // AZERTY AltGr+0 is "@", AltGr+E "€".
             key_down(1.0, 100, "KEY_RIGHTALT", &["alt"]),
@@ -411,7 +465,10 @@ mod tests {
     // Not in the C++ tests: the layout's label wins over the scancode's name.
     #[test]
     fn labels_from_the_layout() {
-        let settings = Keystrokes { enabled: true, ..Keystrokes::default() };
+        let settings = Keystrokes {
+            enabled: true,
+            ..Keystrokes::default()
+        };
         let events = [
             // AZERTY: the key in US Q's place prints "a", the one in US M's place ",".
             labelled(1.0, "KEY_Q", "A", &["ctrl", "shift"]),
@@ -446,7 +503,11 @@ mod tests {
         assert_eq!(key_label("𐐀X"), "𐐨x");
         assert_eq!(key_label("😀"), "😀");
         assert_eq!(key_label("KP😀"), "Kp😀");
-        assert!(is_modifier_name("KEY_LEFTCTRL") && is_modifier_name("KEY_ALTERASE") && !is_modifier_name("KEY_LEFT"));
+        assert!(
+            is_modifier_name("KEY_LEFTCTRL")
+                && is_modifier_name("KEY_ALTERASE")
+                && !is_modifier_name("KEY_LEFT")
+        );
     }
 
     #[test]
@@ -454,35 +515,89 @@ mod tests {
         assert!(is_plain_typing(&key_down(0.0, 0, "KEY_A", &[]), false));
         assert!(is_plain_typing(&key_down(0.0, 0, "KEY_1", &[]), false));
         assert!(is_plain_typing(&key_down(0.0, 0, "ª", &[]), false));
-        assert!(is_plain_typing(&key_down(0.0, 0, "KEY_A", &["shift"]), false));
+        assert!(is_plain_typing(
+            &key_down(0.0, 0, "KEY_A", &["shift"]),
+            false
+        ));
         assert!(is_plain_typing(&key_down(0.0, 0, "KEY_-", &[]), false));
         assert!(is_plain_typing(&key_down(0.0, 0, "Ⓐ", &[]), false));
         assert!(is_plain_typing(&key_down(0.0, 0, "𐐀", &[]), false));
-        assert!(is_plain_typing(&key_down(0.0, 0, "KEY_SEMICOLON", &["shift"]), false));
+        assert!(is_plain_typing(
+            &key_down(0.0, 0, "KEY_SEMICOLON", &["shift"]),
+            false
+        ));
         assert!(is_plain_typing(&key_down(0.0, 0, "KEY_KP0", &[]), false));
-        assert!(is_plain_typing(&key_down(0.0, 0, "KEY_A", &["hyper"]), false));
-        assert!(!is_plain_typing(&key_down(0.0, 0, "KEY_A", &["ctrl"]), false));
-        assert!(is_plain_typing(&key_down(0.0, 0, "KEY_A", &["shift", "alt"]), false), "alt may be AltGr");
-        assert!(!is_plain_typing(&key_down(0.0, 0, "KEY_A", &["shift", "alt"]), true));
-        assert!(!is_plain_typing(&key_down(0.0, 0, "KEY_A", &["meta"]), false));
+        assert!(is_plain_typing(
+            &key_down(0.0, 0, "KEY_A", &["hyper"]),
+            false
+        ));
+        assert!(!is_plain_typing(
+            &key_down(0.0, 0, "KEY_A", &["ctrl"]),
+            false
+        ));
+        assert!(
+            is_plain_typing(&key_down(0.0, 0, "KEY_A", &["shift", "alt"]), false),
+            "alt may be AltGr"
+        );
+        assert!(!is_plain_typing(
+            &key_down(0.0, 0, "KEY_A", &["shift", "alt"]),
+            true
+        ));
+        assert!(!is_plain_typing(
+            &key_down(0.0, 0, "KEY_A", &["meta"]),
+            false
+        ));
         assert!(!is_plain_typing(&key_down(0.0, 0, "KEY_ENTER", &[]), false));
-        assert!(!is_plain_typing(&key_down(0.0, 0, "KEY_KPENTER", &[]), false));
-        assert!(is_plain_typing(&key_down(0.0, 0, "KEY_CAPSLOCK", &[]), false));
-        assert!(!is_plain_typing(&key_down(0.0, 0, "KEY_CAPSLOCK", &["ctrl"]), false));
-        assert!(!is_plain_typing(&key_down(0.0, 0, "KEY_LEFTALT", &[]), false));
+        assert!(!is_plain_typing(
+            &key_down(0.0, 0, "KEY_KPENTER", &[]),
+            false
+        ));
+        assert!(is_plain_typing(
+            &key_down(0.0, 0, "KEY_CAPSLOCK", &[]),
+            false
+        ));
+        assert!(!is_plain_typing(
+            &key_down(0.0, 0, "KEY_CAPSLOCK", &["ctrl"]),
+            false
+        ));
+        assert!(!is_plain_typing(
+            &key_down(0.0, 0, "KEY_LEFTALT", &[]),
+            false
+        ));
         assert!(!is_plain_typing(&key_down(0.0, 0, "KEY_KP", &[]), false));
         assert!(!is_plain_typing(&key_down(0.0, 0, "\u{0}", &[]), false));
-        assert!(is_plain_typing(&labelled(0.0, "KEY_Q", "A", &["shift"]), false));
-        assert!(is_plain_typing(&labelled(0.0, "KEY_ENTER", "é", &[]), false));
-        assert!(!is_plain_typing(&labelled(0.0, "KEY_A", "Enter", &[]), false));
-        assert!(!is_plain_typing(&labelled(0.0, "KEY_SPACE", "Space", &[]), false));
-        assert!(!is_plain_typing(&labelled(0.0, "KEY_Q", "A", &["ctrl"]), false));
-        assert!(!is_plain_typing(&labelled(0.0, "KEY_Q", "A", &["alt"]), false), "a labelled alt is Alt");
+        assert!(is_plain_typing(
+            &labelled(0.0, "KEY_Q", "A", &["shift"]),
+            false
+        ));
+        assert!(is_plain_typing(
+            &labelled(0.0, "KEY_ENTER", "é", &[]),
+            false
+        ));
+        assert!(!is_plain_typing(
+            &labelled(0.0, "KEY_A", "Enter", &[]),
+            false
+        ));
+        assert!(!is_plain_typing(
+            &labelled(0.0, "KEY_SPACE", "Space", &[]),
+            false
+        ));
+        assert!(!is_plain_typing(
+            &labelled(0.0, "KEY_Q", "A", &["ctrl"]),
+            false
+        ));
+        assert!(
+            !is_plain_typing(&labelled(0.0, "KEY_Q", "A", &["alt"]), false),
+            "a labelled alt is Alt"
+        );
     }
 
     #[test]
     fn disabled_track_shows_nothing() {
-        let track = KeystrokeTrack::build(&[key_down(1.0, 25, "KEY_P", &["ctrl"])], &Keystrokes::default());
+        let track = KeystrokeTrack::build(
+            &[key_down(1.0, 25, "KEY_P", &["ctrl"])],
+            &Keystrokes::default(),
+        );
         assert!(track.sample(1.0).is_empty());
     }
 }

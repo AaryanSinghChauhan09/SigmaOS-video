@@ -17,7 +17,9 @@ pub(crate) type CaseRun = (u32, u32, i32, u32);
 pub(crate) fn map_case(runs: &[CaseRun], cp: u32) -> u32 {
     let next = runs.partition_point(|run| run.0 <= cp);
     match next.checked_sub(1).map(|i| runs[i]) {
-        Some((start, end, delta, stride)) if cp <= end && (cp - start) % stride == 0 => cp.wrapping_add_signed(delta),
+        Some((start, end, delta, stride)) if cp <= end && (cp - start) % stride == 0 => {
+            cp.wrapping_add_signed(delta)
+        }
         _ => cp,
     }
 }
@@ -35,7 +37,8 @@ pub fn to_upper(ch: u16) -> u16 {
 /// circled letters (U+24B6) are not.
 pub fn is_letter_or_number(ch: u16) -> bool {
     let next = LETTER_OR_NUMBER.partition_point(|&(start, _)| start <= ch);
-    next.checked_sub(1).is_some_and(|i| ch <= LETTER_OR_NUMBER[i].1)
+    next.checked_sub(1)
+        .is_some_and(|i| ch <= LETTER_OR_NUMBER[i].1)
 }
 
 /// Code units that `QChar::toUpper()` changes.

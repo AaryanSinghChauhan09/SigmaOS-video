@@ -25,7 +25,11 @@ fn obj<const N: usize>(members: [(&str, Value); N]) -> Value {
 }
 
 pub fn spring_to_json(s: &Spring) -> Value {
-    obj([("mass", s.mass.into()), ("stiffness", s.stiffness.into()), ("damping", s.damping.into())])
+    obj([
+        ("mass", s.mass.into()),
+        ("stiffness", s.stiffness.into()),
+        ("damping", s.damping.into()),
+    ])
 }
 
 pub fn spring_from_json(json: &Object, fallback: &Spring) -> Spring {
@@ -37,7 +41,9 @@ pub fn spring_from_json(json: &Object, fallback: &Spring) -> Spring {
 }
 
 pub fn allowed_clip_speeds() -> Vec<f64> {
-    vec![0.5, 0.75, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 3.0, 4.0, 8.0, 16.0, 24.0]
+    vec![
+        0.5, 0.75, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 3.0, 4.0, 8.0, 16.0, 24.0,
+    ]
 }
 
 pub fn allowed_clip_layouts() -> [&'static str; 3] {
@@ -69,11 +75,26 @@ impl Project {
     /// A new recording's project: one clip over the whole recording and the default
     /// gradient.
     pub fn defaults(name: &str, duration: f64) -> Project {
-        let mut result = Project { name: name.to_owned(), ..Project::default() };
-        result.clips = vec![Clip { id: "c1".into(), in_: 0.0, out: duration, speed: 1.0, ..Clip::default() }];
+        let mut result = Project {
+            name: name.to_owned(),
+            ..Project::default()
+        };
+        result.clips = vec![Clip {
+            id: "c1".into(),
+            in_: 0.0,
+            out: duration,
+            speed: 1.0,
+            ..Clip::default()
+        }];
         result.background.gradient.stops = vec![
-            GradientStop { color: QColor::parse("#ff8a00"), position: 0.0 },
-            GradientStop { color: QColor::parse("#e52e71"), position: 1.0 },
+            GradientStop {
+                color: QColor::parse("#ff8a00"),
+                position: 0.0,
+            },
+            GradientStop {
+                color: QColor::parse("#e52e71"),
+                position: 1.0,
+            },
         ];
         result
     }
@@ -87,9 +108,13 @@ impl Project {
         if stored_version < 2 {
             let mut frame = migrated.value("frame").to_object();
             let shadow = frame.value("shadow").to_object();
-            let intensity = shadow.value("intensity").to_double(shadow.value("opacity").to_double(0.0));
+            let intensity = shadow
+                .value("intensity")
+                .to_double(shadow.value("opacity").to_double(0.0));
             let blur = shadow.value("blur").to_double(0.0);
-            let distance = shadow.value("distance").to_double(shadow.value("offsetY").to_double(0.0));
+            let distance = shadow
+                .value("distance")
+                .to_double(shadow.value("offsetY").to_double(0.0));
             let old_shadow_defaults = !shadow.is_empty()
                 && shadow.value("enabled").to_bool(true)
                 && q_fuzzy_compare(intensity, 0.75)
@@ -110,7 +135,11 @@ impl Project {
                 );
             }
 
-            let border_key = if frame.contains("border") { "border" } else { "inset" };
+            let border_key = if frame.contains("border") {
+                "border"
+            } else {
+                "inset"
+            };
             let border = frame.value(border_key).to_object();
             let old_border_defaults = !border.is_empty()
                 && !border.value("enabled").to_bool(false)
@@ -173,7 +202,10 @@ impl Project {
             if q_fuzzy_compare(offset.value("x").to_double(0.0), 0.02)
                 && q_fuzzy_compare(offset.value("y").to_double(0.0), 0.02)
             {
-                camera.insert("offset", obj([("x", d.offset.x.into()), ("y", d.offset.y.into())]));
+                camera.insert(
+                    "offset",
+                    obj([("x", d.offset.x.into()), ("y", d.offset.y.into())]),
+                );
             }
             migrated.insert("camera", camera);
         }
@@ -187,10 +219,19 @@ impl Project {
     /// offers.
     pub fn from_json(root: &Object) -> Project {
         let (source, _) = Project::migrate_defaults(root);
-        let mut p = Project::defaults(&source.value("name").to_string_or("Untitled Recording"), 0.0);
+        let mut p = Project::defaults(
+            &source.value("name").to_string_or("Untitled Recording"),
+            0.0,
+        );
         p.version = source.value("version").to_int(1);
-        p.defaults_version = source.value("defaultsVersion").to_int(Project::CURRENT_DEFAULTS_VERSION);
-        let aspect = if source.value("aspect").is_null() { "auto".to_owned() } else { source.value("aspect").to_string_or("auto") };
+        p.defaults_version = source
+            .value("defaultsVersion")
+            .to_int(Project::CURRENT_DEFAULTS_VERSION);
+        let aspect = if source.value("aspect").is_null() {
+            "auto".to_owned()
+        } else {
+            source.value("aspect").to_string_or("auto")
+        };
         if allowed_aspects().contains(&aspect.as_str()) {
             p.aspect = aspect;
         }
@@ -248,7 +289,8 @@ impl Project {
             p.zooms.push(z);
         }
         let zs = source.value("zoomStyle").to_object();
-        p.zoom_style.spring = spring_from_json(&zs.value("spring").to_object(), &p.zoom_style.spring);
+        p.zoom_style.spring =
+            spring_from_json(&zs.value("spring").to_object(), &p.zoom_style.spring);
         p.zoom_style.snap_to_edges_ratio = zs.value("snapToEdgesRatio").to_double(0.25);
         p.zoom_style.instant_animation = zs.value("instantAnimation").to_bool(false);
         p.zoom_style.motion_blur = cpp::clamp(zs.value("motionBlur").to_double(0.0), 0.0, 1.0);
@@ -266,7 +308,10 @@ impl Project {
             for v in gradient.value("stops").to_array() {
                 let a = v.to_array();
                 if a.len() >= 2 {
-                    p.background.gradient.stops.push(GradientStop { color: parse_color(&a[0], &black()), position: a[1].to_double(0.0) });
+                    p.background.gradient.stops.push(GradientStop {
+                        color: parse_color(&a[0], &black()),
+                        position: a[1].to_double(0.0),
+                    });
                 }
             }
         }
@@ -276,11 +321,20 @@ impl Project {
         p.frame.radius = f.value("radius").to_double(12.0);
         let sh = f.value("shadow").to_object();
         p.frame.shadow.enabled = sh.value("enabled").to_bool(p.frame.shadow.enabled);
-        p.frame.shadow.intensity = sh.value("intensity").to_double(sh.value("opacity").to_double(p.frame.shadow.intensity));
+        p.frame.shadow.intensity = sh
+            .value("intensity")
+            .to_double(sh.value("opacity").to_double(p.frame.shadow.intensity));
         p.frame.shadow.blur = sh.value("blur").to_double(p.frame.shadow.blur);
-        p.frame.shadow.distance = sh.value("distance").to_double(sh.value("offsetY").to_double(p.frame.shadow.distance));
+        p.frame.shadow.distance = sh
+            .value("distance")
+            .to_double(sh.value("offsetY").to_double(p.frame.shadow.distance));
         p.frame.shadow.angle = sh.value("angle").to_double(p.frame.shadow.angle);
-        let border = if f.contains("border") { f.value("border") } else { f.value("inset") }.to_object();
+        let border = if f.contains("border") {
+            f.value("border")
+        } else {
+            f.value("inset")
+        }
+        .to_object();
         p.frame.border.enabled = border.value("enabled").to_bool(p.frame.border.enabled);
         p.frame.border.width = border.value("width").to_double(p.frame.border.width);
         p.frame.border.color = parse_color(border.value("color"), &p.frame.border.color);
@@ -298,7 +352,11 @@ impl Project {
         p.cursor.click_effect = c.value("clickEffect").to_string_or("ripple");
         p.cursor.click_shrink = c.value("clickShrink").to_double(0.8);
         p.cursor.rotate_on_x_movement_ratio = c.value("rotateOnXMovementRatio").to_double(0.5);
-        p.cursor.hide_when_idle_ms = if c.value("hideWhenIdleMs").is_null() { -1 } else { c.value("hideWhenIdleMs").to_int(-1) };
+        p.cursor.hide_when_idle_ms = if c.value("hideWhenIdleMs").is_null() {
+            -1
+        } else {
+            c.value("hideWhenIdleMs").to_int(-1)
+        };
         p.cursor.style = c.value("style").to_string_or("light-arrow");
         if !["light-arrow", "dark-arrow", "dot", "hand"].contains(&p.cursor.style.as_str()) {
             p.cursor.style = "light-arrow".into();
@@ -312,7 +370,14 @@ impl Project {
         let keystrokes = source.value("keystrokes").to_object();
         p.keystrokes.enabled = keystrokes.value("enabled").to_bool(false);
         p.keystrokes.position = keystrokes.value("position").to_string_or("bottom-center");
-        const KEYSTROKE_POSITIONS: [&str; 6] = ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"];
+        const KEYSTROKE_POSITIONS: [&str; 6] = [
+            "top-left",
+            "top-center",
+            "top-right",
+            "bottom-left",
+            "bottom-center",
+            "bottom-right",
+        ];
         if !KEYSTROKE_POSITIONS.contains(&p.keystrokes.position.as_str()) {
             p.keystrokes.position = "bottom-center".into();
         }
@@ -354,11 +419,22 @@ impl Project {
         } else {
             p.camera.shadow.enabled = camera_shadow_value.to_bool(p.camera.shadow.enabled);
         }
-        let camera_border = if camera.contains("border") { camera.value("border") } else { camera.value("inset") }.to_object();
-        p.camera.border.enabled = camera_border.value("enabled").to_bool(p.camera.border.enabled);
-        p.camera.border.width = camera_border.value("width").to_double(p.camera.border.width);
+        let camera_border = if camera.contains("border") {
+            camera.value("border")
+        } else {
+            camera.value("inset")
+        }
+        .to_object();
+        p.camera.border.enabled = camera_border
+            .value("enabled")
+            .to_bool(p.camera.border.enabled);
+        p.camera.border.width = camera_border
+            .value("width")
+            .to_double(p.camera.border.width);
         p.camera.border.color = parse_color(camera_border.value("color"), &p.camera.border.color);
-        p.camera.border.alpha = camera_border.value("alpha").to_double(p.camera.border.alpha);
+        p.camera.border.alpha = camera_border
+            .value("alpha")
+            .to_double(p.camera.border.alpha);
         p.camera.scale_during_zoom = camera.value("scaleDuringZoom").to_double(0.7);
         let camera_offset = camera.value("offset").to_object();
         p.camera.offset = PointF::new(
@@ -408,8 +484,11 @@ impl Project {
             .zooms
             .iter()
             .map(|z| {
-                let target =
-                    if z.automatic_target { Value::from("auto") } else { obj([("x", z.target.x.into()), ("y", z.target.y.into())]) };
+                let target = if z.automatic_target {
+                    Value::from("auto")
+                } else {
+                    obj([("x", z.target.x.into()), ("y", z.target.y.into())])
+                };
                 obj([
                     ("id", z.id.as_str().into()),
                     ("start", z.start.into()),
@@ -430,9 +509,19 @@ impl Project {
         let background = obj([
             ("type", bg.type_.as_str().into()),
             ("wallpaper", bg.wallpaper.as_str().into()),
-            ("gradient", obj([("angle", bg.gradient.angle.into()), ("stops", stops.into())])),
+            (
+                "gradient",
+                obj([("angle", bg.gradient.angle.into()), ("stops", stops.into())]),
+            ),
             ("color", bg.color.name().into()),
-            ("image", if bg.image.is_empty() { Value::Null } else { bg.image.as_str().into() }),
+            (
+                "image",
+                if bg.image.is_empty() {
+                    Value::Null
+                } else {
+                    bg.image.as_str().into()
+                },
+            ),
             ("blur", bg.blur.into()),
         ]);
         let shadow = |s: &Shadow| {
@@ -466,8 +555,18 @@ impl Project {
             ("spring", spring_to_json(&c.spring)),
             ("clickEffect", c.click_effect.as_str().into()),
             ("clickShrink", c.click_shrink.into()),
-            ("rotateOnXMovementRatio", c.rotate_on_x_movement_ratio.into()),
-            ("hideWhenIdleMs", if c.hide_when_idle_ms < 0 { Value::Null } else { c.hide_when_idle_ms.into() }),
+            (
+                "rotateOnXMovementRatio",
+                c.rotate_on_x_movement_ratio.into(),
+            ),
+            (
+                "hideWhenIdleMs",
+                if c.hide_when_idle_ms < 0 {
+                    Value::Null
+                } else {
+                    c.hide_when_idle_ms.into()
+                },
+            ),
             ("style", c.style.as_str().into()),
             ("ringColor", c.ring_color.name().into()),
             ("clickSound", c.click_sound.as_str().into()),
@@ -480,7 +579,14 @@ impl Project {
             ("version", Value::from(self.version)),
             ("defaultsVersion", self.defaults_version.into()),
             ("name", self.name.as_str().into()),
-            ("aspect", if self.aspect == "auto" { Value::Null } else { self.aspect.as_str().into() }),
+            (
+                "aspect",
+                if self.aspect == "auto" {
+                    Value::Null
+                } else {
+                    self.aspect.as_str().into()
+                },
+            ),
             (
                 "crop",
                 obj([
@@ -496,7 +602,10 @@ impl Project {
                 "zoomStyle",
                 obj([
                     ("spring", spring_to_json(&self.zoom_style.spring)),
-                    ("snapToEdgesRatio", self.zoom_style.snap_to_edges_ratio.into()),
+                    (
+                        "snapToEdgesRatio",
+                        self.zoom_style.snap_to_edges_ratio.into(),
+                    ),
                     ("instantAnimation", self.zoom_style.instant_animation.into()),
                     ("motionBlur", self.zoom_style.motion_blur.into()),
                 ]),
@@ -513,7 +622,14 @@ impl Project {
                     ("holdMs", k.hold_ms.into()),
                 ]),
             ),
-            ("audio", obj([("desktop", a.desktop.into()), ("mic", a.mic.into()), ("volume", a.volume.into())])),
+            (
+                "audio",
+                obj([
+                    ("desktop", a.desktop.into()),
+                    ("mic", a.mic.into()),
+                    ("volume", a.volume.into()),
+                ]),
+            ),
             (
                 "camera",
                 obj([
@@ -527,7 +643,10 @@ impl Project {
                     ("shadow", shadow(&cam.shadow)),
                     ("border", border(&cam.border)),
                     ("scaleDuringZoom", cam.scale_during_zoom.into()),
-                    ("offset", obj([("x", cam.offset.x.into()), ("y", cam.offset.y.into())])),
+                    (
+                        "offset",
+                        obj([("x", cam.offset.x.into()), ("y", cam.offset.y.into())]),
+                    ),
                     ("fullFrame", cam.full_frame.as_str().into()),
                 ]),
             ),

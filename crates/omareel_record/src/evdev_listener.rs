@@ -30,9 +30,9 @@ use omareel_core::compat::qdir::{self, Filters, SortFlags};
 use omareel_core::compat::qlog;
 use omareel_core::keystroke_track::{is_typing_key_name, makes_shortcut};
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int, c_uint};
 use std::io::Read;
 use std::os::fd::AsRawFd;
+use std::os::raw::{c_char, c_int, c_uint};
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -49,7 +49,11 @@ unsafe extern "C" {
     fn libevdev_new_from_fd(fd: c_int, dev: *mut *mut Libevdev) -> c_int;
     fn libevdev_free(dev: *mut Libevdev);
     fn libevdev_has_event_code(dev: *const Libevdev, kind: c_uint, code: c_uint) -> c_int;
-    fn libevdev_next_event(dev: *mut Libevdev, flags: c_uint, event: *mut libc::input_event) -> c_int;
+    fn libevdev_next_event(
+        dev: *mut Libevdev,
+        flags: c_uint,
+        event: *mut libc::input_event,
+    ) -> c_int;
     fn libevdev_event_code_get_name(kind: c_uint, code: c_uint) -> *const c_char;
     fn libevdev_set_clock_id(dev: *mut Libevdev, clock: c_int) -> c_int;
 }
@@ -94,7 +98,11 @@ pub fn key_name(code: u16) -> String {
         return String::new();
     }
     // SAFETY: a NUL-terminated static string.
-    unsafe { CStr::from_ptr(name) }.to_bytes().iter().map(|&b| char::from(b)).collect()
+    unsafe { CStr::from_ptr(name) }
+        .to_bytes()
+        .iter()
+        .map(|&b| char::from(b))
+        .collect()
 }
 
 /// The file-static `buttonName`.
@@ -132,7 +140,10 @@ pub struct Keyboard {
 impl Keyboard {
     /// A keyboard with nothing held, read through `layout`, or by US key names without one.
     pub fn new(layout: Option<Layout>) -> Keyboard {
-        Keyboard { layout, ..Keyboard::default() }
+        Keyboard {
+            layout,
+            ..Keyboard::default()
+        }
     }
 
     /// Follows a layout switch from the main keyboard used for labels.
@@ -148,7 +159,11 @@ impl Keyboard {
     fn key(&mut self, code: u16, down: bool) -> Key {
         match &mut self.layout {
             Some(layout) => layout.key(code, down),
-            None => Key { label: String::new(), typing: is_typing_key_name(&key_name(code)), modifier: modifier_name(code) },
+            None => Key {
+                label: String::new(),
+                typing: is_typing_key_name(&key_name(code)),
+                modifier: modifier_name(code),
+            },
         }
     }
 }
@@ -171,7 +186,10 @@ pub fn device_event(
     monotonic_us: i64,
     keyboard: &mut Keyboard,
 ) -> Option<DeviceEvent> {
-    let mut output = DeviceEvent { monotonic_us, ..DeviceEvent::default() };
+    let mut output = DeviceEvent {
+        monotonic_us,
+        ..DeviceEvent::default()
+    };
     if kind == EV_REL && (code == REL_WHEEL || code == REL_HWHEEL) {
         output.kind = DeviceEventKind::Scroll;
         if code == REL_WHEEL {
@@ -186,7 +204,11 @@ pub fn device_event(
     }
     output.button = button_name(code).to_owned();
     if !output.button.is_empty() {
-        output.kind = if value != 0 { DeviceEventKind::ButtonDown } else { DeviceEventKind::ButtonUp };
+        output.kind = if value != 0 {
+            DeviceEventKind::ButtonDown
+        } else {
+            DeviceEventKind::ButtonUp
+        };
         return Some(output);
     }
     if !keyboard_device || code >= BTN_MISC {
@@ -216,7 +238,11 @@ pub fn device_event(
         let index = keyboard.kept.iter().position(|&kept| kept == code)?;
         keyboard.kept.remove(index);
     }
-    output.kind = if down { DeviceEventKind::KeyDown } else { DeviceEventKind::KeyUp };
+    output.kind = if down {
+        DeviceEventKind::KeyDown
+    } else {
+        DeviceEventKind::KeyUp
+    };
     output.key_code = i32::from(code);
     output.key_name = key_name(code);
     Some(output)
@@ -252,7 +278,9 @@ fn has_code(evdev: *const Libevdev, kind: u16, code: u16) -> bool {
 
 /// The file-static `isKeyboard`.
 fn is_keyboard(evdev: *const Libevdev) -> bool {
-    has_code(evdev, EV_KEY, KEY_A) || has_code(evdev, EV_KEY, KEY_ENTER) || has_code(evdev, EV_KEY, KEY_SPACE)
+    has_code(evdev, EV_KEY, KEY_A)
+        || has_code(evdev, EV_KEY, KEY_ENTER)
+        || has_code(evdev, EV_KEY, KEY_SPACE)
 }
 
 /// `EvdevListener`: the devices it reads and the events it kept.
@@ -274,10 +302,22 @@ impl EvdevListener {
     /// warning when there is none.
     pub fn start(&mut self) -> Result<(), String> {
         let input = "/dev/input";
-        for name in qdir::entry_list(input, &["event*"], Filters::SYSTEM | Filters::FILES, SortFlags::NO_SORT) {
-            let Ok(path) = CString::new(qdir::file_path(input, &name)) else { continue };
+        for name in qdir::entry_list(
+            input,
+            &["event*"],
+            Filters::SYSTEM | Filters::FILES,
+            SortFlags::NO_SORT,
+        ) {
+            let Ok(path) = CString::new(qdir::file_path(input, &name)) else {
+                continue;
+            };
             // SAFETY: a NUL-terminated path.
-            let fd = unsafe { libc::open(path.as_ptr(), libc::O_RDONLY | libc::O_NONBLOCK | libc::O_CLOEXEC) };
+            let fd = unsafe {
+                libc::open(
+                    path.as_ptr(),
+                    libc::O_RDONLY | libc::O_NONBLOCK | libc::O_CLOEXEC,
+                )
+            };
             if fd < 0 {
                 continue;
             }
@@ -289,8 +329,14 @@ impl EvdevListener {
                 continue;
             }
             // SAFETY: a device libevdev made.
-            let monotonic_clock = unsafe { libevdev_set_clock_id(evdev, libc::CLOCK_MONOTONIC) } == 0;
-            let device = Device { fd, evdev, keyboard: is_keyboard(evdev), monotonic_clock };
+            let monotonic_clock =
+                unsafe { libevdev_set_clock_id(evdev, libc::CLOCK_MONOTONIC) } == 0;
+            let device = Device {
+                fd,
+                evdev,
+                keyboard: is_keyboard(evdev),
+                monotonic_clock,
+            };
             let useful = device.keyboard
                 || has_code(evdev, EV_KEY, BTN_LEFT)
                 || has_code(evdev, EV_KEY, BTN_RIGHT)
@@ -304,7 +350,10 @@ impl EvdevListener {
             }
         }
         if self.devices.is_empty() {
-            return Err("No readable keyboard or pointer evdev devices; recording without clicks/keys".into());
+            return Err(
+                "No readable keyboard or pointer evdev devices; recording without clicks/keys"
+                    .into(),
+            );
         }
         self.running.store(true, Ordering::SeqCst);
         let devices = std::mem::take(&mut self.devices);
@@ -327,7 +376,10 @@ impl EvdevListener {
 
     /// `events()`: a copy of what was kept, in the order read.
     pub fn events(&self) -> Vec<DeviceEvent> {
-        self.events.lock().unwrap_or_else(PoisonError::into_inner).clone()
+        self.events
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 }
 
@@ -373,7 +425,11 @@ fn hyprland_events() -> Option<UnixStream> {
 
 /// Reads what the event socket has, follows each `activelayout` event in it and keeps a partial
 /// last line in `pending`; false when the socket has closed or failed.
-fn read_hyprland_events(socket: &mut UnixStream, pending: &mut Vec<u8>, keyboard: &mut Keyboard) -> bool {
+fn read_hyprland_events(
+    socket: &mut UnixStream,
+    pending: &mut Vec<u8>,
+    keyboard: &mut Keyboard,
+) -> bool {
     let mut buffer = [0u8; 4096];
     let open = loop {
         match socket.read(&mut buffer) {
@@ -386,7 +442,9 @@ fn read_hyprland_events(socket: &mut UnixStream, pending: &mut Vec<u8>, keyboard
     };
     while let Some(end) = pending.iter().position(|&b| b == b'\n') {
         let line: Vec<u8> = pending.drain(..=end).collect();
-        if let Some((name, layout)) = keymap::active_layout_event(&String::from_utf8_lossy(&line[..end])) {
+        if let Some((name, layout)) =
+            keymap::active_layout_event(&String::from_utf8_lossy(&line[..end]))
+        {
             keyboard.follow_layout(name, layout);
         }
     }
@@ -409,7 +467,16 @@ fn handle_in_time_order(queued: &mut [Queued], keyboard: &mut Keyboard) -> Vec<D
     queued.sort_by_key(|event| event.time);
     queued
         .iter()
-        .filter_map(|event| device_event(event.keyboard_device, event.kind, event.code, event.value, event.time, keyboard))
+        .filter_map(|event| {
+            device_event(
+                event.keyboard_device,
+                event.kind,
+                event.code,
+                event.value,
+                event.time,
+                keyboard,
+            )
+        })
         .collect()
 }
 
@@ -435,7 +502,13 @@ fn drain(device: &Device, queued: &mut Vec<Queued>) {
             break;
         }
         let time = event_time(device, &event);
-        queued.push(Queued { time, keyboard_device: device.keyboard, kind: event.type_, code: event.code, value: event.value });
+        queued.push(Queued {
+            time,
+            keyboard_device: device.keyboard,
+            kind: event.type_,
+            code: event.code,
+            value: event.value,
+        });
     }
 }
 
@@ -458,24 +531,54 @@ const EXTRA_POLLS: usize = 4;
 /// for stragglers, and handles what it read in time order ([`handle_in_time_order`]); layout
 /// switches from the socket are followed as they come. Gives the devices back when stopped.
 /// Events queued while the layouts are read wait in the devices.
-fn run(devices: Vec<Device>, running: &AtomicBool, events: &Mutex<Vec<DeviceEvent>>) -> Vec<Device> {
-    let mut descriptors: Vec<libc::pollfd> =
-        devices.iter().map(|device| libc::pollfd { fd: device.fd, events: libc::POLLIN, revents: 0 }).collect();
-    let mut keyboard = Keyboard::new(if devices.iter().any(|device| device.keyboard) { hyprland_layout() } else { None });
-    let mut socket = if keyboard.layout.is_some() { hyprland_events() } else { None };
+fn run(
+    devices: Vec<Device>,
+    running: &AtomicBool,
+    events: &Mutex<Vec<DeviceEvent>>,
+) -> Vec<Device> {
+    let mut descriptors: Vec<libc::pollfd> = devices
+        .iter()
+        .map(|device| libc::pollfd {
+            fd: device.fd,
+            events: libc::POLLIN,
+            revents: 0,
+        })
+        .collect();
+    let mut keyboard = Keyboard::new(if devices.iter().any(|device| device.keyboard) {
+        hyprland_layout()
+    } else {
+        None
+    });
+    let mut socket = if keyboard.layout.is_some() {
+        hyprland_events()
+    } else {
+        None
+    };
     if let Some(socket) = &socket {
-        descriptors.push(libc::pollfd { fd: socket.as_raw_fd(), events: libc::POLLIN, revents: 0 });
+        descriptors.push(libc::pollfd {
+            fd: socket.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        });
     }
     let mut pending = Vec::new();
     let mut queued = Vec::new();
     while running.load(Ordering::SeqCst) {
         // SAFETY: the pollfds of open devices and the socket (or -1, which poll skips).
-        let ready = unsafe { libc::poll(descriptors.as_mut_ptr(), descriptors.len() as libc::nfds_t, 100) };
+        let ready = unsafe {
+            libc::poll(
+                descriptors.as_mut_ptr(),
+                descriptors.len() as libc::nfds_t,
+                100,
+            )
+        };
         if ready <= 0 {
             continue;
         }
-        if let (Some(stream), Some(descriptor)) = (&mut socket, descriptors.get_mut(devices.len())) {
-            if descriptor.revents != 0 && !read_hyprland_events(stream, &mut pending, &mut keyboard) {
+        if let (Some(stream), Some(descriptor)) = (&mut socket, descriptors.get_mut(devices.len()))
+        {
+            if descriptor.revents != 0 && !read_hyprland_events(stream, &mut pending, &mut keyboard)
+            {
                 descriptor.fd = -1;
                 socket = None;
             }
@@ -492,14 +595,19 @@ fn run(devices: Vec<Device>, running: &AtomicBool, events: &Mutex<Vec<DeviceEven
                 break;
             }
             // SAFETY: the pollfds of the open devices only.
-            if unsafe { libc::poll(descriptors.as_mut_ptr(), devices.len() as libc::nfds_t, 0) } <= 0 {
+            if unsafe { libc::poll(descriptors.as_mut_ptr(), devices.len() as libc::nfds_t, 0) }
+                <= 0
+            {
                 break;
             }
         }
         let kept = handle_in_time_order(&mut queued, &mut keyboard);
         queued.clear();
         if !kept.is_empty() {
-            events.lock().unwrap_or_else(PoisonError::into_inner).extend(kept);
+            events
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .extend(kept);
         }
     }
     devices
@@ -523,8 +631,15 @@ mod tests {
     const KEY_UP: u16 = 103;
 
     fn layout(layout: &str, options: &str) -> Option<Layout> {
-        let names = KeyboardNames { layout: layout.into(), options: options.into(), ..KeyboardNames::default() };
-        Some(Layout::new(&names).expect("libxkbcommon compiles the keymap (xkeyboard-config is installed)"))
+        let names = KeyboardNames {
+            layout: layout.into(),
+            options: options.into(),
+            ..KeyboardNames::default()
+        };
+        Some(
+            Layout::new(&names)
+                .expect("libxkbcommon compiles the keymap (xkeyboard-config is installed)"),
+        )
     }
 
     /// A keyboard pressed and released key by key through [`device_event`].
@@ -554,7 +669,11 @@ mod tests {
         /// Whether a tap of `code` with `held` down is kept, press and release alike.
         fn kept(&mut self, held: &[u16], code: u16) -> bool {
             let (down, up) = self.chord(held, code);
-            assert_eq!(down.is_some(), up.is_some(), "a release is kept with its press ({held:?} {code})");
+            assert_eq!(
+                down.is_some(),
+                up.is_some(),
+                "a release is kept with its press ({held:?} {code})"
+            );
             down.is_some()
         }
 
@@ -577,32 +696,68 @@ mod tests {
     #[test]
     fn events_follow_the_listener() {
         let mut keyboard = Keyboard::new(None);
-        let mut event = |keyboard_device, kind, code, value| device_event(keyboard_device, kind, code, value, 7, &mut keyboard);
+        let mut event = |keyboard_device, kind, code, value| {
+            device_event(keyboard_device, kind, code, value, 7, &mut keyboard)
+        };
         let scroll = event(false, EV_REL, REL_WHEEL, 1).unwrap();
-        assert_eq!((scroll.kind, scroll.dx, scroll.dy, scroll.monotonic_us), (DeviceEventKind::Scroll, 0, -1, 7));
+        assert_eq!(
+            (scroll.kind, scroll.dx, scroll.dy, scroll.monotonic_us),
+            (DeviceEventKind::Scroll, 0, -1, 7)
+        );
         let horizontal = event(false, EV_REL, REL_HWHEEL, -2).unwrap();
         assert_eq!((horizontal.dx, horizontal.dy), (-2, 0));
         assert!(event(false, EV_REL, REL_WHEEL_HI_RES, 120).is_none());
         let click = event(false, EV_KEY, BTN_LEFT, 1).unwrap();
-        assert_eq!((click.kind, click.button.as_str()), (DeviceEventKind::ButtonDown, "left"));
-        assert_eq!(event(true, EV_KEY, BTN_MIDDLE, 0).unwrap().kind, DeviceEventKind::ButtonUp);
-        assert!(event(false, EV_KEY, KEY_ENTER, 1).is_none(), "keys only from keyboards");
+        assert_eq!(
+            (click.kind, click.button.as_str()),
+            (DeviceEventKind::ButtonDown, "left")
+        );
+        assert_eq!(
+            event(true, EV_KEY, BTN_MIDDLE, 0).unwrap().kind,
+            DeviceEventKind::ButtonUp
+        );
+        assert!(
+            event(false, EV_KEY, KEY_ENTER, 1).is_none(),
+            "keys only from keyboards"
+        );
         assert!(event(true, EV_KEY, KEY_ENTER, 2).is_none(), "no repeats");
-        assert!(event(true, EV_KEY, 0x113, 1).is_none(), "side buttons are not keys");
+        assert!(
+            event(true, EV_KEY, 0x113, 1).is_none(),
+            "side buttons are not keys"
+        );
         let ctrl = event(true, EV_KEY, KEY_LEFTCTRL, 1).unwrap();
-        assert_eq!((ctrl.kind, ctrl.key_code, ctrl.key_name.as_str()), (DeviceEventKind::KeyDown, 29, "KEY_LEFTCTRL"));
-        assert_eq!((ctrl.modifiers.as_slice(), ctrl.key_label.as_str()), (["ctrl".to_owned()].as_slice(), ""));
+        assert_eq!(
+            (ctrl.kind, ctrl.key_code, ctrl.key_name.as_str()),
+            (DeviceEventKind::KeyDown, 29, "KEY_LEFTCTRL")
+        );
+        assert_eq!(
+            (ctrl.modifiers.as_slice(), ctrl.key_label.as_str()),
+            (["ctrl".to_owned()].as_slice(), "")
+        );
         event(true, EV_KEY, KEY_RIGHTCTRL, 1);
         event(true, EV_KEY, KEY_LEFTSHIFT, 1);
         let a = event(true, EV_KEY, KEY_A, 1).unwrap();
-        assert_eq!((a.key_name.as_str(), a.modifiers.as_slice()), ("KEY_A", ["ctrl".to_owned(), "shift".to_owned()].as_slice()));
+        assert_eq!(
+            (a.key_name.as_str(), a.modifiers.as_slice()),
+            ("KEY_A", ["ctrl".to_owned(), "shift".to_owned()].as_slice())
+        );
         // Either ctrl going up lets go of ctrl.
         let up = event(true, EV_KEY, KEY_RIGHTCTRL, 0).unwrap();
         assert_eq!((up.kind, up.modifiers.len()), (DeviceEventKind::KeyUp, 0));
-        assert_eq!(event(true, EV_KEY, KEY_A, 0).unwrap().kind, DeviceEventKind::KeyUp, "a kept press's release");
+        assert_eq!(
+            event(true, EV_KEY, KEY_A, 0).unwrap().kind,
+            DeviceEventKind::KeyUp,
+            "a kept press's release"
+        );
         assert!(event(true, EV_KEY, KEY_A, 1).is_none(), "Shift+A is typing");
-        assert!(event(true, EV_KEY, KEY_A, 0).is_none(), "and so is its release");
-        assert_eq!(event(true, EV_KEY, KEY_TAB, 1).unwrap().modifiers, ["shift"]);
+        assert!(
+            event(true, EV_KEY, KEY_A, 0).is_none(),
+            "and so is its release"
+        );
+        assert_eq!(
+            event(true, EV_KEY, KEY_TAB, 1).unwrap().modifiers,
+            ["shift"]
+        );
         assert!(event(true, 0x03, 0, 5).is_none());
     }
 
@@ -614,7 +769,10 @@ mod tests {
             assert!(typist.kept(&[KEY_LEFTCTRL], code), "Ctrl+{code}");
             assert!(typist.kept(&[KEY_LEFTALT], code), "Alt+{code}");
             assert!(typist.kept(&[KEY_LEFTMETA], code), "Super+{code}");
-            assert!(typist.kept(&[KEY_LEFTSHIFT, KEY_RIGHTCTRL], code), "Ctrl+Shift+{code}");
+            assert!(
+                typist.kept(&[KEY_LEFTSHIFT, KEY_RIGHTCTRL], code),
+                "Ctrl+Shift+{code}"
+            );
         }
         for code in [KEY_ENTER, KEY_TAB, KEY_F5, KEY_UP] {
             assert!(typist.kept(&[], code), "{code} alone");
@@ -635,7 +793,10 @@ mod tests {
         keeps_shortcuts_only(&mut typist);
         // Right Alt may be AltGr: it makes no shortcut.
         assert!(!typist.kept(&[KEY_RIGHTALT], KEY_Q));
-        assert_eq!(typist.shown(&[KEY_LEFTCTRL], KEY_Q), (String::new(), vec!["ctrl".to_owned()]));
+        assert_eq!(
+            typist.shown(&[KEY_LEFTCTRL], KEY_Q),
+            (String::new(), vec!["ctrl".to_owned()])
+        );
     }
 
     #[test]
@@ -644,9 +805,15 @@ mod tests {
         keeps_shortcuts_only(&mut typist);
         // Right Alt is Alt on a US layout.
         assert!(typist.kept(&[KEY_RIGHTALT], KEY_Q));
-        assert_eq!(typist.shown(&[KEY_LEFTCTRL, KEY_LEFTSHIFT], KEY_A), ("A".to_owned(), vec!["ctrl".to_owned(), "shift".to_owned()]));
+        assert_eq!(
+            typist.shown(&[KEY_LEFTCTRL, KEY_LEFTSHIFT], KEY_A),
+            ("A".to_owned(), vec!["ctrl".to_owned(), "shift".to_owned()])
+        );
         assert_eq!(typist.shown(&[KEY_LEFTSHIFT], KEY_TAB).0, "Tab");
-        assert_eq!(typist.shown(&[], KEY_LEFTMETA), ("Super".to_owned(), vec!["meta".to_owned()]));
+        assert_eq!(
+            typist.shown(&[], KEY_LEFTMETA),
+            ("Super".to_owned(), vec!["meta".to_owned()])
+        );
         assert_eq!(typist.shown(&[KEY_LEFTMETA], KEY_SPACE).0, "Space");
     }
 
@@ -658,7 +825,10 @@ mod tests {
         assert!(!typist.kept(&[KEY_RIGHTALT], KEY_0));
         assert!(!typist.kept(&[KEY_RIGHTALT], 18));
         assert!(!typist.kept(&[], KEY_RIGHTALT));
-        assert_eq!(typist.shown(&[KEY_LEFTCTRL], KEY_RIGHTALT), ("AltGr".to_owned(), vec!["ctrl".to_owned()]));
+        assert_eq!(
+            typist.shown(&[KEY_LEFTCTRL], KEY_RIGHTALT),
+            ("AltGr".to_owned(), vec!["ctrl".to_owned()])
+        );
         // Keys are named by what AZERTY prints on them.
         assert_eq!(typist.shown(&[KEY_LEFTCTRL, KEY_LEFTSHIFT], KEY_Q).0, "A");
         assert_eq!(typist.shown(&[KEY_LEFTCTRL], KEY_A).0, "Q");
@@ -667,24 +837,60 @@ mod tests {
 
     #[test]
     fn events_read_together_are_handled_in_time_order() {
-        let key = |time, code, value| Queued { time, keyboard_device: true, kind: EV_KEY, code, value };
+        let key = |time, code, value| Queued {
+            time,
+            keyboard_device: true,
+            kind: EV_KEY,
+            code,
+            value,
+        };
         // Read device by device: keyboard B (Ctrl down at 10, up at 20) after keyboard A's
         // letter at 30. In device order the letter would see Ctrl still held.
-        let mut queued = vec![key(30, KEY_A, 1), key(31, KEY_A, 0), key(10, KEY_LEFTCTRL, 1), key(20, KEY_LEFTCTRL, 0)];
+        let mut queued = vec![
+            key(30, KEY_A, 1),
+            key(31, KEY_A, 0),
+            key(10, KEY_LEFTCTRL, 1),
+            key(20, KEY_LEFTCTRL, 0),
+        ];
         let kept = handle_in_time_order(&mut queued, &mut Keyboard::new(layout("us", "")));
-        let codes: Vec<(i32, DeviceEventKind, i64)> = kept.iter().map(|event| (event.key_code, event.kind, event.monotonic_us)).collect();
-        assert_eq!(codes, [(29, DeviceEventKind::KeyDown, 10), (29, DeviceEventKind::KeyUp, 20)]);
+        let codes: Vec<(i32, DeviceEventKind, i64)> = kept
+            .iter()
+            .map(|event| (event.key_code, event.kind, event.monotonic_us))
+            .collect();
+        assert_eq!(
+            codes,
+            [
+                (29, DeviceEventKind::KeyDown, 10),
+                (29, DeviceEventKind::KeyUp, 20)
+            ]
+        );
         // With Ctrl really held across the letter, it is a shortcut.
-        let mut queued = vec![key(30, KEY_A, 1), key(31, KEY_A, 0), key(10, KEY_LEFTCTRL, 1), key(40, KEY_LEFTCTRL, 0)];
+        let mut queued = vec![
+            key(30, KEY_A, 1),
+            key(31, KEY_A, 0),
+            key(10, KEY_LEFTCTRL, 1),
+            key(40, KEY_LEFTCTRL, 0),
+        ];
         let kept = handle_in_time_order(&mut queued, &mut Keyboard::new(None));
-        assert_eq!(kept.iter().map(|event| event.monotonic_us).collect::<Vec<_>>(), [10, 30, 31, 40]);
+        assert_eq!(
+            kept.iter()
+                .map(|event| event.monotonic_us)
+                .collect::<Vec<_>>(),
+            [10, 30, 31, 40]
+        );
     }
 
     #[test]
     fn a_second_keyboard_with_another_layout_types_no_shortcuts() {
         let keyboards = keymap::Keyboards {
-            main: KeyboardNames { layout: "us".into(), ..KeyboardNames::default() },
-            others: vec![KeyboardNames { layout: "fr".into(), ..KeyboardNames::default() }],
+            main: KeyboardNames {
+                layout: "us".into(),
+                ..KeyboardNames::default()
+            },
+            others: vec![KeyboardNames {
+                layout: "fr".into(),
+                ..KeyboardNames::default()
+            }],
         };
         let mut typist = Typist::new(Layout::for_keyboards(&keyboards));
         keeps_shortcuts_only(&mut typist);
@@ -698,7 +904,10 @@ mod tests {
     fn modifiers_follow_the_layout_options() {
         let mut typist = Typist::new(layout("us", "ctrl:nocaps"));
         assert!(typist.kept(&[KEY_CAPSLOCK], KEY_C), "Caps Lock is Ctrl");
-        assert_eq!(typist.shown(&[KEY_CAPSLOCK], KEY_C), ("C".to_owned(), vec!["ctrl".to_owned()]));
+        assert_eq!(
+            typist.shown(&[KEY_CAPSLOCK], KEY_C),
+            ("C".to_owned(), vec!["ctrl".to_owned()])
+        );
         let mut compose = Typist::new(layout("us", "compose:caps"));
         assert!(!compose.kept(&[], KEY_CAPSLOCK), "Compose starts typing");
     }
@@ -706,31 +915,62 @@ mod tests {
     #[test]
     fn layout_events_only_change_the_main_keyboards_labels() {
         use std::io::Write;
-        let names = keymap::keyboards_from_devices(br#"{"keyboards":[
+        let names = keymap::keyboards_from_devices(
+            br#"{"keyboards":[
             {"name":"main-kbd","layout":"us,fr","main":true},
             {"name":"second-kbd","layout":"us,fr"}
-        ]}"#).unwrap();
-        let mut typist = Typist::new(Some(Layout::for_keyboards(&names).expect("keymaps compile")));
+        ]}"#,
+        )
+        .unwrap();
+        let mut typist = Typist::new(Some(
+            Layout::for_keyboards(&names).expect("keymaps compile"),
+        ));
         let (mut reader, mut sender) = UnixStream::pair().unwrap();
         reader.set_nonblocking(true).unwrap();
         let mut pending = Vec::new();
-        sender.write_all(b"activelayout>>second-kbd,French\n").unwrap();
-        assert!(read_hyprland_events(&mut reader, &mut pending, &mut typist.0));
+        sender
+            .write_all(b"activelayout>>second-kbd,French\n")
+            .unwrap();
+        assert!(read_hyprland_events(
+            &mut reader,
+            &mut pending,
+            &mut typist.0
+        ));
         assert_eq!(typist.shown(&[KEY_LEFTCTRL], KEY_Q).0, "Q");
 
         // A main-keyboard event can span socket reads and must still switch it.
         sender.write_all(b"activelayout>>main-kbd,Fre").unwrap();
-        assert!(read_hyprland_events(&mut reader, &mut pending, &mut typist.0));
+        assert!(read_hyprland_events(
+            &mut reader,
+            &mut pending,
+            &mut typist.0
+        ));
         assert_eq!(typist.shown(&[KEY_LEFTCTRL], KEY_Q).0, "Q");
         sender.write_all(b"nch\n").unwrap();
-        assert!(read_hyprland_events(&mut reader, &mut pending, &mut typist.0));
+        assert!(read_hyprland_events(
+            &mut reader,
+            &mut pending,
+            &mut typist.0
+        ));
         assert_eq!(typist.shown(&[KEY_LEFTCTRL], KEY_Q).0, "A");
 
-        sender.write_all(b"activelayout>>second-kbd,English (US)\n").unwrap();
-        assert!(read_hyprland_events(&mut reader, &mut pending, &mut typist.0));
+        sender
+            .write_all(b"activelayout>>second-kbd,English (US)\n")
+            .unwrap();
+        assert!(read_hyprland_events(
+            &mut reader,
+            &mut pending,
+            &mut typist.0
+        ));
         assert_eq!(typist.shown(&[KEY_LEFTCTRL], KEY_Q).0, "A");
-        sender.write_all(b"activelayout>>main-kbd,English (US)\n").unwrap();
-        assert!(read_hyprland_events(&mut reader, &mut pending, &mut typist.0));
+        sender
+            .write_all(b"activelayout>>main-kbd,English (US)\n")
+            .unwrap();
+        assert!(read_hyprland_events(
+            &mut reader,
+            &mut pending,
+            &mut typist.0
+        ));
         assert_eq!(typist.shown(&[KEY_LEFTCTRL], KEY_Q).0, "Q");
     }
 }

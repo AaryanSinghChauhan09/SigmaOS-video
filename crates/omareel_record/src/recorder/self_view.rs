@@ -42,7 +42,11 @@ pub fn monitor_layouts_from(json: &[u8]) -> Vec<MonitorLayout> {
         }
         let scale = cpp::max(0.01, monitor.value("scale").to_double(1.0));
         let reserved = monitor.value("reserved").to_array();
-        let reserved_at = |index: usize| reserved.get(index).map_or(0.0, |value| value.to_double(0.0));
+        let reserved_at = |index: usize| {
+            reserved
+                .get(index)
+                .map_or(0.0, |value| value.to_double(0.0))
+        };
         result.push(MonitorLayout {
             name: monitor.value("name").to_string_or(""),
             geometry: RectF::new(
@@ -133,13 +137,18 @@ pub fn self_view_placement_on(
     if !placement.visible {
         return placement;
     }
-    let Some(target) = monitors.iter().find(|monitor| monitor.name == capture.monitor_name) else {
+    let Some(target) = monitors
+        .iter()
+        .find(|monitor| monitor.name == capture.monitor_name)
+    else {
         return placement;
     };
     placement.safe = true;
     placement.monitor = target.name.clone();
     // Signed overflow is undefined in the C++; it wraps as the x86_64 build does.
-    let range = |extent: f64, pixels: i32| cpp::max(0, q_round(extent).wrapping_sub(pixels).wrapping_sub(32));
+    let range = |extent: f64, pixels: i32| {
+        cpp::max(0, q_round(extent).wrapping_sub(pixels).wrapping_sub(32))
+    };
     let x_range = range(target.geometry.width, placement.pixels);
     let y_range = range(target.geometry.height, placement.pixels);
     placement.position = Point {

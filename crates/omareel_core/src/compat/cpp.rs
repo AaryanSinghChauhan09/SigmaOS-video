@@ -35,7 +35,8 @@ pub fn int_cast(x: f64) -> i32 {
 
 /// `qint64(x)` for a double, as [`int_cast`] is `int(x)`.
 pub fn int64_cast(x: f64) -> i64 {
-    if cfg!(target_arch = "x86_64") && !(-9223372036854775808.0..9223372036854775808.0).contains(&x) {
+    if cfg!(target_arch = "x86_64") && !(-9223372036854775808.0..9223372036854775808.0).contains(&x)
+    {
         i64::MIN
     } else {
         x as i64
@@ -64,8 +65,15 @@ mod tests {
 
     #[test]
     fn integer_casts_truncate() {
-        assert_eq!((int_cast(2.9), int_cast(-2.9), int64_cast(1e15 + 0.5)), (2, -2, 1_000_000_000_000_000));
-        let out_of_range = if cfg!(target_arch = "x86_64") { i32::MIN } else { i32::MAX };
+        assert_eq!(
+            (int_cast(2.9), int_cast(-2.9), int64_cast(1e15 + 0.5)),
+            (2, -2, 1_000_000_000_000_000)
+        );
+        let out_of_range = if cfg!(target_arch = "x86_64") {
+            i32::MIN
+        } else {
+            i32::MAX
+        };
         assert_eq!(int_cast(1e10), out_of_range);
     }
 }

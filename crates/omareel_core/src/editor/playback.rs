@@ -6,7 +6,7 @@ use super::Document;
 use crate::camera_timeline::map_camera_time;
 use crate::compat::cpp;
 use crate::compat::qround::q_round64;
-use crate::layout_timeline::{sample_layout, LayoutSample, DEFAULT_TRANSITION};
+use crate::layout_timeline::{DEFAULT_TRANSITION, LayoutSample, sample_layout};
 
 /// `PlaybackDriver::Player`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -105,7 +105,11 @@ fn max3(a: f64, b: f64, c: f64) -> f64 {
 impl Document {
     /// `playerFor(clipIndex)` (Editor.cpp 673-676).
     pub fn player_for(&self, clip_index: i32) -> Player {
-        if self.clip_is_media(clip_index) { Player::Media } else { Player::Screen }
+        if self.clip_is_media(clip_index) {
+            Player::Media
+        } else {
+            Player::Screen
+        }
     }
 
     /// `m_playback.setPlayingQuery` (Editor.cpp 300-303): whether a player should be running.
@@ -123,26 +127,42 @@ impl Document {
 
     /// `layoutAt(outputTime)`.
     pub fn layout_at(&self, output_time: f64) -> LayoutSample {
-        sample_layout(&self.project.clips, output_time, self.has_camera(), self.project.camera.enabled, DEFAULT_TRANSITION)
+        sample_layout(
+            &self.project.clips,
+            output_time,
+            self.has_camera(),
+            self.project.camera.enabled,
+            DEFAULT_TRANSITION,
+        )
     }
 
     /// The screen player's sound in `changed()`: the volume (0 to 1), muted when neither the
     /// desktop nor the microphone is kept.
     pub fn screen_audio(&self) -> (f64, bool) {
-        (cpp::clamp(self.project.audio.volume, 0.0, 1.0), !self.project.audio.desktop && !self.project.audio.mic)
+        (
+            cpp::clamp(self.project.audio.volume, 0.0, 1.0),
+            !self.project.audio.desktop && !self.project.audio.mic,
+        )
     }
 
     /// `updateInsertAudio()` (Editor.cpp 745-750): the media player's volume, muted while it
     /// decodes ahead of its clip or warms up on a paused frame.
     pub fn insert_audio(&self, active_clip: i32, media_warming: bool) -> (f64, bool) {
-        (cpp::clamp(self.project.audio.volume, 0.0, 1.0), media_warming || !self.clip_is_media(active_clip))
+        (
+            cpp::clamp(self.project.audio.volume, 0.0, 1.0),
+            media_warming || !self.clip_is_media(active_clip),
+        )
     }
 
     /// `seekMedia(outputTime)`'s target; `None` without clips (the C++ never called it then).
     pub fn media_seek(&self, output_time: f64) -> Option<MediaSeek> {
         let (index, clip_start) = self.clip_for_output(output_time);
         let clip = self.clip(index)?;
-        let source = cpp::clamp(clip.in_ + (output_time - clip_start) * clip.speed, clip.in_, clip.out);
+        let source = cpp::clamp(
+            clip.in_ + (output_time - clip_start) * clip.speed,
+            clip.in_,
+            clip.out,
+        );
         Some(MediaSeek {
             clip_index: index,
             media: clip.is_media().then(|| clip.media.clone()),
@@ -167,7 +187,12 @@ impl Document {
         } else {
             return None;
         };
-        Some(NextClip { index: next, kind, speed: clip.speed, target_ms })
+        Some(NextClip {
+            index: next,
+            kind,
+            speed: clip.speed,
+            target_ms,
+        })
     }
 
     /// `advanceClip()` while playing (Editor.cpp 733-743): `Some(t)` to seek to the next clip's
@@ -208,7 +233,11 @@ impl Document {
     pub fn camera_sync(&self, screen_source_time: f64) -> Option<CameraSync> {
         let camera = self.recording.camera?;
         let mapped = map_camera_time(screen_source_time, camera.offset, camera.duration);
-        let tolerance_ms = if self.layout_at(self.output_position).camera_full > 0.0 { 80 } else { 250 };
+        let tolerance_ms = if self.layout_at(self.output_position).camera_full > 0.0 {
+            80
+        } else {
+            250
+        };
         Some(CameraSync {
             target_ms: q_round64(mapped.seconds * 1000.0),
             tolerance_ms,
@@ -242,15 +271,25 @@ impl Document {
         let clip_end = timeline.output_time(active, clip.out);
         let limit = cpp::min(
             clip_end,
-            if self.has_playback_range() { self.playback_range_end - 0.001 } else { self.duration() },
+            if self.has_playback_range() {
+                self.playback_range_end - 0.001
+            } else {
+                self.duration()
+            },
         );
         let mut max_lead = cpp::max(0.05, 2.0 / cpp::max(1.0, self.recording.fps));
         if !clip.is_media() {
-            let anchor = clip.in_ + (transport.playhead_clock_position - timeline.output_time(active, clip.in_)) * clip.speed;
+            let anchor = clip.in_
+                + (transport.playhead_clock_position - timeline.output_time(active, clip.in_))
+                    * clip.speed;
             max_lead += cpp::max(0.0, self.next_screen_frame_time(anchor) - anchor) / clip.speed;
         }
         let elapsed = cpp::min(elapsed_ms as f64 / 1000.0, max_lead);
-        let target = max3(transport.playhead_position, self.output_position, transport.playhead_clock_position + elapsed);
+        let target = max3(
+            transport.playhead_position,
+            self.output_position,
+            transport.playhead_clock_position + elapsed,
+        );
         Some(cpp::min(target, limit))
     }
 
@@ -258,8 +297,19 @@ impl Document {
     /// new origin (`m_playheadClockPosition`, then restart the clock) when a frame the active
     /// clip's player shows while playing lies near the clip and the transport position; a seek
     /// can deliver queued frames from the previous location.
-    pub fn frame_anchor(&self, player: Player, transport: &Transport, start_time_us: i64, live: bool) -> Option<f64> {
-        if !transport.playing || !live || transport.scrubbing || transport.internal_seek || start_time_us < 0 {
+    pub fn frame_anchor(
+        &self,
+        player: Player,
+        transport: &Transport,
+        start_time_us: i64,
+        live: bool,
+    ) -> Option<f64> {
+        if !transport.playing
+            || !live
+            || transport.scrubbing
+            || transport.internal_seek
+            || start_time_us < 0
+        {
             return None;
         }
         let active = transport.active_clip;
@@ -271,7 +321,11 @@ impl Document {
         let source = start_time_us as f64 / 1_000_000.0;
         let output = self.source_to_output(source, active);
         let position = self.output_position;
-        if source >= clip.in_ - 0.01 && source < clip.out && output >= position - 0.1 && output <= position + 0.5 {
+        if source >= clip.in_ - 0.01
+            && source < clip.out
+            && output >= position - 0.1
+            && output <= position + 0.5
+        {
             Some(cpp::max(transport.playhead_position, output))
         } else {
             None
@@ -282,7 +336,11 @@ impl Document {
     /// scrubs, or without clips. Through a still stretch of the recording the player holds its
     /// last frame's time while the playhead runs on; the camera, the clip's end and the position
     /// follow the playhead.
-    pub fn player_position(&self, transport: &Transport, milliseconds: i64) -> Option<PlayerPosition> {
+    pub fn player_position(
+        &self,
+        transport: &Transport,
+        milliseconds: i64,
+    ) -> Option<PlayerPosition> {
         let clips = &self.project.clips;
         if transport.internal_seek || transport.scrubbing || clips.is_empty() {
             return None;
@@ -291,15 +349,24 @@ impl Document {
         let clip = &clips[active.clamp(0, clips.len() as i32 - 1) as usize];
         let mut source = milliseconds as f64 / 1000.0;
         if transport.playing && !clip.is_media() {
-            let playhead_source =
-                clip.in_ + (transport.playhead_position - self.timeline().output_time(active, clip.in_)) * clip.speed;
+            let playhead_source = clip.in_
+                + (transport.playhead_position - self.timeline().output_time(active, clip.in_))
+                    * clip.speed;
             if playhead_source >= clip.in_ - 0.001 && playhead_source <= clip.out + 0.001 {
                 source = cpp::max(source, cpp::min(playhead_source, clip.out));
             }
         }
         let mapped = self.source_to_output(source, active);
-        let mut step = PlayerPosition { stop_at_range_end: None, sync_camera: None, advance: false, position: None };
-        if self.has_playback_range() && transport.playing && mapped >= self.playback_range_end - 0.001 {
+        let mut step = PlayerPosition {
+            stop_at_range_end: None,
+            sync_camera: None,
+            advance: false,
+            position: None,
+        };
+        if self.has_playback_range()
+            && transport.playing
+            && mapped >= self.playback_range_end - 0.001
+        {
             step.stop_at_range_end = Some(self.playback_range_end);
             return Some(step);
         }

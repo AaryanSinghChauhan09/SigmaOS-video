@@ -14,7 +14,10 @@ pub struct LayoutSample {
 
 impl Default for LayoutSample {
     fn default() -> LayoutSample {
-        LayoutSample { camera_full: 0.0, bubble: 1.0 }
+        LayoutSample {
+            camera_full: 0.0,
+            bubble: 1.0,
+        }
     }
 }
 
@@ -23,15 +26,27 @@ pub const DEFAULT_TRANSITION: f64 = 0.5;
 
 fn target(clip: &Clip, camera_available: bool, bubble_enabled: bool) -> LayoutSample {
     if !camera_available || clip.is_media() {
-        return LayoutSample { camera_full: 0.0, bubble: 0.0 };
+        return LayoutSample {
+            camera_full: 0.0,
+            bubble: 0.0,
+        };
     }
     if clip.layout == "camera" {
-        return LayoutSample { camera_full: 1.0, bubble: 0.0 };
+        return LayoutSample {
+            camera_full: 1.0,
+            bubble: 0.0,
+        };
     }
     if clip.layout == "screen" {
-        return LayoutSample { camera_full: 0.0, bubble: 0.0 };
+        return LayoutSample {
+            camera_full: 0.0,
+            bubble: 0.0,
+        };
     }
-    LayoutSample { camera_full: 0.0, bubble: if bubble_enabled { 1.0 } else { 0.0 } }
+    LayoutSample {
+        camera_full: 0.0,
+        bubble: if bubble_enabled { 1.0 } else { 0.0 },
+    }
 }
 
 /// Layouts change at clip boundaries. The new clip eases from the previous clip's layout to its
@@ -45,7 +60,9 @@ pub fn sample_layout(
     bubble_enabled: bool,
     transition: f64,
 ) -> LayoutSample {
-    let Some(first) = clips.first() else { return target(&Clip::default(), camera_available, bubble_enabled) };
+    let Some(first) = clips.first() else {
+        return target(&Clip::default(), camera_available, bubble_enabled);
+    };
     let mut start = 0.0;
     let mut previous = target(first, camera_available, bubble_enabled);
     for (i, clip) in clips.iter().enumerate() {
@@ -59,7 +76,8 @@ pub fn sample_layout(
             }
             let progress = ease_in_out_cubic((output_time - start) / span);
             return LayoutSample {
-                camera_full: previous.camera_full + (next.camera_full - previous.camera_full) * progress,
+                camera_full: previous.camera_full
+                    + (next.camera_full - previous.camera_full) * progress,
                 bubble: previous.bubble + (next.bubble - previous.bubble) * progress,
             };
         }
@@ -92,11 +110,29 @@ mod tests {
     }
 
     fn clip_at_speed(id: &str, in_: f64, out: f64, layout: &str, speed: f64) -> Clip {
-        Clip { id: id.into(), in_, out, speed, layout: layout.into(), ..Clip::default() }
+        Clip {
+            id: id.into(),
+            in_,
+            out,
+            speed,
+            layout: layout.into(),
+            ..Clip::default()
+        }
     }
 
-    fn sample(clips: &[Clip], output_time: f64, camera_available: bool, bubble_enabled: bool) -> LayoutSample {
-        sample_layout(clips, output_time, camera_available, bubble_enabled, DEFAULT_TRANSITION)
+    fn sample(
+        clips: &[Clip],
+        output_time: f64,
+        camera_available: bool,
+        bubble_enabled: bool,
+    ) -> LayoutSample {
+        sample_layout(
+            clips,
+            output_time,
+            camera_available,
+            bubble_enabled,
+            DEFAULT_TRANSITION,
+        )
     }
 
     // tests/test_layouttimeline.cpp
@@ -122,13 +158,19 @@ mod tests {
 
     #[test]
     fn first_clip_starts_on_its_layout() {
-        let clips = [clip("intro", 0.0, 2.0, "camera"), clip("main", 2.0, 6.0, "default")];
+        let clips = [
+            clip("intro", 0.0, 2.0, "camera"),
+            clip("main", 2.0, 6.0, "default"),
+        ];
         assert!(qcompare(sample(&clips, 0.0, true, true).camera_full, 1.0));
     }
 
     #[test]
     fn next_clip_eases_from_the_previous_layout() {
-        let clips = [clip("intro", 0.0, 2.0, "camera"), clip("main", 2.0, 6.0, "default")];
+        let clips = [
+            clip("intro", 0.0, 2.0, "camera"),
+            clip("main", 2.0, 6.0, "default"),
+        ];
         assert!(qcompare(sample(&clips, 1.999, true, true).camera_full, 1.0));
         assert!(qcompare(sample(&clips, 2.0, true, true).camera_full, 1.0));
         let middle = sample(&clips, 2.25, true, true);
@@ -145,14 +187,21 @@ mod tests {
     #[test]
     fn transition_uses_output_time_at_any_speed() {
         // The second clip plays 4 s of source at 2x: 2 s of output, transition still 0.5 s.
-        let clips = [clip("intro", 0.0, 1.0, "default"), clip_at_speed("outro", 1.0, 5.0, "camera", 2.0)];
+        let clips = [
+            clip("intro", 0.0, 1.0, "default"),
+            clip_at_speed("outro", 1.0, 5.0, "camera", 2.0),
+        ];
         assert!((sample(&clips, 1.25, true, true).camera_full - 0.5).abs() < 1e-9);
         assert!(qcompare(sample(&clips, 1.5, true, true).camera_full, 1.0));
     }
 
     #[test]
     fn short_clips_still_end_on_their_layout() {
-        let clips = [clip("a", 0.0, 1.0, "camera"), clip("b", 1.0, 1.2, "screen"), clip("c", 1.2, 3.0, "camera")];
+        let clips = [
+            clip("a", 0.0, 1.0, "camera"),
+            clip("b", 1.0, 1.2, "screen"),
+            clip("c", 1.2, 3.0, "camera"),
+        ];
         assert!(qcompare(sample(&clips, 1.1, true, true).camera_full, 0.5));
         assert!(sample(&clips, 1.1999, true, true).camera_full < 1e-6);
         assert!(qcompare(sample(&clips, 1.2, true, true).camera_full, 0.0));
@@ -161,7 +210,10 @@ mod tests {
 
     #[test]
     fn bubble_fades_when_the_screen_loses_it() {
-        let clips = [clip("a", 0.0, 1.0, "default"), clip("b", 1.0, 3.0, "screen")];
+        let clips = [
+            clip("a", 0.0, 1.0, "default"),
+            clip("b", 1.0, 3.0, "screen"),
+        ];
         assert!((sample(&clips, 1.25, true, true).bubble - 0.5).abs() < 1e-9);
         assert!(qcompare(sample(&clips, 1.25, true, true).camera_full, 0.0));
         assert!(qcompare(sample(&clips, 2.0, true, true).bubble, 0.0));
@@ -171,7 +223,11 @@ mod tests {
     fn inserted_videos_cut_in_and_out() {
         let mut insert = clip("m", 0.0, 1.0, "default");
         insert.media = "media/demo.mp4".into();
-        let clips = [clip("a", 0.0, 1.0, "camera"), insert, clip("b", 1.0, 3.0, "default")];
+        let clips = [
+            clip("a", 0.0, 1.0, "camera"),
+            insert,
+            clip("b", 1.0, 3.0, "default"),
+        ];
         // No camera during the insert, and the clip after it starts on its own layout.
         assert!(qcompare(sample(&clips, 1.1, true, true).camera_full, 0.0));
         assert!(qcompare(sample(&clips, 1.1, true, true).bubble, 0.0));
@@ -181,7 +237,10 @@ mod tests {
 
     #[test]
     fn past_the_end_holds_the_last_layout() {
-        let clips = [clip("a", 0.0, 1.0, "default"), clip("b", 1.0, 3.0, "camera")];
+        let clips = [
+            clip("a", 0.0, 1.0, "default"),
+            clip("b", 1.0, 3.0, "camera"),
+        ];
         assert!(qcompare(sample(&clips, 10.0, true, true).camera_full, 1.0));
         assert!(qcompare(sample(&[], 1.0, true, true).bubble, 1.0));
     }

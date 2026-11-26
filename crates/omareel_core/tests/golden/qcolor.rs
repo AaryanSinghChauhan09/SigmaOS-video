@@ -33,14 +33,23 @@ fn color_names_txt() {
     let expected = read_expected("qcolor/color-names.txt");
     let mut out = Text::new();
     for row in rows(&expected) {
-        let name = row[0].strip_prefix('"').and_then(|n| n.strip_suffix('"')).expect("a quoted name");
+        let name = row[0]
+            .strip_prefix('"')
+            .and_then(|n| n.strip_suffix('"'))
+            .expect("a quoted name");
         out.row([quote(name), color(&QColor::parse(name))]);
     }
-    assert_same("qcolor/color-names.txt", &expected, out.into_string().as_bytes());
+    assert_same(
+        "qcolor/color-names.txt",
+        &expected,
+        out.into_string().as_bytes(),
+    );
 }
 
 #[cfg(target_arch = "x86_64")]
-const FACTORS: [i32; 13] = [50, 100, 101, 106, 108, 110, 112, 115, 118, 120, 150, 200, 300];
+const FACTORS: [i32; 13] = [
+    50, 100, 101, 106, 108, 110, 112, 115, 118, 120, 150, 200, 300,
+];
 
 #[cfg(target_arch = "x86_64")]
 #[test]
@@ -114,18 +123,33 @@ fn lighter_darker_special_txt() {
         let input = &block[0][0];
         let fields: Vec<&str> = input.split(' ').collect();
         assert_eq!(fields[0], "Rgb", "random colours are Rgb: {input}");
-        let channel = |i: usize| u16::from_str_radix(&fields[1][4 * i..4 * i + 4], 16).expect("rgba64 hex");
-        colors.push(QColor::from_rgba64(channel(0), channel(1), channel(2), channel(3)));
+        let channel =
+            |i: usize| u16::from_str_radix(&fields[1][4 * i..4 * i + 4], 16).expect("rgba64 hex");
+        colors.push(QColor::from_rgba64(
+            channel(0),
+            channel(1),
+            channel(2),
+            channel(3),
+        ));
     }
     assert_eq!(colors.len(), FIRST_RANDOM - 3 + 64);
 
     let mut out = Text::new();
     for base in &colors {
         for factor in [-10, 0, 1, 99].into_iter().chain(FACTORS) {
-            out.row([color(base), factor.to_string(), color(&base.lighter(factor)), color(&base.darker(factor))]);
+            out.row([
+                color(base),
+                factor.to_string(),
+                color(&base.lighter(factor)),
+                color(&base.darker(factor)),
+            ]);
         }
     }
-    let expected = keep_lines(&expected, |line| !UNPORTED_SPECS.iter().any(|spec| line.starts_with(spec.as_bytes())));
+    let expected = keep_lines(&expected, |line| {
+        !UNPORTED_SPECS
+            .iter()
+            .any(|spec| line.starts_with(spec.as_bytes()))
+    });
     assert_same(
         "qcolor/lighter-darker-special.txt (without the Hsv, Hsl and Cmyk inputs)",
         &expected,
@@ -198,7 +222,19 @@ fn from_rgb_f_txt() {
         channel.push(f64::from(i) / 255.0);
         channel.push((f64::from(i) + 0.5) / 255.0);
     }
-    channel.extend([-0.5, -1e-9, -0.0, 1e-9, 1.0000001, 1.5, 2.0, 0.123456789, 0.999999, 1.0 / 3.0, 2.0 / 3.0]);
+    channel.extend([
+        -0.5,
+        -1e-9,
+        -0.0,
+        1e-9,
+        1.0000001,
+        1.5,
+        2.0,
+        0.123456789,
+        0.999999,
+        1.0 / 3.0,
+        2.0 / 3.0,
+    ]);
 
     let mut arguments: Vec<[f64; 4]> = channel.iter().map(|&v| [v, 0.25, 0.5, 1.0]).collect();
     arguments.extend(channel.iter().map(|&v| [0.0, 0.0, 0.0, v]));
@@ -213,5 +249,9 @@ fn from_rgb_f_txt() {
         let c = QColor::from_rgb_f(r as f32, g as f32, b as f32, a as f32);
         out.row([num(r), num(g), num(b), num(a), color(&c), color_floats(&c)]);
     }
-    assert_same("qcolor/from-rgb-f.txt", &expected, out.into_string().as_bytes());
+    assert_same(
+        "qcolor/from-rgb-f.txt",
+        &expected,
+        out.into_string().as_bytes(),
+    );
 }

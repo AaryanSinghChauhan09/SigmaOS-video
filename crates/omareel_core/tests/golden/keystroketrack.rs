@@ -41,13 +41,21 @@ fn sample_txt() {
     for run in cases.get("runs").to_array() {
         let run = run.to_array();
         let log = run[0].to_string_or("");
-        let input = InputLog::load(corpus_path(&log), 1_000_000, -1.0).unwrap_or_else(|e| panic!("{log}: {e}"));
-        let key_times: Vec<f64> =
-            input.events().iter().filter(|e| e.kind == InputKind::KeyDown).map(|e| e.time).collect();
+        let input = InputLog::load(corpus_path(&log), 1_000_000, -1.0)
+            .unwrap_or_else(|e| panic!("{log}: {e}"));
+        let key_times: Vec<f64> = input
+            .events()
+            .iter()
+            .filter(|e| e.kind == InputKind::KeyDown)
+            .map(|e| e.time)
+            .collect();
         let last = key_times.iter().copied().reduce(cpp::max).unwrap_or(0.0);
         for name in run[1].to_array() {
             let name = name.to_string_or("");
-            assert!(settings.contains(&name), "keystroketrack: no settings {name}");
+            assert!(
+                settings.contains(&name),
+                "keystroketrack: no settings {name}"
+            );
             let keystrokes = keystrokes_from_json(settings.value(&name));
             let track = KeystrokeTrack::build(input.events(), &keystrokes);
             out.section(&format!("{log} settings={name}"));
@@ -72,5 +80,9 @@ fn sample_txt() {
         }
     }
     let expected = lone_surrogates_as_replacement(&read_expected("keystroketrack/sample.txt"));
-    assert_same("keystroketrack/sample.txt (lone surrogates as U+FFFD)", &expected, out.into_string().as_bytes());
+    assert_same(
+        "keystroketrack/sample.txt (lone surrogates as U+FFFD)",
+        &expected,
+        out.into_string().as_bytes(),
+    );
 }

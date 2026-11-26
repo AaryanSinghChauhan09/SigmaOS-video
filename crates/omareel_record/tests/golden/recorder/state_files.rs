@@ -29,9 +29,19 @@ fn absolute_path(path: &str) -> String {
 }
 
 fn show(out: &mut Text, path: &str) {
-    let bytes = std::path::Path::new(path).is_file().then(|| std::fs::read(path).ok()).flatten();
-    out.row(["  file".to_owned(), bytes.map_or("-".into(), |b| quote_bytes(&b)), octal_mode(path)]);
-    out.row(["  directory".to_owned(), directory_listing(&absolute_path(path))]);
+    let bytes = std::path::Path::new(path)
+        .is_file()
+        .then(|| std::fs::read(path).ok())
+        .flatten();
+    out.row([
+        "  file".to_owned(),
+        bytes.map_or("-".into(), |b| quote_bytes(&b)),
+        octal_mode(path),
+    ]);
+    out.row([
+        "  directory".to_owned(),
+        directory_listing(&absolute_path(path)),
+    ]);
 }
 
 fn error_cell(h: &Hermetic, result: &Result<(), String>) -> String {
@@ -71,16 +81,32 @@ fn state_files_txt() {
     }
 
     let states = corpus_path("recorder/state");
-    let state_path = |name: &str| states.join(name).to_str().expect("UTF-8 corpus path").to_owned();
+    let state_path = |name: &str| {
+        states
+            .join(name)
+            .to_str()
+            .expect("UTF-8 corpus path")
+            .to_owned()
+    };
     let names = sorted_entries(&states, false);
     for name in &names {
-        out.row(["readStateFile".to_owned(), name.clone(), compact(&read_state_file(&state_path(name)))]);
+        out.row([
+            "readStateFile".to_owned(),
+            name.clone(),
+            compact(&read_state_file(&state_path(name))),
+        ]);
     }
-    out.row(["readStateFile".to_owned(), "<missing>".into(), compact(&read_state_file(&state_path("missing.json")))]);
+    out.row([
+        "readStateFile".to_owned(),
+        "<missing>".into(),
+        compact(&read_state_file(&state_path("missing.json"))),
+    ]);
     out.row([
         "readStateFile".to_owned(),
         "<directory>".into(),
-        compact(&read_state_file(states.to_str().expect("UTF-8 corpus path"))),
+        compact(&read_state_file(
+            states.to_str().expect("UTF-8 corpus path"),
+        )),
     ]);
 
     // The running-recording queries over each state file as recording.json. Only states whose
@@ -96,7 +122,10 @@ fn state_files_txt() {
         }
         let install = || {
             remove_path(&state_directory);
-            write_file(&state_file, std::fs::read(state_path(name)).expect("corpus state"));
+            write_file(
+                &state_file,
+                std::fs::read(state_path(name)).expect("corpus state"),
+            );
         };
         install();
         let mut cells = vec![
@@ -112,12 +141,19 @@ fn state_files_txt() {
         install();
         let signalled = signal_existing(false);
         cells.push(boolean(signalled.is_ok()).into());
-        cells.push(quote(signalled.as_ref().err().map_or("<untouched>", String::as_str)));
+        cells.push(quote(
+            signalled
+                .as_ref()
+                .err()
+                .map_or("<untouched>", String::as_str),
+        ));
         cells.push(exists(&state_file));
         install();
         let stopped = stop_existing(true);
         cells.push(stopped.code.to_string());
-        cells.push(quote(stopped.bundle_path.as_deref().unwrap_or("<untouched>")));
+        cells.push(quote(
+            stopped.bundle_path.as_deref().unwrap_or("<untouched>"),
+        ));
         cells.push(quote(&stopped.error));
         cells.push(exists(&state_file));
         out.row(cells);
@@ -151,17 +187,52 @@ fn state_files_txt() {
     let scratch = format!("{}/state", h.scratch());
     let file = format!("{scratch}/deep/omareel/recording.json");
     let lock_path = format!("{file}.lock");
-    update(&mut out, "creates the directories", &file, r#"{"pid":0,"monitor":"DP-1"}"#);
+    update(
+        &mut out,
+        "creates the directories",
+        &file,
+        r#"{"pid":0,"monitor":"DP-1"}"#,
+    );
     update(&mut out, "first command", &file, r#"{"command":"rotate"}"#);
     update(&mut out, "second command", &file, r#"{"command":"rotate"}"#);
-    update(&mut out, "explicit sequence", &file, r#"{"command":"flip","command_sequence":7}"#);
-    update(&mut out, "after an explicit sequence", &file, r#"{"command":"corner"}"#);
-    update(&mut out, "no command", &file, r#"{"camera_status":"ready","selfview_x":16.5}"#);
+    update(
+        &mut out,
+        "explicit sequence",
+        &file,
+        r#"{"command":"flip","command_sequence":7}"#,
+    );
+    update(
+        &mut out,
+        "after an explicit sequence",
+        &file,
+        r#"{"command":"corner"}"#,
+    );
+    update(
+        &mut out,
+        "no command",
+        &file,
+        r#"{"camera_status":"ready","selfview_x":16.5}"#,
+    );
     update(&mut out, "empty command", &file, r#"{"command":""}"#);
     update(&mut out, "null command", &file, r#"{"command":null}"#);
-    update(&mut out, "sequence only", &file, r#"{"command_sequence":-3}"#);
-    update(&mut out, "command after a negative sequence", &file, r#"{"command":"show"}"#);
-    update(&mut out, "nested values", &file, r#"{"extra":{"list":[1,"two",null]},"monitor":null}"#);
+    update(
+        &mut out,
+        "sequence only",
+        &file,
+        r#"{"command_sequence":-3}"#,
+    );
+    update(
+        &mut out,
+        "command after a negative sequence",
+        &file,
+        r#"{"command":"show"}"#,
+    );
+    update(
+        &mut out,
+        "nested values",
+        &file,
+        r#"{"extra":{"list":[1,"two",null]},"monitor":null}"#,
+    );
     update(&mut out, "nothing", &file, "{}");
     for name in [
         "strings.json",
@@ -174,8 +245,16 @@ fn state_files_txt() {
         "empty.json",
         "bom.json",
     ] {
-        write_file(&file, std::fs::read(state_path(name)).expect("corpus state"));
-        update(&mut out, &format!("command over {name}"), &file, r#"{"command":"x"}"#);
+        write_file(
+            &file,
+            std::fs::read(state_path(name)).expect("corpus state"),
+        );
+        update(
+            &mut out,
+            &format!("command over {name}"),
+            &file,
+            r#"{"command":"x"}"#,
+        );
     }
     write_file(&file, "{\"command_sequence\": 1}");
     chmod(&file, 0o600);
@@ -183,47 +262,111 @@ fn state_files_txt() {
     {
         let mut held = LockFile::new(lock_path.as_str());
         assert!(held.try_lock(0), "could not take the lock");
-        update(&mut out, "lock held by this process (waits a second)", &file, r#"{"command":"busy"}"#);
+        update(
+            &mut out,
+            "lock held by this process (waits a second)",
+            &file,
+            r#"{"command":"busy"}"#,
+        );
     }
-    out.row(["after unlock".to_owned(), directory_listing(&absolute_path(&file))]);
+    out.row([
+        "after unlock".to_owned(),
+        directory_listing(&absolute_path(&file)),
+    ]);
     write_file(&lock_path, "999999999\nomareel\n\n");
-    update(&mut out, "stale lock of a dead process", &file, r#"{"command":"stale"}"#);
+    update(
+        &mut out,
+        "stale lock of a dead process",
+        &file,
+        r#"{"command":"stale"}"#,
+    );
     write_file(&lock_path, "garbage");
-    update(&mut out, "garbage lock file (waits a second)", &file, r#"{"command":"garbage"}"#);
+    update(
+        &mut out,
+        "garbage lock file (waits a second)",
+        &file,
+        r#"{"command":"garbage"}"#,
+    );
     set_times(&lock_path, 1_000_000_000, 0);
-    update(&mut out, "garbage lock file, old", &file, r#"{"command":"old garbage"}"#);
+    update(
+        &mut out,
+        "garbage lock file, old",
+        &file,
+        r#"{"command":"old garbage"}"#,
+    );
     std::fs::create_dir_all(&lock_path).expect("mkpath lock");
-    update(&mut out, "lock path is a directory (waits a second)", &file, r#"{"command":"directory"}"#);
+    update(
+        &mut out,
+        "lock path is a directory (waits a second)",
+        &file,
+        r#"{"command":"directory"}"#,
+    );
     remove_path(&lock_path);
     remove_path(&file);
     std::fs::create_dir_all(&file).expect("mkpath state");
-    update(&mut out, "state path is a directory", &file, r#"{"command":"x"}"#);
+    update(
+        &mut out,
+        "state path is a directory",
+        &file,
+        r#"{"command":"x"}"#,
+    );
     remove_path(&file);
     let read_only = format!("{scratch}/read-only");
     std::fs::create_dir_all(&read_only).expect("mkpath read-only");
     chmod(&read_only, 0o500);
-    update(&mut out, "read-only directory", &format!("{read_only}/recording.json"), r#"{"command":"x"}"#);
+    update(
+        &mut out,
+        "read-only directory",
+        &format!("{read_only}/recording.json"),
+        r#"{"command":"x"}"#,
+    );
     chmod(&read_only, 0o700);
     {
         // The C++ call without an error pointer leaves the caller's text alone.
-        let ok = update_state_file(&format!("{scratch}/no-error.json"), &values(r#"{"command":"x"}"#)).is_ok();
-        out.row(["update".to_owned(), "without an error pointer".into(), boolean(ok).into(), quote("<untouched>")]);
+        let ok = update_state_file(
+            &format!("{scratch}/no-error.json"),
+            &values(r#"{"command":"x"}"#),
+        )
+        .is_ok();
+        out.row([
+            "update".to_owned(),
+            "without an error pointer".into(),
+            boolean(ok).into(),
+            quote("<untouched>"),
+        ]);
     }
 
     // The fixed paths: sendHostCommand and updateRecordingState under XDG_RUNTIME_DIR.
     remove_path(&state_directory);
     for command in ["quit", "configure", ""] {
         let ok = send_host_command(command);
-        out.row(["sendHostCommand".to_owned(), quote(command), boolean(ok).into()]);
+        out.row([
+            "sendHostCommand".to_owned(),
+            quote(command),
+            boolean(ok).into(),
+        ]);
         show(&mut out, &self_view_host_path());
     }
     let result = update_recording_state(&values(r#"{"capture_started":true,"command":"rotate"}"#));
-    out.row(["updateRecordingState".to_owned(), boolean(result.is_ok()).into(), error_cell(&h, &result)]);
+    out.row([
+        "updateRecordingState".to_owned(),
+        boolean(result.is_ok()).into(),
+        error_cell(&h, &result),
+    ]);
     show(&mut out, &state_file);
 
     // last-error.txt.
-    out.row(["readLastError".to_owned(), "<missing>".into(), quote(&read_last_error())]);
-    for detail in ["Overlays could not leave the recorded output", "two\nlines\n", "  padded  ", ""] {
+    out.row([
+        "readLastError".to_owned(),
+        "<missing>".into(),
+        quote(&read_last_error()),
+    ]);
+    for detail in [
+        "Overlays could not leave the recorded output",
+        "two\nlines\n",
+        "  padded  ",
+        "",
+    ] {
         write_last_error(detail);
         out.row([
             "writeLastError".to_owned(),
@@ -251,14 +394,38 @@ fn state_files_txt() {
         };
         if lines.len() >= 3 {
             mask(&mut lines, 0, pid.to_string().as_bytes(), "{pid}");
-            mask(&mut lines, 1, qlockfile::process_name_by_pid(pid).as_bytes(), "{applicationName}");
-            mask(&mut lines, 2, qlockfile::machine_host_name().as_bytes(), "{hostName}");
+            mask(
+                &mut lines,
+                1,
+                qlockfile::process_name_by_pid(pid).as_bytes(),
+                "{applicationName}",
+            );
+            mask(
+                &mut lines,
+                2,
+                qlockfile::machine_host_name().as_bytes(),
+                "{hostName}",
+            );
         }
         if lines.len() >= 5 {
-            mask(&mut lines, 3, &qlockfile::machine_unique_id(), "{machineUniqueId}");
-            mask(&mut lines, 4, &qlockfile::boot_unique_id(), "{bootUniqueId}");
+            mask(
+                &mut lines,
+                3,
+                &qlockfile::machine_unique_id(),
+                "{machineUniqueId}",
+            );
+            mask(
+                &mut lines,
+                4,
+                &qlockfile::boot_unique_id(),
+                "{bootUniqueId}",
+            );
         }
-        out.row(["QLockFile".to_owned(), quote_bytes(&lines.join(&b'\n')), octal_mode(&format_lock)]);
+        out.row([
+            "QLockFile".to_owned(),
+            quote_bytes(&lines.join(&b'\n')),
+            octal_mode(&format_lock),
+        ]);
     }
     out.row(["QLockFile after unlock".to_owned(), exists(&format_lock)]);
 

@@ -21,7 +21,13 @@ pub struct VideoInfo {
 
 impl Default for VideoInfo {
     fn default() -> VideoInfo {
-        VideoInfo { width: 0, height: 0, duration: 0.0, fps: 30.0, audio: false }
+        VideoInfo {
+            width: 0,
+            height: 0,
+            duration: 0.0,
+            fps: 30.0,
+            audio: false,
+        }
     }
 }
 
@@ -44,7 +50,11 @@ fn ratio(text: &str) -> f64 {
         return to_double(text);
     }
     let denominator = to_double(parts[1]);
-    if denominator != 0.0 { to_double(parts[0]) / denominator } else { 0.0 }
+    if denominator != 0.0 {
+        to_double(parts[0]) / denominator
+    } else {
+        0.0
+    }
 }
 
 /// ffprobe's view of `path`, or why it gave none. A missing file is an error, a file that holds
@@ -78,7 +88,10 @@ pub fn probe_video(path: &str) -> Result<VideoInfo, String> {
             process.kill();
         }
         let details = qstring::from_utf8(&process.read_all_standard_error());
-        return Err(format!("Could not read {name}: {}", qstring::trimmed(&details)));
+        return Err(format!(
+            "Could not read {name}: {}",
+            qstring::trimmed(&details)
+        ));
     }
     let root = qjson::object_from_json(&process.read_all_standard_output()).unwrap_or_default();
     let mut info = VideoInfo::default();
@@ -100,8 +113,14 @@ pub fn probe_video(path: &str) -> Result<VideoInfo, String> {
             width *= sample_aspect;
         }
         // Phones record upright video as landscape frames with a rotation; ffmpeg turns them.
-        let mut rotation =
-            qnumber::to_int(&stream.value("tags").to_object().value("rotate").to_string_or("")).unwrap_or(0);
+        let mut rotation = qnumber::to_int(
+            &stream
+                .value("tags")
+                .to_object()
+                .value("rotate")
+                .to_string_or(""),
+        )
+        .unwrap_or(0);
         for side in stream.value("side_data_list").to_array() {
             let side: Object = side.to_object();
             if side.contains("rotation") {
@@ -123,24 +142,41 @@ pub fn probe_video(path: &str) -> Result<VideoInfo, String> {
         info.duration = to_double(&stream.value("duration").to_string_or(""));
     }
     if info.duration <= 0.0 {
-        info.duration = to_double(&root.value("format").to_object().value("duration").to_string_or(""));
+        info.duration = to_double(
+            &root
+                .value("format")
+                .to_object()
+                .value("duration")
+                .to_string_or(""),
+        );
     }
     if !info.is_valid() {
-        return Err(if found_video { format!("{name} has no playable video") } else { format!("{name} is not a video") });
+        return Err(if found_video {
+            format!("{name} has no playable video")
+        } else {
+            format!("{name} is not a video")
+        });
     }
     Ok(info)
 }
 
 /// [`probe_video`]'s reading of what the libraries found, as it reads ffprobe's JSON.
 fn video_info_from(name: &str, probe: &crate::media_av::Probe) -> Result<VideoInfo, String> {
-    let mut info = VideoInfo { audio: probe.has_audio, ..VideoInfo::default() };
+    let mut info = VideoInfo {
+        audio: probe.has_audio,
+        ..VideoInfo::default()
+    };
     if probe.has_video {
         let mut width = f64::from(probe.width);
         let height = f64::from(probe.height);
         if probe.sample_aspect > 0.0 {
             width *= probe.sample_aspect;
         }
-        let mut rotation = probe.rotate_tag.as_deref().and_then(qnumber::to_int).unwrap_or(0);
+        let mut rotation = probe
+            .rotate_tag
+            .as_deref()
+            .and_then(qnumber::to_int)
+            .unwrap_or(0);
         if let Some(turned) = probe.rotation {
             rotation = turned;
         }
@@ -161,7 +197,11 @@ fn video_info_from(name: &str, probe: &crate::media_av::Probe) -> Result<VideoIn
         info.duration = probe.format_duration.unwrap_or(0.0);
     }
     if !info.is_valid() {
-        return Err(if probe.has_video { format!("{name} has no playable video") } else { format!("{name} is not a video") });
+        return Err(if probe.has_video {
+            format!("{name} has no playable video")
+        } else {
+            format!("{name} is not a video")
+        });
     }
     Ok(info)
 }
@@ -179,7 +219,17 @@ pub fn probe_frame_times(path: &str) -> Vec<f64> {
     let mut process = Process::new();
     process.start(
         "ffprobe",
-        &["-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time", "-of", "csv=p=0", path],
+        &[
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "packet=pts_time",
+            "-of",
+            "csv=p=0",
+            path,
+        ],
     );
     if !process.wait_for_finished(60000) || process.exit_code() != 0 {
         if process.state() != ProcessState::NotRunning {
@@ -197,6 +247,9 @@ pub fn probe_frame_times(path: &str) -> Vec<f64> {
     // which keeps them in order, as a stable sort does.
     // A NaN would make that comparison inconsistent, which Rust's sort may panic on. ffprobe
     // never prints one; should it, it sorts last instead of aborting.
-    times.sort_by(|a, b| a.partial_cmp(b).unwrap_or_else(|| a.is_nan().cmp(&b.is_nan())));
+    times.sort_by(|a, b| {
+        a.partial_cmp(b)
+            .unwrap_or_else(|| a.is_nan().cmp(&b.is_nan()))
+    });
     times
 }

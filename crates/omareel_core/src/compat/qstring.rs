@@ -1,6 +1,6 @@
 //! `QString` operations whose rules are not Rust's `str` rules, as Qt 6.11.2 has them.
 
-use super::qchar::{map_case, CaseRun};
+use super::qchar::{CaseRun, map_case};
 use super::qnumber::is_qchar_space;
 
 /// `QString::size()`: the length in UTF-16 code units, so a character outside the Basic
@@ -23,7 +23,10 @@ pub fn trimmed(s: &str) -> &str {
 /// `QString::simplified()`: whitespace (as `QChar::isSpace` has it) trimmed from both ends and
 /// every inner run of it made one space.
 pub fn simplified(s: &str) -> String {
-    s.split(is_qchar_space).filter(|piece| !piece.is_empty()).collect::<Vec<_>>().join(" ")
+    s.split(is_qchar_space)
+        .filter(|piece| !piece.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// `QString::toLower()`: each code point lowercased on its own, by its full mapping (U+0130 `İ`
@@ -69,7 +72,12 @@ pub fn to_upper(s: &str) -> String {
 /// digits), which this does not reproduce; under the C locale the two are the same.
 pub fn arg(s: &str, a: &str) -> String {
     let bytes = s.as_bytes();
-    let digit = |i: usize| bytes.get(i).filter(|b| b.is_ascii_digit()).map(|b| u32::from(b - b'0'));
+    let digit = |i: usize| {
+        bytes
+            .get(i)
+            .filter(|b| b.is_ascii_digit())
+            .map(|b| u32::from(b - b'0'))
+    };
     // (start, end, number) of every placeholder, scanned as Qt's findArgEscapes does.
     let mut escapes = Vec::new();
     let mut i = 0;
@@ -92,7 +100,9 @@ pub fn arg(s: &str, a: &str) -> String {
         }
         escapes.push((start, i, number));
     }
-    let Some(lowest) = escapes.iter().map(|&(_, _, number)| number).min() else { return s.to_owned() };
+    let Some(lowest) = escapes.iter().map(|&(_, _, number)| number).min() else {
+        return s.to_owned();
+    };
     let mut result = String::with_capacity(s.len() + a.len());
     let mut copied = 0;
     for (start, end, number) in escapes {

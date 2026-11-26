@@ -9,12 +9,21 @@ use crate::compat::qsavefile;
 use crate::project::Project;
 
 /// The parts of a project a preset holds.
-pub const PRESET_KEYS: [&str; 7] = ["background", "frame", "cursor", "zoomStyle", "camera", "audio", "export"];
+pub const PRESET_KEYS: [&str; 7] = [
+    "background",
+    "frame",
+    "cursor",
+    "zoomStyle",
+    "camera",
+    "audio",
+    "export",
+];
 
 /// `cleanPresetName`: trimmed (Unicode white space), every character but ASCII letters, digits,
 /// space, `_`, `.` and `-` replaced by `_`, leading dots dropped, at most 80 characters.
 pub fn clean_preset_name(name: &str) -> String {
-    let name = super::bundle::replace_unsafe_name_characters(name.trim_matches(char::is_whitespace));
+    let name =
+        super::bundle::replace_unsafe_name_characters(name.trim_matches(char::is_whitespace));
     let mut name = name.trim_start_matches('.').to_owned();
     // Only ASCII is left, so 80 UTF-16 units are 80 bytes.
     name.truncate(80);
@@ -28,15 +37,23 @@ impl Document {
     }
 
     fn preset_path(&self, raw_name: &str) -> String {
-        qdir::file_path(&self.presets_directory(), &format!("{}.json", clean_preset_name(raw_name)))
+        qdir::file_path(
+            &self.presets_directory(),
+            &format!("{}.json", clean_preset_name(raw_name)),
+        )
     }
 
     /// `presetNames`: the `*.json` files (any case) by name, without the suffix.
     pub fn preset_names(&self) -> Vec<String> {
-        qdir::entry_list(&self.presets_directory(), &["*.json"], Filters::FILES, SortFlags::NAME)
-            .iter()
-            .map(|file| FileInfo::new(file.as_str()).complete_base_name())
-            .collect()
+        qdir::entry_list(
+            &self.presets_directory(),
+            &["*.json"],
+            Filters::FILES,
+            SortFlags::NAME,
+        )
+        .iter()
+        .map(|file| FileInfo::new(file.as_str()).complete_base_name())
+        .collect()
     }
 
     /// `stylePreset()`: what a preset file holds.
@@ -61,7 +78,10 @@ impl Document {
         }
         qdir::mkpath(&self.presets_directory());
         let path = qdir::file_path(&self.presets_directory(), &format!("{name}.json"));
-        if let Err(error) = qsavefile::save(&path, self.style_preset().to_json(Format::Indented).as_bytes()) {
+        if let Err(error) = qsavefile::save(
+            &path,
+            self.style_preset().to_json(Format::Indented).as_bytes(),
+        ) {
             self.emit(Effect::ErrorOccurred(error));
         }
         self.emit(Effect::PresetsChanged);
@@ -81,7 +101,8 @@ impl Document {
         };
         let mut bytes = Vec::new();
         let _ = file.read_to_end(&mut bytes);
-        let (preset, _) = Project::migrate_defaults(&qjson::object_from_json(&bytes).unwrap_or_default());
+        let (preset, _) =
+            Project::migrate_defaults(&qjson::object_from_json(&bytes).unwrap_or_default());
         let mut project = self.project.to_json();
         for key in PRESET_KEYS {
             if preset.contains(key) {

@@ -7,7 +7,12 @@ fn main() {
     println!("cargo:rerun-if-changed=csrc/gpu_capture.h");
     println!("cargo:rerun-if-changed=../omareel_core/csrc/ffmpeg_dl.h");
     let mut build = cc::Build::new();
-    build.file("csrc/gpu_capture.c").std("c11").warnings(true).extra_warnings(true).include("../omareel_core/csrc");
+    build
+        .file("csrc/gpu_capture.c")
+        .std("c11")
+        .warnings(true)
+        .extra_warnings(true)
+        .include("../omareel_core/csrc");
     for library in ["gbm", "libdrm", "libva"] {
         let found = pkg_config::Config::new()
             .probe(library)
@@ -16,11 +21,19 @@ fn main() {
             build.include(path);
         }
     }
-    for library in ["libavcodec", "libavformat", "libavfilter", "libavutil", "libswscale"] {
+    for library in [
+        "libavcodec",
+        "libavformat",
+        "libavfilter",
+        "libavutil",
+        "libswscale",
+    ] {
         let found = pkg_config::Config::new()
             .cargo_metadata(false)
             .probe(library)
-            .unwrap_or_else(|error| panic!("the screen capture needs {library}'s headers: {error}"));
+            .unwrap_or_else(|error| {
+                panic!("the screen capture needs {library}'s headers: {error}")
+            });
         for path in found.include_paths {
             build.include(path);
         }

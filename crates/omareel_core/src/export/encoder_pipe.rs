@@ -17,7 +17,11 @@ pub const FINISH_TIMEOUT_MS: i32 = 120000;
 fn fail(process: &mut Process, reason: &str) -> String {
     let details = qstring::from_utf8(&process.read_all_standard_error());
     let details = qstring::trimmed(&details);
-    if details.is_empty() { reason.to_owned() } else { format!("{reason}: {details}") }
+    if details.is_empty() {
+        reason.to_owned()
+    } else {
+        format!("{reason}: {details}")
+    }
 }
 
 fn elapsed_ms(since: Instant) -> i64 {
@@ -53,14 +57,21 @@ pub fn write_encoder_frame(
             if process.state() == ProcessState::NotRunning {
                 return Err(fail(process, "Encoder exited before receiving all frames"));
             }
-            return Err(fail(process, "Encoder stopped accepting frames (write timed out)"));
+            return Err(fail(
+                process,
+                "Encoder stopped accepting frames (write timed out)",
+            ));
         }
     }
     Ok(())
 }
 
 /// Closes the encoder's input and waits for it to write the file and exit successfully.
-pub fn finish_encoder_pipe(process: &mut Process, cancelled: &dyn Fn() -> bool, timeout_ms: i32) -> Result<(), String> {
+pub fn finish_encoder_pipe(
+    process: &mut Process,
+    cancelled: &dyn Fn() -> bool,
+    timeout_ms: i32,
+) -> Result<(), String> {
     process.close_write_channel();
     let timer = Instant::now();
     while process.state() != ProcessState::NotRunning {
@@ -77,7 +88,10 @@ pub fn finish_encoder_pipe(process: &mut Process, cancelled: &dyn Fn() -> bool, 
         return Err(fail(process, "Export cancelled"));
     }
     if process.exit_status() != ExitStatus::NormalExit || process.exit_code() != 0 {
-        return Err(fail(process, &format!("Encoder failed (exit code {})", process.exit_code())));
+        return Err(fail(
+            process,
+            &format!("Encoder failed (exit code {})", process.exit_code()),
+        ));
     }
     Ok(())
 }
@@ -97,7 +111,9 @@ mod tests {
     /// and prints how many bytes it got.
     #[test]
     fn pipe_child() {
-        let Ok(mode) = std::env::var(CHILD_MODE) else { return };
+        let Ok(mode) = std::env::var(CHILD_MODE) else {
+            return;
+        };
         let code = match mode.as_str() {
             "failed" => 7,
             "killed" => {
@@ -170,7 +186,10 @@ mod tests {
     /// What the "slow" child printed last (the test harness prints a line before it).
     fn printed_total(process: &mut Process) -> u64 {
         let out = String::from_utf8_lossy(&process.read_all_standard_output()).into_owned();
-        out.lines().rfind(|l| !l.trim().is_empty()).and_then(|l| l.trim().parse().ok()).unwrap_or(0)
+        out.lines()
+            .rfind(|l| !l.trim().is_empty())
+            .and_then(|l| l.trim().parse().ok())
+            .unwrap_or(0)
     }
 
     #[test]
@@ -182,7 +201,10 @@ mod tests {
             write_encoder_frame(&mut child.0, &frame, &never_cancelled, 1000).expect("write");
             assert_eq!(child.0.bytes_to_write(), 0);
         }
-        assert!(started.elapsed() > Duration::from_millis(500), "writes must wait for the deliberately slow consumer");
+        assert!(
+            started.elapsed() > Duration::from_millis(500),
+            "writes must wait for the deliberately slow consumer"
+        );
         finish_encoder_pipe(&mut child.0, &never_cancelled, FINISH_TIMEOUT_MS).expect("finish");
         assert_eq!(printed_total(&mut child.0), frame.len() as u64 * 8);
     }
@@ -191,7 +213,13 @@ mod tests {
     fn progressing_frame_does_not_time_out() {
         let mut child = Child::launch("slow");
         let started = Instant::now();
-        write_encoder_frame(&mut child.0, &vec![b'x'; 2 * 1024 * 1024], &never_cancelled, 250).expect("write");
+        write_encoder_frame(
+            &mut child.0,
+            &vec![b'x'; 2 * 1024 * 1024],
+            &never_cancelled,
+            250,
+        )
+        .expect("write");
         assert!(started.elapsed() > Duration::from_millis(250));
         assert_eq!(child.0.bytes_to_write(), 0);
         finish_encoder_pipe(&mut child.0, &never_cancelled, FINISH_TIMEOUT_MS).expect("finish");
@@ -202,7 +230,13 @@ mod tests {
         let mut child = Child::launch("stalled");
         let started = Instant::now();
         let cancelled = || started.elapsed() >= Duration::from_millis(100);
-        let error = write_encoder_frame(&mut child.0, &vec![b'x'; 1024 * 1024], &cancelled, STALL_TIMEOUT_MS).unwrap_err();
+        let error = write_encoder_frame(
+            &mut child.0,
+            &vec![b'x'; 1024 * 1024],
+            &cancelled,
+            STALL_TIMEOUT_MS,
+        )
+        .unwrap_err();
         assert!(error.contains("cancelled"), "{error}");
         assert!(started.elapsed() < Duration::from_secs(2));
     }
@@ -210,15 +244,26 @@ mod tests {
     #[test]
     fn stalled_write_has_diagnostic() {
         let mut child = Child::launch("stalled");
-        let error = write_encoder_frame(&mut child.0, &vec![b'x'; 1024 * 1024], &never_cancelled, 100).unwrap_err();
+        let error = write_encoder_frame(
+            &mut child.0,
+            &vec![b'x'; 1024 * 1024],
+            &never_cancelled,
+            100,
+        )
+        .unwrap_err();
         assert!(error.contains("timed out"), "{error}");
     }
 
     #[test]
     fn early_exit_has_diagnostic() {
         let mut child = Child::launch("failed");
-        let error =
-            write_encoder_frame(&mut child.0, &vec![b'x'; 1024 * 1024], &never_cancelled, STALL_TIMEOUT_MS).unwrap_err();
+        let error = write_encoder_frame(
+            &mut child.0,
+            &vec![b'x'; 1024 * 1024],
+            &never_cancelled,
+            STALL_TIMEOUT_MS,
+        )
+        .unwrap_err();
         assert!(!error.is_empty());
     }
 
@@ -226,7 +271,8 @@ mod tests {
     fn finalization_failure() {
         for mode in ["failed", "killed"] {
             let mut child = Child::launch(mode);
-            let error = finish_encoder_pipe(&mut child.0, &never_cancelled, FINISH_TIMEOUT_MS).unwrap_err();
+            let error =
+                finish_encoder_pipe(&mut child.0, &never_cancelled, FINISH_TIMEOUT_MS).unwrap_err();
             assert!(error.contains("Encoder failed"), "{mode}: {error}");
         }
     }
@@ -251,10 +297,19 @@ mod tests {
     #[test]
     fn waits_for_finalization() {
         let mut child = Child::launch("slow");
-        write_encoder_frame(&mut child.0, &[b'x'; 16384], &never_cancelled, STALL_TIMEOUT_MS).expect("write");
+        write_encoder_frame(
+            &mut child.0,
+            &[b'x'; 16384],
+            &never_cancelled,
+            STALL_TIMEOUT_MS,
+        )
+        .expect("write");
         let started = Instant::now();
         finish_encoder_pipe(&mut child.0, &never_cancelled, FINISH_TIMEOUT_MS).expect("finish");
         assert!(started.elapsed() >= Duration::from_millis(100));
-        assert_eq!((child.0.exit_status(), child.0.exit_code()), (ExitStatus::NormalExit, 0));
+        assert_eq!(
+            (child.0.exit_status(), child.0.exit_code()),
+            (ExitStatus::NormalExit, 0)
+        );
     }
 }

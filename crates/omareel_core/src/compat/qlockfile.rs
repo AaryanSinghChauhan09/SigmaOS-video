@@ -74,7 +74,12 @@ pub fn machine_host_name() -> String {
     if unsafe { libc::uname(&mut name) } != 0 {
         return String::new();
     }
-    let bytes: Vec<u8> = name.nodename.iter().take_while(|&&c| c != 0).map(|&c| c as u8).collect();
+    let bytes: Vec<u8> = name
+        .nodename
+        .iter()
+        .take_while(|&&c| c != 0)
+        .map(|&c| c as u8)
+        .collect();
     qdir::decode_name(&bytes)
 }
 
@@ -104,7 +109,9 @@ fn read_up_to(path: &str, limit: usize) -> Result<Vec<u8>, i32> {
 pub fn machine_unique_id() -> Vec<u8> {
     match read_up_to("/var/lib/dbus/machine-id", 32) {
         Ok(bytes) => bytes,
-        Err(libc::ENOENT) => read_up_to("/usr/local/var/lib/dbus/machine-id", 32).unwrap_or_default(),
+        Err(libc::ENOENT) => {
+            read_up_to("/usr/local/var/lib/dbus/machine-id", 32).unwrap_or_default()
+        }
         Err(_) => Vec::new(),
     }
 }
@@ -124,7 +131,9 @@ pub fn process_name_by_pid(pid: i64) -> String {
     if !have_procfs() {
         return String::new();
     }
-    let Ok(target) = std::fs::read_link(format!("/proc/{pid}/exe")) else { return "/ERROR/".into() };
+    let Ok(target) = std::fs::read_link(format!("/proc/{pid}/exe")) else {
+        return "/ERROR/".into();
+    };
     let mut bytes = std::os::unix::ffi::OsStrExt::as_bytes(target.as_os_str()).to_vec();
     if bytes.is_empty() {
         return "/ERROR/".into();
@@ -139,7 +148,12 @@ pub fn process_name_by_pid(pid: i64) -> String {
 /// `QLockFilePrivate::lockFileContents()`.
 pub fn lock_file_contents() -> Vec<u8> {
     let pid = i64::from(std::process::id());
-    let mut data = format!("{pid}\n{}\n{}\n", process_name_by_pid(pid), machine_host_name()).into_bytes();
+    let mut data = format!(
+        "{pid}\n{}\n{}\n",
+        process_name_by_pid(pid),
+        machine_host_name()
+    )
+    .into_bytes();
     data.extend_from_slice(&machine_unique_id());
     data.push(b'\n');
     data.extend_from_slice(&boot_unique_id());
@@ -160,7 +174,10 @@ struct LockFileInfo {
 /// `\r\n` written `\n`; then `chop(1)`.
 fn read_chopped_line(data: &[u8], at: &mut usize) -> Vec<u8> {
     let rest = &data[*at..];
-    let end = rest.iter().position(|&b| b == b'\n').map_or(rest.len(), |i| i + 1);
+    let end = rest
+        .iter()
+        .position(|&b| b == b'\n')
+        .map_or(rest.len(), |i| i + 1);
     let mut line = rest[..end].to_vec();
     *at += end;
     if line.ends_with(b"\r\n") {
@@ -209,7 +226,13 @@ fn lock_info(file_name: &str) -> Option<LockFileInfo> {
     let hostid = read_chopped_line(&data, &mut at);
     let bootid = read_chopped_line(&data, &mut at);
     let pid = to_long_long(&pid_line)?;
-    (pid > 0).then_some(LockFileInfo { pid, appname, hostname, hostid, bootid })
+    (pid > 0).then_some(LockFileInfo {
+        pid,
+        appname,
+        hostname,
+        hostid,
+        bootid,
+    })
 }
 
 /// `QLockFilePrivate::isProcessRunning`.
@@ -233,7 +256,10 @@ fn is_process_running(pid: i64, appname: &str) -> bool {
 
 /// `QDateTime::currentDateTimeUtc()` in milliseconds since the epoch.
 fn now_msecs() -> i64 {
-    let mut now = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+    let mut now = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
     // SAFETY: clock_gettime writes a timespec.
     unsafe { libc::clock_gettime(libc::CLOCK_REALTIME, &mut now) };
     now.tv_sec * 1000 + now.tv_nsec / 1_000_000
@@ -246,7 +272,9 @@ fn set_native_locks(fd: libc::c_int) -> bool {
 }
 
 fn unlink(path: &str) -> bool {
-    let Ok(c) = CString::new(path) else { return false };
+    let Ok(c) = CString::new(path) else {
+        return false;
+    };
     // SAFETY: a valid NUL-terminated string.
     unsafe { libc::unlink(c.as_ptr()) == 0 }
 }
@@ -295,7 +323,8 @@ impl LockFile {
 
     /// `tryLock(timeout)` in milliseconds (negative: for ever).
     pub fn try_lock(&mut self, timeout_ms: i64) -> bool {
-        let deadline = (timeout_ms >= 0).then(|| Instant::now() + Duration::from_millis(timeout_ms as u64));
+        let deadline =
+            (timeout_ms >= 0).then(|| Instant::now() + Duration::from_millis(timeout_ms as u64));
         let mut sleep_time = Duration::from_millis(100);
         loop {
             self.lock_error = self.try_lock_sys();
@@ -310,7 +339,10 @@ impl LockFile {
                         // Stale lock from another thread or process; make sure two processes
                         // don't remove it at the same time.
                         let mut rmlock = LockFile::new(format!("{}.rmlock", self.file_name));
-                        if rmlock.try_lock(0) && self.is_apparently_stale() && self.remove_stale_lock() {
+                        if rmlock.try_lock(0)
+                            && self.is_apparently_stale()
+                            && self.remove_stale_lock()
+                        {
                             continue;
                         }
                     }
@@ -321,7 +353,8 @@ impl LockFile {
                 Some(deadline) => deadline.saturating_duration_since(Instant::now()),
             };
             // QDeadlineTimer counts whole milliseconds.
-            let remaining = Duration::from_millis(remaining.as_millis().min(u128::from(u64::MAX)) as u64);
+            let remaining =
+                Duration::from_millis(remaining.as_millis().min(u128::from(u64::MAX)) as u64);
             if remaining.is_zero() {
                 return false;
             }
@@ -337,7 +370,11 @@ impl LockFile {
 
     /// `QLockFilePrivate::tryLock_sys`.
     fn try_lock_sys(&mut self) -> LockError {
-        let fd = match open_raw(self.file_name.as_bytes(), libc::O_RDWR | libc::O_CREAT | libc::O_EXCL, 0o666) {
+        let fd = match open_raw(
+            self.file_name.as_bytes(),
+            libc::O_RDWR | libc::O_CREAT | libc::O_EXCL,
+            0o666,
+        ) {
             Ok(fd) => fd,
             Err(libc::EEXIST) => return LockError::LockFailedError,
             Err(libc::EACCES | libc::EROFS) => return LockError::PermissionError,
@@ -403,7 +440,9 @@ impl LockFile {
     /// `QLockFilePrivate::removeStaleLock`: true if the file was removed, which fails while its
     /// owner holds its `flock`.
     fn remove_stale_lock(&self) -> bool {
-        let Ok(fd) = open_raw(self.file_name.as_bytes(), libc::O_WRONLY, 0o666) else { return false };
+        let Ok(fd) = open_raw(self.file_name.as_bytes(), libc::O_WRONLY, 0o666) else {
+            return false;
+        };
         let success = set_native_locks(fd) && unlink(&self.file_name);
         // SAFETY: `fd` is open and closed once.
         unsafe { libc::close(fd) };
@@ -444,7 +483,8 @@ mod tests {
     use super::*;
 
     fn scratch(name: &str) -> String {
-        let dir = std::env::temp_dir().join(format!("omareel-qlockfile-{}-{name}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("omareel-qlockfile-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir.to_str().unwrap().to_owned()
@@ -452,10 +492,16 @@ mod tests {
 
     fn set_mtime(path: &str, seconds: i64) {
         let c = CString::new(path).unwrap();
-        let time = libc::timespec { tv_sec: seconds, tv_nsec: 0 };
+        let time = libc::timespec {
+            tv_sec: seconds,
+            tv_nsec: 0,
+        };
         let times = [time, time];
         // SAFETY: `c` is NUL-terminated and `times` holds two timespecs.
-        assert_eq!(unsafe { libc::utimensat(libc::AT_FDCWD, c.as_ptr(), times.as_ptr(), 0) }, 0);
+        assert_eq!(
+            unsafe { libc::utimensat(libc::AT_FDCWD, c.as_ptr(), times.as_ptr(), 0) },
+            0
+        );
     }
 
     #[test]
@@ -469,7 +515,10 @@ mod tests {
         let lines: Vec<&[u8]> = contents.split(|&b| b == b'\n').collect();
         assert_eq!(lines.len(), 6, "five lines, each ending in a newline");
         assert_eq!(lines[0], std::process::id().to_string().as_bytes());
-        assert_eq!(lines[1], process_name_by_pid(i64::from(std::process::id())).as_bytes());
+        assert_eq!(
+            lines[1],
+            process_name_by_pid(i64::from(std::process::id())).as_bytes()
+        );
         assert!(!lines[1].is_empty() && !lines[1].contains(&b'/'));
         assert_eq!(lines[2], machine_host_name().as_bytes());
         assert_eq!(lines[4].len(), 36);
@@ -492,7 +541,10 @@ mod tests {
         let started = Instant::now();
         assert!(!other.try_lock(350));
         let waited = started.elapsed();
-        assert!(waited >= Duration::from_millis(340) && waited < Duration::from_millis(1500), "{waited:?}");
+        assert!(
+            waited >= Duration::from_millis(340) && waited < Duration::from_millis(1500),
+            "{waited:?}"
+        );
         assert_eq!(other.error(), LockError::LockFailedError);
         assert!(!other.try_lock(0));
         held.unlock();
@@ -513,12 +565,21 @@ mod tests {
         assert!(!std::path::Path::new(&format!("{path}.rmlock")).exists());
         lock.unlock();
         // A running pid whose process name differs is stale too (the pid was reused).
-        std::fs::write(&path, format!("{}\nnot-this-program\n\n", std::process::id())).unwrap();
+        std::fs::write(
+            &path,
+            format!("{}\nnot-this-program\n\n", std::process::id()),
+        )
+        .unwrap();
         assert!(lock.try_lock(0));
         lock.unlock();
         // Another boot of this machine: stale.
         let pid = i64::from(std::process::id());
-        let mut contents = format!("{pid}\n{}\n{}\n", process_name_by_pid(pid), machine_host_name()).into_bytes();
+        let mut contents = format!(
+            "{pid}\n{}\n{}\n",
+            process_name_by_pid(pid),
+            machine_host_name()
+        )
+        .into_bytes();
         contents.extend_from_slice(&machine_unique_id());
         contents.extend_from_slice(b"\n00000000-0000-0000-0000-000000000000\n");
         std::fs::write(&path, &contents).unwrap();
@@ -572,8 +633,19 @@ mod tests {
         let data = b"12\r\napp\nhost";
         assert_eq!(read_chopped_line(data, &mut at), b"12");
         assert_eq!(read_chopped_line(data, &mut at), b"app");
-        assert_eq!(read_chopped_line(data, &mut at), b"hos", "the last byte goes even without a newline");
+        assert_eq!(
+            read_chopped_line(data, &mut at),
+            b"hos",
+            "the last byte goes even without a newline"
+        );
         assert_eq!(read_chopped_line(data, &mut at), b"");
-        assert_eq!((to_long_long(b" 42 "), to_long_long(b"4x"), to_long_long(b"")), (Some(42), None, None));
+        assert_eq!(
+            (
+                to_long_long(b" 42 "),
+                to_long_long(b"4x"),
+                to_long_long(b"")
+            ),
+            (Some(42), None, None)
+        );
     }
 }

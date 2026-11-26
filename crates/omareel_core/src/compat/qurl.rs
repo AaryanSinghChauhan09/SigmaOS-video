@@ -57,7 +57,10 @@ pub fn from_local_file(path: &str) -> String {
             None => &path[2..],
         };
         let ssl_at = host_spec.len().wrapping_sub(4);
-        if host_spec.len() >= 4 && host_spec.is_char_boundary(ssl_at) && host_spec[ssl_at..].eq_ignore_ascii_case("@SSL") {
+        if host_spec.len() >= 4
+            && host_spec.is_char_boundary(ssl_at)
+            && host_spec[ssl_at..].eq_ignore_ascii_case("@SSL")
+        {
             host_spec = &host_spec[..ssl_at];
             scheme = "webdavs";
         }
@@ -86,7 +89,22 @@ pub fn from_local_file(path: &str) -> String {
     for c in path.chars() {
         let encode = matches!(
             c,
-            '\0'..='\u{1f}' | '\u{7f}' | '%' | '"' | '#' | '<' | '>' | '?' | '[' | '\\' | ']' | '^' | '`' | '{' | '|' | '}'
+            '\0'..='\u{1f}'
+                | '\u{7f}'
+                | '%'
+                | '"'
+                | '#'
+                | '<'
+                | '>'
+                | '?'
+                | '['
+                | '\\'
+                | ']'
+                | '^'
+                | '`'
+                | '{'
+                | '|'
+                | '}'
         );
         if encode {
             out.push_str(&format!("%{:02X}", c as u32));
@@ -130,13 +148,19 @@ fn parse_host(host: &str) -> Host {
         return Host::InvalidRegName;
     }
     let lower = host.to_ascii_lowercase();
-    let labels: Vec<&str> = lower.strip_suffix('.').unwrap_or(&lower).split('.').collect();
+    let labels: Vec<&str> = lower
+        .strip_suffix('.')
+        .unwrap_or(&lower)
+        .split('.')
+        .collect();
     let valid_label = |label: &&str| {
         !label.is_empty()
             && label.len() <= 63
             && !label.starts_with('-')
             && !label.ends_with('-')
-            && label.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_')
+            && label
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_')
     };
     if labels.iter().all(valid_label) {
         Host::Valid(lower)
@@ -151,7 +175,13 @@ fn ascii_buffer(units: &[u16]) -> Option<Vec<u8>> {
     if units.iter().any(|&u| u >= 0x7f) {
         return None;
     }
-    Some(units.iter().map(|&u| u as u8).take_while(|&b| b != 0).collect())
+    Some(
+        units
+            .iter()
+            .map(|&u| u as u8)
+            .take_while(|&b| b != 0)
+            .collect(),
+    )
 }
 
 fn ascii_space(b: u8) -> bool {
@@ -206,7 +236,10 @@ fn strntoull(text: &[u8], base: u32) -> Option<(u64, usize)> {
     if base == 0 || p >= text.len() {
         return None;
     }
-    let digits = text[p..].iter().take_while(|&&b| char::from(b).is_digit(base)).count();
+    let digits = text[p..]
+        .iter()
+        .take_while(|&&b| char::from(b).is_digit(base))
+        .count();
     if digits == 0 {
         return None;
     }
@@ -270,7 +303,8 @@ fn ip4_to_string(address: u32) -> String {
 /// address read by `QIPAddressUtils::parseIp6`, and the host written back in brackets.
 fn parse_bracketed_ip6(inner: &[u16]) -> Option<String> {
     let zone_marker: Vec<u16> = "%25".encode_utf16().collect();
-    let mut positions = (0..inner.len().saturating_sub(2)).filter(|&i| inner[i..i + 3] == zone_marker[..]);
+    let mut positions =
+        (0..inner.len().saturating_sub(2)).filter(|&i| inner[i..i + 3] == zone_marker[..]);
     let mut address_units = inner;
     let mut zone: &[u16] = &[];
     if let Some(first) = positions.next() {
@@ -420,10 +454,18 @@ fn ip6_to_string(address: &[u8; 16]) -> String {
             continue;
         }
         if i == 12 && embedded_ip4 {
-            out.push_str(&ip4_to_string(u32::from_be_bytes([address[12], address[13], address[14], address[15]])));
+            out.push_str(&ip4_to_string(u32::from_be_bytes([
+                address[12],
+                address[13],
+                address[14],
+                address[15],
+            ])));
             return out;
         }
-        out.push_str(&format!("{:x}", u16::from_be_bytes([address[i], address[i + 1]])));
+        out.push_str(&format!(
+            "{:x}",
+            u16::from_be_bytes([address[i], address[i + 1]])
+        ));
         if i != 14 {
             out.push(':');
         }
@@ -441,7 +483,8 @@ fn parse_ip_future(units: &[u16]) -> Option<String> {
     let version = char::from_u32(u32::from(units[2])).filter(char::is_ascii_hexdigit)?;
     let mut host = format!("[v{}.", version.to_ascii_uppercase());
     for &u in &units[4..units.len() - 1] {
-        let c = char::from_u32(u32::from(u)).filter(|c| c.is_ascii_alphanumeric() || "!$&'()*+,;=:-._~".contains(*c))?;
+        let c = char::from_u32(u32::from(u))
+            .filter(|c| c.is_ascii_alphanumeric() || "!$&'()*+,;=:-._~".contains(*c))?;
         host.push(c);
     }
     host.push(']');
@@ -461,7 +504,10 @@ mod tests {
             ("/tmp/a%b.png", "file:///tmp/a%25b.png"),
             ("/tmp/a#b?c.png", "file:///tmp/a%23b%3Fc.png"),
             ("/tmp/ünï cödé/ß.png", "file:///tmp/ünï cödé/ß.png"),
-            ("/tmp/[x]{y}|z^`\"<>\\.png", "file:///tmp/%5Bx%5D%7By%7D%7Cz%5E%60%22%3C%3E%5C.png"),
+            (
+                "/tmp/[x]{y}|z^`\"<>\\.png",
+                "file:///tmp/%5Bx%5D%7By%7D%7Cz%5E%60%22%3C%3E%5C.png",
+            ),
             ("/tmp/;=+&$!'()*,:@~.png", "file:///tmp/;=+&$!'()*,:@~.png"),
             ("/tmp/\u{1}\u{1f}\u{7f}.png", "file:///tmp/%01%1F%7F.png"),
             ("/tmp/tab\there", "file:///tmp/tab%09here"),
@@ -540,7 +586,10 @@ mod tests {
             // IPv6 as Qt writes it back.
             ("//[::1.2.3.4]/x", "file://[::1.2.3.4]/x"),
             ("//[::0.0.0.5]/x", "file://[::5]/x"),
-            ("//[1:2:3:4:5:6:1.2.3.4]/x", "file://[1:2:3:4:5:6:102:304]/x"),
+            (
+                "//[1:2:3:4:5:6:1.2.3.4]/x",
+                "file://[1:2:3:4:5:6:102:304]/x",
+            ),
             ("//[1:2:3:4:5:6:7::]/x", "file://[1:2:3:4:5:6:7:0]/x"),
             ("//[1:0:0:2:0:0:3:4]/x", "file://[1::2:0:0:3:4]/x"),
             ("//[ 1::2]/x", "file://[1::2]/x"),
@@ -568,7 +617,10 @@ mod tests {
             assert_eq!(from_local_file(path), expected, "{path:?}");
         }
         let long = format!("//{}/x", "a".repeat(63));
-        assert_eq!(from_local_file(&long), format!("file:{long}").replacen("file://", "file://", 1));
+        assert_eq!(
+            from_local_file(&long),
+            format!("file:{long}").replacen("file://", "file://", 1)
+        );
         let too_long = format!("//{}/x", "a".repeat(64));
         assert_eq!(from_local_file(&too_long), format!("file://{too_long}"));
     }
@@ -579,8 +631,15 @@ mod tests {
         let encoded = "\"#%<>?[\\]^`{|}\u{7f}";
         for code in 1u8..128 {
             let c = char::from(code);
-            let expected = if c < ' ' || encoded.contains(c) { format!("%{code:02X}") } else { c.to_string() };
-            assert_eq!(from_local_file(&format!("/t/{c}")), format!("file:///t/{expected}"));
+            let expected = if c < ' ' || encoded.contains(c) {
+                format!("%{code:02X}")
+            } else {
+                c.to_string()
+            };
+            assert_eq!(
+                from_local_file(&format!("/t/{c}")),
+                format!("file:///t/{expected}")
+            );
         }
     }
 }

@@ -53,10 +53,11 @@ fn current_background_in(state_root: &str) -> String {
         }
     }
     let directory = qdir::file_path(state_root, "theme/backgrounds");
-    let backgrounds: Vec<String> = qdir::entry_info_list(&directory, &IMAGE_FILTERS, Filters::FILES, SortFlags::NAME)
-        .iter()
-        .map(qdir::FileInfo::canonical_file_path)
-        .collect();
+    let backgrounds: Vec<String> =
+        qdir::entry_info_list(&directory, &IMAGE_FILTERS, Filters::FILES, SortFlags::NAME)
+            .iter()
+            .map(qdir::FileInfo::canonical_file_path)
+            .collect();
     backgrounds.into_iter().next().unwrap_or_default()
 }
 
@@ -105,16 +106,30 @@ fn background_groups(roots: &[String], state_root: &str) -> Vec<BackgroundGroup>
     let mut seen: HashSet<String> = HashSet::new();
     let key = |name: &str| name.encode_utf16().collect::<Vec<u16>>();
     for root in roots {
-        for theme in qdir::entry_info_list(root, &[], Filters::DIRS | Filters::NO_DOT_AND_DOT_DOT, SortFlags::NAME) {
+        for theme in qdir::entry_info_list(
+            root,
+            &[],
+            Filters::DIRS | Filters::NO_DOT_AND_DOT_DOT,
+            SortFlags::NAME,
+        ) {
             let backgrounds = qdir::file_path(&theme.absolute_file_path(), "backgrounds");
-            for file in qdir::entry_info_list(&backgrounds, &IMAGE_FILTERS, Filters::FILES, SortFlags::NAME) {
+            for file in qdir::entry_info_list(
+                &backgrounds,
+                &IMAGE_FILTERS,
+                Filters::FILES,
+                SortFlags::NAME,
+            ) {
                 let path = file.canonical_file_path();
                 if path.is_empty() || seen.contains(&path) {
                     continue;
                 }
                 seen.insert(path.clone());
                 let name = theme.file_name();
-                grouped.entry(key(&name)).or_insert_with(|| (name, Vec::new())).1.push(path);
+                grouped
+                    .entry(key(&name))
+                    .or_insert_with(|| (name, Vec::new()))
+                    .1
+                    .push(path);
             }
         }
     }
@@ -122,8 +137,16 @@ fn background_groups(roots: &[String], state_root: &str) -> Vec<BackgroundGroup>
     let current_name = current_theme_name_in(state_root);
     let current_path = current_background_in(state_root);
     if !current_path.is_empty() && !seen.contains(&current_path) {
-        let name = if current_name.is_empty() { "Current".to_owned() } else { current_name.clone() };
-        grouped.entry(key(&name)).or_insert_with(|| (name, Vec::new())).1.insert(0, current_path);
+        let name = if current_name.is_empty() {
+            "Current".to_owned()
+        } else {
+            current_name.clone()
+        };
+        grouped
+            .entry(key(&name))
+            .or_insert_with(|| (name, Vec::new()))
+            .1
+            .insert(0, current_path);
     }
 
     let mut names: Vec<(String, Vec<String>)> = grouped.into_values().collect();
@@ -135,7 +158,12 @@ fn background_groups(roots: &[String], state_root: &str) -> Vec<BackgroundGroup>
     }
     names
         .into_iter()
-        .map(|(name, paths)| BackgroundGroup { label: label(&name), current: name == current_name, name, paths })
+        .map(|(name, paths)| BackgroundGroup {
+            label: label(&name),
+            current: name == current_name,
+            name,
+            paths,
+        })
         .collect()
 }
 
@@ -171,7 +199,10 @@ pub fn theme_backgrounds() -> Vec<String> {
 
 /// [`theme_background_groups_in`]'s paths, group by group.
 pub fn theme_backgrounds_in(roots: &[String]) -> Vec<String> {
-    theme_background_groups_in(roots).into_iter().flat_map(|group| group.paths).collect()
+    theme_background_groups_in(roots)
+        .into_iter()
+        .flat_map(|group| group.paths)
+        .collect()
 }
 
 /// Where recordings go: `OMAREEL_RECENTS_DIR` made absolute, or "omareel" in the user's
@@ -179,7 +210,10 @@ pub fn theme_backgrounds_in(roots: &[String]) -> Vec<String> {
 pub fn recordings_directory() -> String {
     match qdir::env_var("OMAREEL_RECENTS_DIR") {
         Some(path) if !path.is_empty() => qdir::absolute_path(&path),
-        _ => qdir::file_path(&qstandardpaths::writable_location(Location::Movies), "omareel"),
+        _ => qdir::file_path(
+            &qstandardpaths::writable_location(Location::Movies),
+            "omareel",
+        ),
     }
 }
 
@@ -194,7 +228,10 @@ pub fn wallpaper_thumbnail_path(wallpaper_path: &str) -> String {
     identity.push(0);
     identity.extend_from_slice(source.last_modified_msecs().to_string().as_bytes());
     let hash = qdir::sha256_hex(&identity);
-    let directory = qdir::file_path(&qstandardpaths::writable_location(Location::GenericCache), "omareel/wallpapers");
+    let directory = qdir::file_path(
+        &qstandardpaths::writable_location(Location::GenericCache),
+        "omareel/wallpapers",
+    );
     qdir::file_path(&directory, &(hash + ".jpg"))
 }
 
@@ -207,7 +244,8 @@ mod tests {
 
     impl Scratch {
         fn new(name: &str) -> Scratch {
-            let path = std::env::temp_dir().join(format!("omareel-paths-{name}-{}", std::process::id()));
+            let path =
+                std::env::temp_dir().join(format!("omareel-paths-{name}-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&path);
             std::fs::create_dir_all(&path).unwrap();
             Scratch(std::fs::canonicalize(&path).unwrap())
@@ -297,7 +335,10 @@ mod tests {
         // z.jpg links to a.jpg, which alpha already has, so zeta has no group.
         assert_eq!(
             groups,
-            [group("beta", "Beta", true, &[&outside, &b]), group("alpha", "Alpha", false, &[&a, &shared])]
+            [
+                group("beta", "Beta", true, &[&outside, &b]),
+                group("alpha", "Alpha", false, &[&a, &shared])
+            ]
         );
 
         std::fs::remove_file(scratch.path("state/theme.name")).unwrap();
@@ -337,7 +378,11 @@ mod tests {
         scratch.touch("state/theme/backgrounds/.hidden.png");
         assert_eq!(current_background_in(&state), upper);
         // A link to something that is not a file doesn't count.
-        symlink(scratch.path("state/theme/backgrounds"), scratch.path("state/background")).unwrap();
+        symlink(
+            scratch.path("state/theme/backgrounds"),
+            scratch.path("state/background"),
+        )
+        .unwrap();
         assert_eq!(current_background_in(&state), upper);
     }
 }

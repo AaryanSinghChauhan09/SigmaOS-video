@@ -352,11 +352,7 @@ fn is_resource(path: &str) -> bool {
 
 /// `QResource::fileName()` for a resource that doesn't exist: the path as given, ":" as ":/".
 fn resource_file_name(path: &str) -> &str {
-    if path == ":" {
-        ":/"
-    } else {
-        path
-    }
+    if path == ":" { ":/" } else { path }
 }
 
 /// `QDir::isAbsolutePath`: starts with "/", or with ":" (a Qt resource). "" is relative.
@@ -375,7 +371,11 @@ pub fn is_relative_path(path: &str) -> bool {
 /// `QDir(path)`'s stored path (`QDirPrivate::setPath`): "." for "", and one trailing slash
 /// removed.
 fn dir_entry_path(path: &str) -> String {
-    let mut p = if path.is_empty() { ".".to_string() } else { path.to_string() };
+    let mut p = if path.is_empty() {
+        ".".to_string()
+    } else {
+        path.to_string()
+    };
     if p.len() > 1 && p.ends_with('/') {
         p.pop();
     }
@@ -437,7 +437,9 @@ pub(crate) fn absolute_file_path_with_cwd(dir: &str, name: &str, cwd: &[u8]) -> 
 }
 
 fn current_dir_bytes() -> Vec<u8> {
-    std::env::current_dir().map(|d| d.into_os_string().into_vec()).unwrap_or_default()
+    std::env::current_dir()
+        .map(|d| d.into_os_string().into_vec())
+        .unwrap_or_default()
 }
 
 /// `QDir::currentPath()`.
@@ -913,7 +915,9 @@ pub fn mkpath(path: &str) -> bool {
 /// `createDirectoryWithParents` from qfilesystemengine_unix.cpp; returns 0 or an errno.
 fn create_directory_with_parents(path: &[u8]) -> i32 {
     let try_mkdir = || -> i32 {
-        let Ok(c) = CString::new(path) else { return libc::EINVAL };
+        let Ok(c) = CString::new(path) else {
+            return libc::EINVAL;
+        };
         // SAFETY: `c` is a valid NUL-terminated string.
         if unsafe { libc::mkdir(c.as_ptr(), 0o777) } == 0 {
             return 0;
@@ -935,7 +939,9 @@ fn create_directory_with_parents(path: &[u8]) -> i32 {
     if result != libc::ENOENT {
         return result;
     }
-    let Some(mut slash) = path.iter().rposition(|&b| b == b'/') else { return result };
+    let Some(mut slash) = path.iter().rposition(|&b| b == b'/') else {
+        return result;
+    };
     while slash > 0 && path[slash - 1] == b'/' {
         slash -= 1;
     }
@@ -976,8 +982,11 @@ pub fn remove_recursively(path: &str) -> bool {
                     let mut ok = std::fs::remove_file(&entry.path).is_ok();
                     if !ok && !info.is_writable() {
                         let mode = info.permissions_mode() | 0o200;
-                        ok = std::fs::set_permissions(&entry.path, std::fs::Permissions::from_mode(mode))
-                            .is_ok()
+                        ok = std::fs::set_permissions(
+                            &entry.path,
+                            std::fs::Permissions::from_mode(mode),
+                        )
+                        .is_ok()
                             && std::fs::remove_file(&entry.path).is_ok();
                     }
                     if !ok {
@@ -1076,7 +1085,11 @@ const NO_NAME_FILTERS_FOR_DIRS: u32 = 1 << 8;
 
 /// `QDirPrivate::toDirListingFlags`.
 fn listing_flags(filters: Filters) -> u32 {
-    let filters = if filters == Filters::NO_FILTER { Filters::ALL_ENTRIES } else { filters };
+    let filters = if filters == Filters::NO_FILTER {
+        Filters::ALL_ENTRIES
+    } else {
+        filters
+    };
     let mut flags = 0;
     if !filters.has(Filters::DIRS) && !filters.has(Filters::ALL_DIRS) {
         flags |= EXCLUDE_DIRS;
@@ -1120,7 +1133,12 @@ impl RawEntry {
     fn known_type(&self) -> bool {
         matches!(
             self.d_type,
-            libc::DT_DIR | libc::DT_BLK | libc::DT_CHR | libc::DT_FIFO | libc::DT_SOCK | libc::DT_REG
+            libc::DT_DIR
+                | libc::DT_BLK
+                | libc::DT_CHR
+                | libc::DT_FIFO
+                | libc::DT_SOCK
+                | libc::DT_REG
         )
     }
 
@@ -1175,10 +1193,18 @@ fn read_dir_raw(dir: &str) -> Vec<RawEntry> {
             break;
         }
         // SAFETY: readdir64 returned a valid entry whose d_name is NUL-terminated.
-        let (raw, d_type) =
-            unsafe { (CStr::from_ptr((*entry).d_name.as_ptr()).to_bytes(), (*entry).d_type) };
+        let (raw, d_type) = unsafe {
+            (
+                CStr::from_ptr((*entry).d_name.as_ptr()).to_bytes(),
+                (*entry).d_type,
+            )
+        };
         if let Some(name) = decode_listing_name(raw) {
-            out.push(RawEntry { path: format!("{prefix}{name}"), name, d_type });
+            out.push(RawEntry {
+                path: format!("{prefix}{name}"),
+                name,
+                d_type,
+            });
         }
     }
     // SAFETY: `stream` came from opendir and is closed once.
@@ -1257,8 +1283,16 @@ fn list(
     sort: SortFlags,
     names_only: bool,
 ) -> Vec<RawEntry> {
-    let filters = if filters == Filters::NO_FILTER { Filters::ALL_ENTRIES } else { filters };
-    let sort = if sort == SortFlags::NO_SORT { SortFlags::NAME | SortFlags::IGNORE_CASE } else { sort };
+    let filters = if filters == Filters::NO_FILTER {
+        Filters::ALL_ENTRIES
+    } else {
+        filters
+    };
+    let sort = if sort == SortFlags::NO_SORT {
+        SortFlags::NAME | SortFlags::IGNORE_CASE
+    } else {
+        sort
+    };
     let unsorted = sort.0 & 0x03 == SortFlags::UNSORTED.0;
     let path = dir_entry_path(dir);
     if is_resource(&path) {
@@ -1269,7 +1303,10 @@ fn list(
     let patterns: Vec<Glob> = if name_filters.contains(&"*") {
         Vec::new()
     } else {
-        name_filters.iter().map(|f| Glob::new(f, case_sensitive)).collect()
+        name_filters
+            .iter()
+            .map(|f| Glob::new(f, case_sensitive))
+            .collect()
     };
     let entries: Vec<RawEntry> = read_dir_raw(&path)
         .into_iter()
@@ -1308,15 +1345,26 @@ pub fn entry_info_list(
     filters: Filters,
     sort: SortFlags,
 ) -> Vec<FileInfo> {
-    list(dir, name_filters, filters, sort, false).into_iter().map(|e| FileInfo::new(e.path)).collect()
+    list(dir, name_filters, filters, sort, false)
+        .into_iter()
+        .map(|e| FileInfo::new(e.path))
+        .collect()
 }
 
 /// `QDir(dir).entryList(nameFilters, filters, sort)`: the names of [`entry_info_list`], except
 /// that, as in Qt, an unsorted `entryList` ignores [`Filters::READABLE`], [`Filters::WRITABLE`],
 /// [`Filters::EXECUTABLE`], [`Filters::NO_DOT`] and [`Filters::NO_DOT_DOT`] (the last two only
 /// matter when one is given without the other).
-pub fn entry_list(dir: &str, name_filters: &[&str], filters: Filters, sort: SortFlags) -> Vec<String> {
-    list(dir, name_filters, filters, sort, true).into_iter().map(|e| e.name).collect()
+pub fn entry_list(
+    dir: &str,
+    name_filters: &[&str],
+    filters: Filters,
+    sort: SortFlags,
+) -> Vec<String> {
+    list(dir, name_filters, filters, sort, true)
+        .into_iter()
+        .map(|e| e.name)
+        .collect()
 }
 
 struct SortItem {
@@ -1417,11 +1465,7 @@ fn compare_utf16_ignore_case(a: &[u16], b: &[u16]) -> i64 {
         }
     }
     if l == a.len() {
-        if l == b.len() {
-            0
-        } else {
-            -1
-        }
+        if l == b.len() { 0 } else { -1 }
     } else {
         1
     }
@@ -1461,7 +1505,12 @@ fn introsort_loop<T>(
     }
 }
 
-fn partition_pivot<T>(v: &mut [T], first: usize, last: usize, less: &dyn Fn(&T, &T) -> bool) -> usize {
+fn partition_pivot<T>(
+    v: &mut [T],
+    first: usize,
+    last: usize,
+    less: &dyn Fn(&T, &T) -> bool,
+) -> usize {
     let mid = first + (last - first) / 2;
     let (a, b, c) = (first + 1, mid, last - 1);
     // __move_median_to_first
@@ -1590,58 +1639,215 @@ fn adjust_heap<T>(v: &mut [T], top: usize, len: usize, less: &dyn Fn(&T, &T) -> 
 /// PCRE2 10.48, which Qt's `QRegularExpression` uses, matches two characters caselessly
 /// exactly when they fold to the same character here.
 const CASE_FOLD_RUNS: &[(u32, u32, u32, i32)] = &[
-    (0x41, 26, 1, 32), (0xB5, 1, 1, 775), (0xC0, 23, 1, 32), (0xD8, 7, 1, 32), (0x100, 24, 2, 1),
-    (0x132, 3, 2, 1), (0x139, 8, 2, 1), (0x14A, 23, 2, 1), (0x178, 1, 1, -121), (0x179, 3, 2, 1),
-    (0x17F, 1, 1, -268), (0x181, 1, 1, 210), (0x182, 2, 2, 1), (0x186, 1, 1, 206),
-    (0x187, 1, 1, 1), (0x189, 2, 1, 205), (0x18B, 1, 1, 1), (0x18E, 1, 1, 79),
-    (0x18F, 1, 1, 202), (0x190, 1, 1, 203), (0x191, 1, 1, 1), (0x193, 1, 1, 205),
-    (0x194, 1, 1, 207), (0x196, 1, 1, 211), (0x197, 1, 1, 209), (0x198, 1, 1, 1),
-    (0x19C, 1, 1, 211), (0x19D, 1, 1, 213), (0x19F, 1, 1, 214), (0x1A0, 3, 2, 1),
-    (0x1A6, 1, 1, 218), (0x1A7, 1, 1, 1), (0x1A9, 1, 1, 218), (0x1AC, 1, 1, 1),
-    (0x1AE, 1, 1, 218), (0x1AF, 1, 1, 1), (0x1B1, 2, 1, 217), (0x1B3, 2, 2, 1),
-    (0x1B7, 1, 1, 219), (0x1B8, 1, 1, 1), (0x1BC, 1, 1, 1), (0x1C4, 1, 1, 2), (0x1C5, 1, 1, 1),
-    (0x1C7, 1, 1, 2), (0x1C8, 1, 1, 1), (0x1CA, 1, 1, 2), (0x1CB, 9, 2, 1), (0x1DE, 9, 2, 1),
-    (0x1F1, 1, 1, 2), (0x1F2, 2, 2, 1), (0x1F6, 1, 1, -97), (0x1F7, 1, 1, -56),
-    (0x1F8, 20, 2, 1), (0x220, 1, 1, -130), (0x222, 9, 2, 1), (0x23A, 1, 1, 10795),
-    (0x23B, 1, 1, 1), (0x23D, 1, 1, -163), (0x23E, 1, 1, 10792), (0x241, 1, 1, 1),
-    (0x243, 1, 1, -195), (0x244, 1, 1, 69), (0x245, 1, 1, 71), (0x246, 5, 2, 1),
-    (0x345, 1, 1, 116), (0x370, 2, 2, 1), (0x376, 1, 1, 1), (0x37F, 1, 1, 116),
-    (0x386, 1, 1, 38), (0x388, 3, 1, 37), (0x38C, 1, 1, 64), (0x38E, 2, 1, 63),
-    (0x391, 17, 1, 32), (0x3A3, 9, 1, 32), (0x3C2, 1, 1, 1), (0x3CF, 1, 1, 8),
-    (0x3D0, 1, 1, -30), (0x3D1, 1, 1, -25), (0x3D5, 1, 1, -15), (0x3D6, 1, 1, -22),
-    (0x3D8, 12, 2, 1), (0x3F0, 1, 1, -54), (0x3F1, 1, 1, -48), (0x3F4, 1, 1, -60),
-    (0x3F5, 1, 1, -64), (0x3F7, 1, 1, 1), (0x3F9, 1, 1, -7), (0x3FA, 1, 1, 1),
-    (0x3FD, 3, 1, -130), (0x400, 16, 1, 80), (0x410, 32, 1, 32), (0x460, 17, 2, 1),
-    (0x48A, 27, 2, 1), (0x4C0, 1, 1, 15), (0x4C1, 7, 2, 1), (0x4D0, 48, 2, 1),
-    (0x531, 38, 1, 48), (0x10A0, 38, 1, 7264), (0x10C7, 1, 1, 7264), (0x10CD, 1, 1, 7264),
-    (0x13F8, 6, 1, -8), (0x1C80, 1, 1, -6222), (0x1C81, 1, 1, -6221), (0x1C82, 1, 1, -6212),
-    (0x1C83, 2, 1, -6210), (0x1C85, 1, 1, -6211), (0x1C86, 1, 1, -6204), (0x1C87, 1, 1, -6180),
-    (0x1C88, 1, 1, 35267), (0x1C89, 1, 1, 1), (0x1C90, 43, 1, -3008), (0x1CBD, 3, 1, -3008),
-    (0x1E00, 75, 2, 1), (0x1E9B, 1, 1, -58), (0x1E9E, 1, 1, -7615), (0x1EA0, 48, 2, 1),
-    (0x1F08, 8, 1, -8), (0x1F18, 6, 1, -8), (0x1F28, 8, 1, -8), (0x1F38, 8, 1, -8),
-    (0x1F48, 6, 1, -8), (0x1F59, 4, 2, -8), (0x1F68, 8, 1, -8), (0x1F88, 8, 1, -8),
-    (0x1F98, 8, 1, -8), (0x1FA8, 8, 1, -8), (0x1FB8, 2, 1, -8), (0x1FBA, 2, 1, -74),
-    (0x1FBC, 1, 1, -9), (0x1FBE, 1, 1, -7173), (0x1FC8, 4, 1, -86), (0x1FCC, 1, 1, -9),
-    (0x1FD3, 1, 1, -7235), (0x1FD8, 2, 1, -8), (0x1FDA, 2, 1, -100), (0x1FE3, 1, 1, -7219),
-    (0x1FE8, 2, 1, -8), (0x1FEA, 2, 1, -112), (0x1FEC, 1, 1, -7), (0x1FF8, 2, 1, -128),
-    (0x1FFA, 2, 1, -126), (0x1FFC, 1, 1, -9), (0x2126, 1, 1, -7517), (0x212A, 1, 1, -8383),
-    (0x212B, 1, 1, -8262), (0x2132, 1, 1, 28), (0x2160, 16, 1, 16), (0x2183, 1, 1, 1),
-    (0x24B6, 26, 1, 26), (0x2C00, 48, 1, 48), (0x2C60, 1, 1, 1), (0x2C62, 1, 1, -10743),
-    (0x2C63, 1, 1, -3814), (0x2C64, 1, 1, -10727), (0x2C67, 3, 2, 1), (0x2C6D, 1, 1, -10780),
-    (0x2C6E, 1, 1, -10749), (0x2C6F, 1, 1, -10783), (0x2C70, 1, 1, -10782), (0x2C72, 1, 1, 1),
-    (0x2C75, 1, 1, 1), (0x2C7E, 2, 1, -10815), (0x2C80, 50, 2, 1), (0x2CEB, 2, 2, 1),
-    (0x2CF2, 1, 1, 1), (0xA640, 23, 2, 1), (0xA680, 14, 2, 1), (0xA722, 7, 2, 1),
-    (0xA732, 31, 2, 1), (0xA779, 2, 2, 1), (0xA77D, 1, 1, -35332), (0xA77E, 5, 2, 1),
-    (0xA78B, 1, 1, 1), (0xA78D, 1, 1, -42280), (0xA790, 2, 2, 1), (0xA796, 10, 2, 1),
-    (0xA7AA, 1, 1, -42308), (0xA7AB, 1, 1, -42319), (0xA7AC, 1, 1, -42315),
-    (0xA7AD, 1, 1, -42305), (0xA7AE, 1, 1, -42308), (0xA7B0, 1, 1, -42258),
-    (0xA7B1, 1, 1, -42282), (0xA7B2, 1, 1, -42261), (0xA7B3, 1, 1, 928), (0xA7B4, 8, 2, 1),
-    (0xA7C4, 1, 1, -48), (0xA7C5, 1, 1, -42307), (0xA7C6, 1, 1, -35384), (0xA7C7, 2, 2, 1),
-    (0xA7CB, 1, 1, -42343), (0xA7CC, 8, 2, 1), (0xA7DC, 1, 1, -42561), (0xA7F5, 1, 1, 1),
-    (0xAB70, 80, 1, -38864), (0xFB05, 1, 1, 1), (0xFF21, 26, 1, 32), (0x10400, 40, 1, 40),
-    (0x104B0, 36, 1, 40), (0x10570, 11, 1, 39), (0x1057C, 15, 1, 39), (0x1058C, 7, 1, 39),
-    (0x10594, 2, 1, 39), (0x10C80, 51, 1, 64), (0x10D50, 22, 1, 32), (0x118A0, 32, 1, 32),
-    (0x16E40, 32, 1, 32), (0x16EA0, 25, 1, 27), (0x1E900, 34, 1, 34),
+    (0x41, 26, 1, 32),
+    (0xB5, 1, 1, 775),
+    (0xC0, 23, 1, 32),
+    (0xD8, 7, 1, 32),
+    (0x100, 24, 2, 1),
+    (0x132, 3, 2, 1),
+    (0x139, 8, 2, 1),
+    (0x14A, 23, 2, 1),
+    (0x178, 1, 1, -121),
+    (0x179, 3, 2, 1),
+    (0x17F, 1, 1, -268),
+    (0x181, 1, 1, 210),
+    (0x182, 2, 2, 1),
+    (0x186, 1, 1, 206),
+    (0x187, 1, 1, 1),
+    (0x189, 2, 1, 205),
+    (0x18B, 1, 1, 1),
+    (0x18E, 1, 1, 79),
+    (0x18F, 1, 1, 202),
+    (0x190, 1, 1, 203),
+    (0x191, 1, 1, 1),
+    (0x193, 1, 1, 205),
+    (0x194, 1, 1, 207),
+    (0x196, 1, 1, 211),
+    (0x197, 1, 1, 209),
+    (0x198, 1, 1, 1),
+    (0x19C, 1, 1, 211),
+    (0x19D, 1, 1, 213),
+    (0x19F, 1, 1, 214),
+    (0x1A0, 3, 2, 1),
+    (0x1A6, 1, 1, 218),
+    (0x1A7, 1, 1, 1),
+    (0x1A9, 1, 1, 218),
+    (0x1AC, 1, 1, 1),
+    (0x1AE, 1, 1, 218),
+    (0x1AF, 1, 1, 1),
+    (0x1B1, 2, 1, 217),
+    (0x1B3, 2, 2, 1),
+    (0x1B7, 1, 1, 219),
+    (0x1B8, 1, 1, 1),
+    (0x1BC, 1, 1, 1),
+    (0x1C4, 1, 1, 2),
+    (0x1C5, 1, 1, 1),
+    (0x1C7, 1, 1, 2),
+    (0x1C8, 1, 1, 1),
+    (0x1CA, 1, 1, 2),
+    (0x1CB, 9, 2, 1),
+    (0x1DE, 9, 2, 1),
+    (0x1F1, 1, 1, 2),
+    (0x1F2, 2, 2, 1),
+    (0x1F6, 1, 1, -97),
+    (0x1F7, 1, 1, -56),
+    (0x1F8, 20, 2, 1),
+    (0x220, 1, 1, -130),
+    (0x222, 9, 2, 1),
+    (0x23A, 1, 1, 10795),
+    (0x23B, 1, 1, 1),
+    (0x23D, 1, 1, -163),
+    (0x23E, 1, 1, 10792),
+    (0x241, 1, 1, 1),
+    (0x243, 1, 1, -195),
+    (0x244, 1, 1, 69),
+    (0x245, 1, 1, 71),
+    (0x246, 5, 2, 1),
+    (0x345, 1, 1, 116),
+    (0x370, 2, 2, 1),
+    (0x376, 1, 1, 1),
+    (0x37F, 1, 1, 116),
+    (0x386, 1, 1, 38),
+    (0x388, 3, 1, 37),
+    (0x38C, 1, 1, 64),
+    (0x38E, 2, 1, 63),
+    (0x391, 17, 1, 32),
+    (0x3A3, 9, 1, 32),
+    (0x3C2, 1, 1, 1),
+    (0x3CF, 1, 1, 8),
+    (0x3D0, 1, 1, -30),
+    (0x3D1, 1, 1, -25),
+    (0x3D5, 1, 1, -15),
+    (0x3D6, 1, 1, -22),
+    (0x3D8, 12, 2, 1),
+    (0x3F0, 1, 1, -54),
+    (0x3F1, 1, 1, -48),
+    (0x3F4, 1, 1, -60),
+    (0x3F5, 1, 1, -64),
+    (0x3F7, 1, 1, 1),
+    (0x3F9, 1, 1, -7),
+    (0x3FA, 1, 1, 1),
+    (0x3FD, 3, 1, -130),
+    (0x400, 16, 1, 80),
+    (0x410, 32, 1, 32),
+    (0x460, 17, 2, 1),
+    (0x48A, 27, 2, 1),
+    (0x4C0, 1, 1, 15),
+    (0x4C1, 7, 2, 1),
+    (0x4D0, 48, 2, 1),
+    (0x531, 38, 1, 48),
+    (0x10A0, 38, 1, 7264),
+    (0x10C7, 1, 1, 7264),
+    (0x10CD, 1, 1, 7264),
+    (0x13F8, 6, 1, -8),
+    (0x1C80, 1, 1, -6222),
+    (0x1C81, 1, 1, -6221),
+    (0x1C82, 1, 1, -6212),
+    (0x1C83, 2, 1, -6210),
+    (0x1C85, 1, 1, -6211),
+    (0x1C86, 1, 1, -6204),
+    (0x1C87, 1, 1, -6180),
+    (0x1C88, 1, 1, 35267),
+    (0x1C89, 1, 1, 1),
+    (0x1C90, 43, 1, -3008),
+    (0x1CBD, 3, 1, -3008),
+    (0x1E00, 75, 2, 1),
+    (0x1E9B, 1, 1, -58),
+    (0x1E9E, 1, 1, -7615),
+    (0x1EA0, 48, 2, 1),
+    (0x1F08, 8, 1, -8),
+    (0x1F18, 6, 1, -8),
+    (0x1F28, 8, 1, -8),
+    (0x1F38, 8, 1, -8),
+    (0x1F48, 6, 1, -8),
+    (0x1F59, 4, 2, -8),
+    (0x1F68, 8, 1, -8),
+    (0x1F88, 8, 1, -8),
+    (0x1F98, 8, 1, -8),
+    (0x1FA8, 8, 1, -8),
+    (0x1FB8, 2, 1, -8),
+    (0x1FBA, 2, 1, -74),
+    (0x1FBC, 1, 1, -9),
+    (0x1FBE, 1, 1, -7173),
+    (0x1FC8, 4, 1, -86),
+    (0x1FCC, 1, 1, -9),
+    (0x1FD3, 1, 1, -7235),
+    (0x1FD8, 2, 1, -8),
+    (0x1FDA, 2, 1, -100),
+    (0x1FE3, 1, 1, -7219),
+    (0x1FE8, 2, 1, -8),
+    (0x1FEA, 2, 1, -112),
+    (0x1FEC, 1, 1, -7),
+    (0x1FF8, 2, 1, -128),
+    (0x1FFA, 2, 1, -126),
+    (0x1FFC, 1, 1, -9),
+    (0x2126, 1, 1, -7517),
+    (0x212A, 1, 1, -8383),
+    (0x212B, 1, 1, -8262),
+    (0x2132, 1, 1, 28),
+    (0x2160, 16, 1, 16),
+    (0x2183, 1, 1, 1),
+    (0x24B6, 26, 1, 26),
+    (0x2C00, 48, 1, 48),
+    (0x2C60, 1, 1, 1),
+    (0x2C62, 1, 1, -10743),
+    (0x2C63, 1, 1, -3814),
+    (0x2C64, 1, 1, -10727),
+    (0x2C67, 3, 2, 1),
+    (0x2C6D, 1, 1, -10780),
+    (0x2C6E, 1, 1, -10749),
+    (0x2C6F, 1, 1, -10783),
+    (0x2C70, 1, 1, -10782),
+    (0x2C72, 1, 1, 1),
+    (0x2C75, 1, 1, 1),
+    (0x2C7E, 2, 1, -10815),
+    (0x2C80, 50, 2, 1),
+    (0x2CEB, 2, 2, 1),
+    (0x2CF2, 1, 1, 1),
+    (0xA640, 23, 2, 1),
+    (0xA680, 14, 2, 1),
+    (0xA722, 7, 2, 1),
+    (0xA732, 31, 2, 1),
+    (0xA779, 2, 2, 1),
+    (0xA77D, 1, 1, -35332),
+    (0xA77E, 5, 2, 1),
+    (0xA78B, 1, 1, 1),
+    (0xA78D, 1, 1, -42280),
+    (0xA790, 2, 2, 1),
+    (0xA796, 10, 2, 1),
+    (0xA7AA, 1, 1, -42308),
+    (0xA7AB, 1, 1, -42319),
+    (0xA7AC, 1, 1, -42315),
+    (0xA7AD, 1, 1, -42305),
+    (0xA7AE, 1, 1, -42308),
+    (0xA7B0, 1, 1, -42258),
+    (0xA7B1, 1, 1, -42282),
+    (0xA7B2, 1, 1, -42261),
+    (0xA7B3, 1, 1, 928),
+    (0xA7B4, 8, 2, 1),
+    (0xA7C4, 1, 1, -48),
+    (0xA7C5, 1, 1, -42307),
+    (0xA7C6, 1, 1, -35384),
+    (0xA7C7, 2, 2, 1),
+    (0xA7CB, 1, 1, -42343),
+    (0xA7CC, 8, 2, 1),
+    (0xA7DC, 1, 1, -42561),
+    (0xA7F5, 1, 1, 1),
+    (0xAB70, 80, 1, -38864),
+    (0xFB05, 1, 1, 1),
+    (0xFF21, 26, 1, 32),
+    (0x10400, 40, 1, 40),
+    (0x104B0, 36, 1, 40),
+    (0x10570, 11, 1, 39),
+    (0x1057C, 15, 1, 39),
+    (0x1058C, 7, 1, 39),
+    (0x10594, 2, 1, 39),
+    (0x10C80, 51, 1, 64),
+    (0x10D50, 22, 1, 32),
+    (0x118A0, 32, 1, 32),
+    (0x16E40, 32, 1, 32),
+    (0x16EA0, 25, 1, 27),
+    (0x1E900, 34, 1, 34),
 ];
 
 /// `QChar::toCaseFolded(c)`.
@@ -1688,7 +1894,10 @@ enum Token {
     Literal(char),
     AnyRun,
     AnyOne,
-    Class { negated: bool, ranges: Vec<(char, char)> },
+    Class {
+        negated: bool,
+        ranges: Vec<(char, char)>,
+    },
 }
 
 /// A name filter as `QRegularExpression::fromWildcard(pattern, cs)` compiles it, matched
@@ -1701,11 +1910,16 @@ struct Glob {
 
 impl Glob {
     fn new(pattern: &str, case_sensitive: bool) -> Glob {
-        Glob { tokens: parse_wildcard(pattern), case_sensitive }
+        Glob {
+            tokens: parse_wildcard(pattern),
+            case_sensitive,
+        }
     }
 
     fn matches(&self, name: &str) -> bool {
-        let Some(tokens) = &self.tokens else { return false };
+        let Some(tokens) = &self.tokens else {
+            return false;
+        };
         let chars: Vec<char> = name.chars().collect();
         let one = |t: &Token, c: char| -> bool {
             match t {
@@ -1833,7 +2047,9 @@ fn parse_wildcard(pattern: &str) -> Option<Vec<Token>> {
 /// right before the closing "]" with no other "[" of that kind in between; otherwise the "["
 /// is an ordinary member.
 fn posix_syntax_at(content: &[char], k: usize) -> bool {
-    let Some(&t) = content.get(k + 1) else { return false };
+    let Some(&t) = content.get(k + 1) else {
+        return false;
+    };
     if !matches!(t, ':' | '.' | '=') {
         return false;
     }
@@ -1864,17 +2080,21 @@ pub fn wildcard_match(pattern: &str, name: &str, case_sensitive: bool) -> bool {
 /// digits.
 pub fn sha256_hex(data: &[u8]) -> String {
     const K: [u32; 64] = [
-        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
+        0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
+        0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
+        0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+        0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+        0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
+        0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
+        0xc67178f2,
     ];
-    let mut h: [u32; 8] =
-        [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+    let mut h: [u32; 8] = [
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
+        0x5be0cd19,
+    ];
     let mut message = data.to_vec();
     message.push(0x80);
     while message.len() % 64 != 56 {
@@ -1889,13 +2109,20 @@ pub fn sha256_hex(data: &[u8]) -> String {
         for t in 16..64 {
             let s0 = w[t - 15].rotate_right(7) ^ w[t - 15].rotate_right(18) ^ (w[t - 15] >> 3);
             let s1 = w[t - 2].rotate_right(17) ^ w[t - 2].rotate_right(19) ^ (w[t - 2] >> 10);
-            w[t] = w[t - 16].wrapping_add(s0).wrapping_add(w[t - 7]).wrapping_add(s1);
+            w[t] = w[t - 16]
+                .wrapping_add(s0)
+                .wrapping_add(w[t - 7])
+                .wrapping_add(s1);
         }
         let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut hh] = h;
         for t in 0..64 {
             let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
             let ch = (e & f) ^ (!e & g);
-            let t1 = hh.wrapping_add(s1).wrapping_add(ch).wrapping_add(K[t]).wrapping_add(w[t]);
+            let t1 = hh
+                .wrapping_add(s1)
+                .wrapping_add(ch)
+                .wrapping_add(K[t])
+                .wrapping_add(w[t]);
             let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
             let maj = (a & b) ^ (a & c) ^ (b & c);
             let t2 = s0.wrapping_add(maj);
@@ -1945,7 +2172,9 @@ pub(crate) mod tests {
 
     impl Drop for TempDir {
         fn drop(&mut self) {
-            let _ = std::process::Command::new("chmod").args(["-R", "u+rwx", &self.0]).status();
+            let _ = std::process::Command::new("chmod")
+                .args(["-R", "u+rwx", &self.0])
+                .status();
             let _ = std::fs::remove_dir_all(&self.0);
         }
     }
@@ -1957,58 +2186,811 @@ pub(crate) mod tests {
         // input, cleanPath, isAbsolutePath, QDir.absolutePath, QDir.dirName, fileName, path,
         // absoluteFilePath, absolutePath, baseName, completeBaseName, suffix, completeSuffix,
         // QDir.filePath("x"), QDir.filePath("/abs"), QDir.filePath(""), QDir.absoluteFilePath("x")
-        ["//a/./b/../c/", "/a/c", "1", "/a/c", "c", "", "//a/./b/../c", "/a/c/", "/a/c", "", "", "", "", "//a/./b/../c/x", "/abs", "//a/./b/../c", "/a/c/x"],
-        ["../x", "../x", "0", "/tmp/paths-scratch/cwd dir/x", "x", "x", "..", "/tmp/paths-scratch/cwd dir/x", "/tmp/paths-scratch/cwd dir", "x", "x", "", "", "../x/x", "/abs", "../x", "/tmp/paths-scratch/cwd dir/x/x"],
-        ["/..", "/..", "1", "/..", "..", "..", "/", "/..", "/", "", ".", "", ".", "/../x", "/abs", "/..", "/../x"],
-        ["", "", "0", "/tmp/paths-scratch/cwd dir/é", ".", "", "", "", "", "", "", "", "", "./x", "/abs", ".", "/tmp/paths-scratch/cwd dir/é/x"],
-        [".", ".", "0", "/tmp/paths-scratch/cwd dir/é", ".", ".", ".", "/tmp/paths-scratch/cwd dir/é", "/tmp/paths-scratch/cwd dir", "", "", "", "", "./x", "/abs", ".", "/tmp/paths-scratch/cwd dir/é/x"],
-        ["a//b", "a/b", "0", "/tmp/paths-scratch/cwd dir/é/a/b", "b", "b", "a/", "/tmp/paths-scratch/cwd dir/é/a/b", "/tmp/paths-scratch/cwd dir/é/a", "b", "b", "", "", "a//b/x", "/abs", "a//b", "/tmp/paths-scratch/cwd dir/é/a/b/x"],
-        ["~", "~", "0", "/tmp/paths-scratch/cwd dir/é/~", "~", "~", ".", "/tmp/paths-scratch/cwd dir/é/~", "/tmp/paths-scratch/cwd dir/é", "~", "~", "", "", "~/x", "/abs", "~", "/tmp/paths-scratch/cwd dir/é/~/x"],
-        ["/", "/", "1", "/", "", "", "/", "/", "/", "", "", "", "", "/x", "/abs", "/", "/x"],
-        ["//", "/", "1", "/", "", "", "/", "//", "/", "", "", "", "", "/x", "/abs", "/", "/x"],
-        ["///", "/", "1", "/", "", "", "//", "//", "/", "", "", "", "", "//x", "/abs", "//", "/x"],
-        ["./", ".", "0", "/tmp/paths-scratch/cwd dir/é", ".", "", ".", "/tmp/paths-scratch/cwd dir/é/", "/tmp/paths-scratch/cwd dir/é", "", "", "", "", "./x", "/abs", ".", "/tmp/paths-scratch/cwd dir/é/x"],
-        ["../", "..", "0", "/tmp/paths-scratch/cwd dir", "..", "", "..", "/tmp/paths-scratch/cwd dir/", "/tmp/paths-scratch/cwd dir", "", "", "", "", "../x", "/abs", "..", "/tmp/paths-scratch/cwd dir/x"],
-        ["/./", "/", "1", "/", ".", "", "/.", "//", "/", "", "", "", "", "/./x", "/abs", "/.", "/x"],
-        ["/../", "/..", "1", "/..", "..", "", "/..", "/../", "/..", "", "", "", "", "/../x", "/abs", "/..", "/../x"],
-        ["a/..", ".", "0", "/tmp/paths-scratch/cwd dir/é", "..", "..", "a", "/tmp/paths-scratch/cwd dir/é", "/tmp/paths-scratch/cwd dir", "", ".", "", ".", "a/../x", "/abs", "a/..", "/tmp/paths-scratch/cwd dir/é/x"],
-        ["a/../..", "..", "0", "/tmp/paths-scratch/cwd dir", "..", "..", "a/..", "/tmp/paths-scratch/cwd dir", "/tmp/paths-scratch", "", ".", "", ".", "a/../../x", "/abs", "a/../..", "/tmp/paths-scratch/cwd dir/x"],
-        ["/a/../..", "/..", "1", "/..", "..", "..", "/a/..", "/..", "/", "", ".", "", ".", "/a/../../x", "/abs", "/a/../..", "/../x"],
-        [":/x", ":/x", "1", ":/x", "x", "x", ":", ":/x", ":/", "x", "x", "", "", ":/x/x", "/abs", ":/x", ":/x/x"],
-        [":x/../y", "y", "1", ":x/../y", "y", "y", ":x/..", ":x/../y", ":x/..", "y", "y", "", "", ":x/../y/x", "/abs", ":x/../y", "y/x"],
-        [":", ":", "1", ":/", "", "", ".", ":/", ":/", "", "", "", "", ":/x", "/abs", ":", ":/x"],
-        ["a/b/", "a/b", "0", "/tmp/paths-scratch/cwd dir/é/a/b", "b", "", "a/b", "/tmp/paths-scratch/cwd dir/é/a/b/", "/tmp/paths-scratch/cwd dir/é/a/b", "", "", "", "", "a/b/x", "/abs", "a/b", "/tmp/paths-scratch/cwd dir/é/a/b/x"],
-        ["a/b//", "a/b", "0", "/tmp/paths-scratch/cwd dir/é/a/b", "", "", "a/b/", "/tmp/paths-scratch/cwd dir/é/a/b/", "/tmp/paths-scratch/cwd dir/é/a/b", "", "", "", "", "a/b/x", "/abs", "a/b/", "/tmp/paths-scratch/cwd dir/é/a/b/x"],
-        ["/a/b//", "/a/b", "1", "/a/b/", "", "", "/a/b/", "/a/b/", "/a/b", "", "", "", "", "/a/b/x", "/abs", "/a/b/", "/a/b/x"],
-        ["/a/b/.", "/a/b", "1", "/a/b", ".", ".", "/a/b", "/a/b", "/a", "", "", "", "", "/a/b/./x", "/abs", "/a/b/.", "/a/b/x"],
-        ["/a/b/..", "/a", "1", "/a", "..", "..", "/a/b", "/a", "/", "", ".", "", ".", "/a/b/../x", "/abs", "/a/b/..", "/a/x"],
-        ["./a", "a", "0", "/tmp/paths-scratch/cwd dir/é/a", "a", "a", ".", "/tmp/paths-scratch/cwd dir/é/a", "/tmp/paths-scratch/cwd dir/é", "a", "a", "", "", "./a/x", "/abs", "./a", "/tmp/paths-scratch/cwd dir/é/a/x"],
-        [".//a", "a", "0", "/tmp/paths-scratch/cwd dir/é/a", "a", "a", "./", "/tmp/paths-scratch/cwd dir/é/a", "/tmp/paths-scratch/cwd dir/é", "a", "a", "", "", ".//a/x", "/abs", ".//a", "/tmp/paths-scratch/cwd dir/é/a/x"],
-        ["a/./", "a", "0", "/tmp/paths-scratch/cwd dir/é/a", ".", "", "a/.", "/tmp/paths-scratch/cwd dir/é/a/", "/tmp/paths-scratch/cwd dir/é/a", "", "", "", "", "a/./x", "/abs", "a/.", "/tmp/paths-scratch/cwd dir/é/a/x"],
-        ["...", "...", "0", "/tmp/paths-scratch/cwd dir/é/...", "...", "...", ".", "/tmp/paths-scratch/cwd dir/é/...", "/tmp/paths-scratch/cwd dir/é", "", "..", "", "..", ".../x", "/abs", "...", "/tmp/paths-scratch/cwd dir/é/.../x"],
-        ["x/.../y", "x/.../y", "0", "/tmp/paths-scratch/cwd dir/é/x/.../y", "y", "y", "x/...", "/tmp/paths-scratch/cwd dir/é/x/.../y", "/tmp/paths-scratch/cwd dir/é/x/...", "y", "y", "", "", "x/.../y/x", "/abs", "x/.../y", "/tmp/paths-scratch/cwd dir/é/x/.../y/x"],
-        [".x", ".x", "0", "/tmp/paths-scratch/cwd dir/é/.x", ".x", ".x", ".", "/tmp/paths-scratch/cwd dir/é/.x", "/tmp/paths-scratch/cwd dir/é", "", "", "x", "x", ".x/x", "/abs", ".x", "/tmp/paths-scratch/cwd dir/é/.x/x"],
-        ["x.", "x.", "0", "/tmp/paths-scratch/cwd dir/é/x.", "x.", "x.", ".", "/tmp/paths-scratch/cwd dir/é/x.", "/tmp/paths-scratch/cwd dir/é", "x", "x", "", "", "x./x", "/abs", "x.", "/tmp/paths-scratch/cwd dir/é/x./x"],
-        ["a.b.c", "a.b.c", "0", "/tmp/paths-scratch/cwd dir/é/a.b.c", "a.b.c", "a.b.c", ".", "/tmp/paths-scratch/cwd dir/é/a.b.c", "/tmp/paths-scratch/cwd dir/é", "a", "a.b", "c", "b.c", "a.b.c/x", "/abs", "a.b.c", "/tmp/paths-scratch/cwd dir/é/a.b.c/x"],
-        ["/.bashrc", "/.bashrc", "1", "/.bashrc", ".bashrc", ".bashrc", "/", "/.bashrc", "/", "", "", "bashrc", "bashrc", "/.bashrc/x", "/abs", "/.bashrc", "/.bashrc/x"],
-        ["dir.x/file", "dir.x/file", "0", "/tmp/paths-scratch/cwd dir/é/dir.x/file", "file", "file", "dir.x", "/tmp/paths-scratch/cwd dir/é/dir.x/file", "/tmp/paths-scratch/cwd dir/é/dir.x", "file", "file", "", "", "dir.x/file/x", "/abs", "dir.x/file", "/tmp/paths-scratch/cwd dir/é/dir.x/file/x"],
-        ["dir.x/file.tar.gz", "dir.x/file.tar.gz", "0", "/tmp/paths-scratch/cwd dir/é/dir.x/file.tar.gz", "file.tar.gz", "file.tar.gz", "dir.x", "/tmp/paths-scratch/cwd dir/é/dir.x/file.tar.gz", "/tmp/paths-scratch/cwd dir/é/dir.x", "file", "file.tar", "gz", "tar.gz", "dir.x/file.tar.gz/x", "/abs", "dir.x/file.tar.gz", "/tmp/paths-scratch/cwd dir/é/dir.x/file.tar.gz/x"],
-        ["/tmp/", "/tmp", "1", "/tmp", "tmp", "", "/tmp", "/tmp/", "/tmp", "", "", "", "", "/tmp/x", "/abs", "/tmp", "/tmp/x"],
-        ["tmp", "tmp", "0", "/tmp/paths-scratch/cwd dir/é/tmp", "tmp", "tmp", ".", "/tmp/paths-scratch/cwd dir/é/tmp", "/tmp/paths-scratch/cwd dir/é", "tmp", "tmp", "", "", "tmp/x", "/abs", "tmp", "/tmp/paths-scratch/cwd dir/é/tmp/x"],
-        ["C:/x", "C:/x", "0", "/tmp/paths-scratch/cwd dir/é/C:/x", "x", "x", "C:", "/tmp/paths-scratch/cwd dir/é/C:/x", "/tmp/paths-scratch/cwd dir/é/C:", "x", "x", "", "", "C:/x/x", "/abs", "C:/x", "/tmp/paths-scratch/cwd dir/é/C:/x/x"],
-        ["\\a\\b", "\\a\\b", "0", "/tmp/paths-scratch/cwd dir/é/\\a\\b", "\\a\\b", "\\a\\b", ".", "/tmp/paths-scratch/cwd dir/é/\\a\\b", "/tmp/paths-scratch/cwd dir/é", "\\a\\b", "\\a\\b", "", "", "\\a\\b/x", "/abs", "\\a\\b", "/tmp/paths-scratch/cwd dir/é/\\a\\b/x"],
-        [" /x", " /x", "0", "/tmp/paths-scratch/cwd dir/é/ /x", "x", "x", " ", "/tmp/paths-scratch/cwd dir/é/ /x", "/tmp/paths-scratch/cwd dir/é/ ", "x", "x", "", "", " /x/x", "/abs", " /x", "/tmp/paths-scratch/cwd dir/é/ /x/x"],
-        ["é/ü.ñ", "é/ü.ñ", "0", "/tmp/paths-scratch/cwd dir/é/é/ü.ñ", "ü.ñ", "ü.ñ", "é", "/tmp/paths-scratch/cwd dir/é/é/ü.ñ", "/tmp/paths-scratch/cwd dir/é/é", "ü", "ü", "ñ", "ñ", "é/ü.ñ/x", "/abs", "é/ü.ñ", "/tmp/paths-scratch/cwd dir/é/é/ü.ñ/x"],
-        ["😀/😀.😀", "😀/😀.😀", "0", "/tmp/paths-scratch/cwd dir/é/😀/😀.😀", "😀.😀", "😀.😀", "😀", "/tmp/paths-scratch/cwd dir/é/😀/😀.😀", "/tmp/paths-scratch/cwd dir/é/😀", "😀", "😀", "😀", "😀", "😀/😀.😀/x", "/abs", "😀/😀.😀", "/tmp/paths-scratch/cwd dir/é/😀/😀.😀/x"],
-        ["//a//b//", "/a/b", "1", "/a/b", "", "", "//a//b/", "/a/b/", "/a/b", "", "", "", "", "//a//b/x", "/abs", "//a//b/", "/a/b/x"],
-        ["/a/./../b", "/b", "1", "/b", "b", "b", "/a/./..", "/b", "/", "b", "b", "", "", "/a/./../b/x", "/abs", "/a/./../b", "/b/x"],
-        ["a/b/../../..", "..", "0", "/tmp/paths-scratch/cwd dir", "..", "..", "a/b/../..", "/tmp/paths-scratch/cwd dir", "/tmp/paths-scratch", "", ".", "", ".", "a/b/../../../x", "/abs", "a/b/../../..", "/tmp/paths-scratch/cwd dir/x"],
-        ["../../a", "../../a", "0", "/tmp/paths-scratch/a", "a", "a", "../..", "/tmp/paths-scratch/a", "/tmp/paths-scratch", "a", "a", "", "", "../../a/x", "/abs", "../../a", "/tmp/paths-scratch/a/x"],
-        ["/../../a", "/../../a", "1", "/../../a", "a", "a", "/../..", "/../../a", "/../..", "a", "a", "", "", "/../../a/x", "/abs", "/../../a", "/../../a/x"],
-        ["/a/b/c/../../../..", "/..", "1", "/..", "..", "..", "/a/b/c/../../..", "/..", "/", "", ".", "", ".", "/a/b/c/../../../../x", "/abs", "/a/b/c/../../../..", "/../x"],
-        ["./..", "..", "0", "/tmp/paths-scratch/cwd dir", "..", "..", ".", "/tmp/paths-scratch/cwd dir", "/tmp/paths-scratch", "", ".", "", ".", "./../x", "/abs", "./..", "/tmp/paths-scratch/cwd dir/x"],
-        ["~/x", "~/x", "0", "/tmp/paths-scratch/cwd dir/é/~/x", "x", "x", "~", "/tmp/paths-scratch/cwd dir/é/~/x", "/tmp/paths-scratch/cwd dir/é/~", "x", "x", "", "", "~/x/x", "/abs", "~/x", "/tmp/paths-scratch/cwd dir/é/~/x/x"],
-        ["a:b", "a:b", "0", "/tmp/paths-scratch/cwd dir/é/a:b", "a:b", "a:b", ".", "/tmp/paths-scratch/cwd dir/é/a:b", "/tmp/paths-scratch/cwd dir/é", "a:b", "a:b", "", "", "a:b/x", "/abs", "a:b", "/tmp/paths-scratch/cwd dir/é/a:b/x"],
+        [
+            "//a/./b/../c/",
+            "/a/c",
+            "1",
+            "/a/c",
+            "c",
+            "",
+            "//a/./b/../c",
+            "/a/c/",
+            "/a/c",
+            "",
+            "",
+            "",
+            "",
+            "//a/./b/../c/x",
+            "/abs",
+            "//a/./b/../c",
+            "/a/c/x",
+        ],
+        [
+            "../x",
+            "../x",
+            "0",
+            "/tmp/paths-scratch/cwd dir/x",
+            "x",
+            "x",
+            "..",
+            "/tmp/paths-scratch/cwd dir/x",
+            "/tmp/paths-scratch/cwd dir",
+            "x",
+            "x",
+            "",
+            "",
+            "../x/x",
+            "/abs",
+            "../x",
+            "/tmp/paths-scratch/cwd dir/x/x",
+        ],
+        [
+            "/..", "/..", "1", "/..", "..", "..", "/", "/..", "/", "", ".", "", ".", "/../x",
+            "/abs", "/..", "/../x",
+        ],
+        [
+            "",
+            "",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é",
+            ".",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "./x",
+            "/abs",
+            ".",
+            "/tmp/paths-scratch/cwd dir/é/x",
+        ],
+        [
+            ".",
+            ".",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é",
+            ".",
+            ".",
+            ".",
+            "/tmp/paths-scratch/cwd dir/é",
+            "/tmp/paths-scratch/cwd dir",
+            "",
+            "",
+            "",
+            "",
+            "./x",
+            "/abs",
+            ".",
+            "/tmp/paths-scratch/cwd dir/é/x",
+        ],
+        [
+            "a//b",
+            "a/b",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/a/b",
+            "b",
+            "b",
+            "a/",
+            "/tmp/paths-scratch/cwd dir/é/a/b",
+            "/tmp/paths-scratch/cwd dir/é/a",
+            "b",
+            "b",
+            "",
+            "",
+            "a//b/x",
+            "/abs",
+            "a//b",
+            "/tmp/paths-scratch/cwd dir/é/a/b/x",
+        ],
+        [
+            "~",
+            "~",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/~",
+            "~",
+            "~",
+            ".",
+            "/tmp/paths-scratch/cwd dir/é/~",
+            "/tmp/paths-scratch/cwd dir/é",
+            "~",
+            "~",
+            "",
+            "",
+            "~/x",
+            "/abs",
+            "~",
+            "/tmp/paths-scratch/cwd dir/é/~/x",
+        ],
+        [
+            "/", "/", "1", "/", "", "", "/", "/", "/", "", "", "", "", "/x", "/abs", "/", "/x",
+        ],
+        [
+            "//", "/", "1", "/", "", "", "/", "//", "/", "", "", "", "", "/x", "/abs", "/", "/x",
+        ],
+        [
+            "///", "/", "1", "/", "", "", "//", "//", "/", "", "", "", "", "//x", "/abs", "//",
+            "/x",
+        ],
+        [
+            "./",
+            ".",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é",
+            ".",
+            "",
+            ".",
+            "/tmp/paths-scratch/cwd dir/é/",
+            "/tmp/paths-scratch/cwd dir/é",
+            "",
+            "",
+            "",
+            "",
+            "./x",
+            "/abs",
+            ".",
+            "/tmp/paths-scratch/cwd dir/é/x",
+        ],
+        [
+            "../",
+            "..",
+            "0",
+            "/tmp/paths-scratch/cwd dir",
+            "..",
+            "",
+            "..",
+            "/tmp/paths-scratch/cwd dir/",
+            "/tmp/paths-scratch/cwd dir",
+            "",
+            "",
+            "",
+            "",
+            "../x",
+            "/abs",
+            "..",
+            "/tmp/paths-scratch/cwd dir/x",
+        ],
+        [
+            "/./", "/", "1", "/", ".", "", "/.", "//", "/", "", "", "", "", "/./x", "/abs", "/.",
+            "/x",
+        ],
+        [
+            "/../", "/..", "1", "/..", "..", "", "/..", "/../", "/..", "", "", "", "", "/../x",
+            "/abs", "/..", "/../x",
+        ],
+        [
+            "a/..",
+            ".",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é",
+            "..",
+            "..",
+            "a",
+            "/tmp/paths-scratch/cwd dir/é",
+            "/tmp/paths-scratch/cwd dir",
+            "",
+            ".",
+            "",
+            ".",
+            "a/../x",
+            "/abs",
+            "a/..",
+            "/tmp/paths-scratch/cwd dir/é/x",
+        ],
+        [
+            "a/../..",
+            "..",
+            "0",
+            "/tmp/paths-scratch/cwd dir",
+            "..",
+            "..",
+            "a/..",
+            "/tmp/paths-scratch/cwd dir",
+            "/tmp/paths-scratch",
+            "",
+            ".",
+            "",
+            ".",
+            "a/../../x",
+            "/abs",
+            "a/../..",
+            "/tmp/paths-scratch/cwd dir/x",
+        ],
+        [
+            "/a/../..",
+            "/..",
+            "1",
+            "/..",
+            "..",
+            "..",
+            "/a/..",
+            "/..",
+            "/",
+            "",
+            ".",
+            "",
+            ".",
+            "/a/../../x",
+            "/abs",
+            "/a/../..",
+            "/../x",
+        ],
+        [
+            ":/x", ":/x", "1", ":/x", "x", "x", ":", ":/x", ":/", "x", "x", "", "", ":/x/x",
+            "/abs", ":/x", ":/x/x",
+        ],
+        [
+            ":x/../y",
+            "y",
+            "1",
+            ":x/../y",
+            "y",
+            "y",
+            ":x/..",
+            ":x/../y",
+            ":x/..",
+            "y",
+            "y",
+            "",
+            "",
+            ":x/../y/x",
+            "/abs",
+            ":x/../y",
+            "y/x",
+        ],
+        [
+            ":", ":", "1", ":/", "", "", ".", ":/", ":/", "", "", "", "", ":/x", "/abs", ":", ":/x",
+        ],
+        [
+            "a/b/",
+            "a/b",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/a/b",
+            "b",
+            "",
+            "a/b",
+            "/tmp/paths-scratch/cwd dir/é/a/b/",
+            "/tmp/paths-scratch/cwd dir/é/a/b",
+            "",
+            "",
+            "",
+            "",
+            "a/b/x",
+            "/abs",
+            "a/b",
+            "/tmp/paths-scratch/cwd dir/é/a/b/x",
+        ],
+        [
+            "a/b//",
+            "a/b",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/a/b",
+            "",
+            "",
+            "a/b/",
+            "/tmp/paths-scratch/cwd dir/é/a/b/",
+            "/tmp/paths-scratch/cwd dir/é/a/b",
+            "",
+            "",
+            "",
+            "",
+            "a/b/x",
+            "/abs",
+            "a/b/",
+            "/tmp/paths-scratch/cwd dir/é/a/b/x",
+        ],
+        [
+            "/a/b//", "/a/b", "1", "/a/b/", "", "", "/a/b/", "/a/b/", "/a/b", "", "", "", "",
+            "/a/b/x", "/abs", "/a/b/", "/a/b/x",
+        ],
+        [
+            "/a/b/.", "/a/b", "1", "/a/b", ".", ".", "/a/b", "/a/b", "/a", "", "", "", "",
+            "/a/b/./x", "/abs", "/a/b/.", "/a/b/x",
+        ],
+        [
+            "/a/b/..",
+            "/a",
+            "1",
+            "/a",
+            "..",
+            "..",
+            "/a/b",
+            "/a",
+            "/",
+            "",
+            ".",
+            "",
+            ".",
+            "/a/b/../x",
+            "/abs",
+            "/a/b/..",
+            "/a/x",
+        ],
+        [
+            "./a",
+            "a",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/a",
+            "a",
+            "a",
+            ".",
+            "/tmp/paths-scratch/cwd dir/é/a",
+            "/tmp/paths-scratch/cwd dir/é",
+            "a",
+            "a",
+            "",
+            "",
+            "./a/x",
+            "/abs",
+            "./a",
+            "/tmp/paths-scratch/cwd dir/é/a/x",
+        ],
+        [
+            ".//a",
+            "a",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/a",
+            "a",
+            "a",
+            "./",
+            "/tmp/paths-scratch/cwd dir/é/a",
+            "/tmp/paths-scratch/cwd dir/é",
+            "a",
+            "a",
+            "",
+            "",
+            ".//a/x",
+            "/abs",
+            ".//a",
+            "/tmp/paths-scratch/cwd dir/é/a/x",
+        ],
+        [
+            "a/./",
+            "a",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/a",
+            ".",
+            "",
+            "a/.",
+            "/tmp/paths-scratch/cwd dir/é/a/",
+            "/tmp/paths-scratch/cwd dir/é/a",
+            "",
+            "",
+            "",
+            "",
+            "a/./x",
+            "/abs",
+            "a/.",
+            "/tmp/paths-scratch/cwd dir/é/a/x",
+        ],
+        [
+            "...",
+            "...",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/...",
+            "...",
+            "...",
+            ".",
+            "/tmp/paths-scratch/cwd dir/é/...",
+            "/tmp/paths-scratch/cwd dir/é",
+            "",
+            "..",
+            "",
+            "..",
+            ".../x",
+            "/abs",
+            "...",
+            "/tmp/paths-scratch/cwd dir/é/.../x",
+        ],
+        [
+            "x/.../y",
+            "x/.../y",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/x/.../y",
+            "y",
+            "y",
+            "x/...",
+            "/tmp/paths-scratch/cwd dir/é/x/.../y",
+            "/tmp/paths-scratch/cwd dir/é/x/...",
+            "y",
+            "y",
+            "",
+            "",
+            "x/.../y/x",
+            "/abs",
+            "x/.../y",
+            "/tmp/paths-scratch/cwd dir/é/x/.../y/x",
+        ],
+        [
+            ".x",
+            ".x",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/.x",
+            ".x",
+            ".x",
+            ".",
+            "/tmp/paths-scratch/cwd dir/é/.x",
+            "/tmp/paths-scratch/cwd dir/é",
+            "",
+            "",
+            "x",
+            "x",
+            ".x/x",
+            "/abs",
+            ".x",
+            "/tmp/paths-scratch/cwd dir/é/.x/x",
+        ],
+        [
+            "x.",
+            "x.",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/x.",
+            "x.",
+            "x.",
+            ".",
+            "/tmp/paths-scratch/cwd dir/é/x.",
+            "/tmp/paths-scratch/cwd dir/é",
+            "x",
+            "x",
+            "",
+            "",
+            "x./x",
+            "/abs",
+            "x.",
+            "/tmp/paths-scratch/cwd dir/é/x./x",
+        ],
+        [
+            "a.b.c",
+            "a.b.c",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/a.b.c",
+            "a.b.c",
+            "a.b.c",
+            ".",
+            "/tmp/paths-scratch/cwd dir/é/a.b.c",
+            "/tmp/paths-scratch/cwd dir/é",
+            "a",
+            "a.b",
+            "c",
+            "b.c",
+            "a.b.c/x",
+            "/abs",
+            "a.b.c",
+            "/tmp/paths-scratch/cwd dir/é/a.b.c/x",
+        ],
+        [
+            "/.bashrc",
+            "/.bashrc",
+            "1",
+            "/.bashrc",
+            ".bashrc",
+            ".bashrc",
+            "/",
+            "/.bashrc",
+            "/",
+            "",
+            "",
+            "bashrc",
+            "bashrc",
+            "/.bashrc/x",
+            "/abs",
+            "/.bashrc",
+            "/.bashrc/x",
+        ],
+        [
+            "dir.x/file",
+            "dir.x/file",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/dir.x/file",
+            "file",
+            "file",
+            "dir.x",
+            "/tmp/paths-scratch/cwd dir/é/dir.x/file",
+            "/tmp/paths-scratch/cwd dir/é/dir.x",
+            "file",
+            "file",
+            "",
+            "",
+            "dir.x/file/x",
+            "/abs",
+            "dir.x/file",
+            "/tmp/paths-scratch/cwd dir/é/dir.x/file/x",
+        ],
+        [
+            "dir.x/file.tar.gz",
+            "dir.x/file.tar.gz",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/dir.x/file.tar.gz",
+            "file.tar.gz",
+            "file.tar.gz",
+            "dir.x",
+            "/tmp/paths-scratch/cwd dir/é/dir.x/file.tar.gz",
+            "/tmp/paths-scratch/cwd dir/é/dir.x",
+            "file",
+            "file.tar",
+            "gz",
+            "tar.gz",
+            "dir.x/file.tar.gz/x",
+            "/abs",
+            "dir.x/file.tar.gz",
+            "/tmp/paths-scratch/cwd dir/é/dir.x/file.tar.gz/x",
+        ],
+        [
+            "/tmp/", "/tmp", "1", "/tmp", "tmp", "", "/tmp", "/tmp/", "/tmp", "", "", "", "",
+            "/tmp/x", "/abs", "/tmp", "/tmp/x",
+        ],
+        [
+            "tmp",
+            "tmp",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/tmp",
+            "tmp",
+            "tmp",
+            ".",
+            "/tmp/paths-scratch/cwd dir/é/tmp",
+            "/tmp/paths-scratch/cwd dir/é",
+            "tmp",
+            "tmp",
+            "",
+            "",
+            "tmp/x",
+            "/abs",
+            "tmp",
+            "/tmp/paths-scratch/cwd dir/é/tmp/x",
+        ],
+        [
+            "C:/x",
+            "C:/x",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/C:/x",
+            "x",
+            "x",
+            "C:",
+            "/tmp/paths-scratch/cwd dir/é/C:/x",
+            "/tmp/paths-scratch/cwd dir/é/C:",
+            "x",
+            "x",
+            "",
+            "",
+            "C:/x/x",
+            "/abs",
+            "C:/x",
+            "/tmp/paths-scratch/cwd dir/é/C:/x/x",
+        ],
+        [
+            "\\a\\b",
+            "\\a\\b",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/\\a\\b",
+            "\\a\\b",
+            "\\a\\b",
+            ".",
+            "/tmp/paths-scratch/cwd dir/é/\\a\\b",
+            "/tmp/paths-scratch/cwd dir/é",
+            "\\a\\b",
+            "\\a\\b",
+            "",
+            "",
+            "\\a\\b/x",
+            "/abs",
+            "\\a\\b",
+            "/tmp/paths-scratch/cwd dir/é/\\a\\b/x",
+        ],
+        [
+            " /x",
+            " /x",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/ /x",
+            "x",
+            "x",
+            " ",
+            "/tmp/paths-scratch/cwd dir/é/ /x",
+            "/tmp/paths-scratch/cwd dir/é/ ",
+            "x",
+            "x",
+            "",
+            "",
+            " /x/x",
+            "/abs",
+            " /x",
+            "/tmp/paths-scratch/cwd dir/é/ /x/x",
+        ],
+        [
+            "é/ü.ñ",
+            "é/ü.ñ",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/é/ü.ñ",
+            "ü.ñ",
+            "ü.ñ",
+            "é",
+            "/tmp/paths-scratch/cwd dir/é/é/ü.ñ",
+            "/tmp/paths-scratch/cwd dir/é/é",
+            "ü",
+            "ü",
+            "ñ",
+            "ñ",
+            "é/ü.ñ/x",
+            "/abs",
+            "é/ü.ñ",
+            "/tmp/paths-scratch/cwd dir/é/é/ü.ñ/x",
+        ],
+        [
+            "😀/😀.😀",
+            "😀/😀.😀",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/😀/😀.😀",
+            "😀.😀",
+            "😀.😀",
+            "😀",
+            "/tmp/paths-scratch/cwd dir/é/😀/😀.😀",
+            "/tmp/paths-scratch/cwd dir/é/😀",
+            "😀",
+            "😀",
+            "😀",
+            "😀",
+            "😀/😀.😀/x",
+            "/abs",
+            "😀/😀.😀",
+            "/tmp/paths-scratch/cwd dir/é/😀/😀.😀/x",
+        ],
+        [
+            "//a//b//", "/a/b", "1", "/a/b", "", "", "//a//b/", "/a/b/", "/a/b", "", "", "", "",
+            "//a//b/x", "/abs", "//a//b/", "/a/b/x",
+        ],
+        [
+            "/a/./../b",
+            "/b",
+            "1",
+            "/b",
+            "b",
+            "b",
+            "/a/./..",
+            "/b",
+            "/",
+            "b",
+            "b",
+            "",
+            "",
+            "/a/./../b/x",
+            "/abs",
+            "/a/./../b",
+            "/b/x",
+        ],
+        [
+            "a/b/../../..",
+            "..",
+            "0",
+            "/tmp/paths-scratch/cwd dir",
+            "..",
+            "..",
+            "a/b/../..",
+            "/tmp/paths-scratch/cwd dir",
+            "/tmp/paths-scratch",
+            "",
+            ".",
+            "",
+            ".",
+            "a/b/../../../x",
+            "/abs",
+            "a/b/../../..",
+            "/tmp/paths-scratch/cwd dir/x",
+        ],
+        [
+            "../../a",
+            "../../a",
+            "0",
+            "/tmp/paths-scratch/a",
+            "a",
+            "a",
+            "../..",
+            "/tmp/paths-scratch/a",
+            "/tmp/paths-scratch",
+            "a",
+            "a",
+            "",
+            "",
+            "../../a/x",
+            "/abs",
+            "../../a",
+            "/tmp/paths-scratch/a/x",
+        ],
+        [
+            "/../../a",
+            "/../../a",
+            "1",
+            "/../../a",
+            "a",
+            "a",
+            "/../..",
+            "/../../a",
+            "/../..",
+            "a",
+            "a",
+            "",
+            "",
+            "/../../a/x",
+            "/abs",
+            "/../../a",
+            "/../../a/x",
+        ],
+        [
+            "/a/b/c/../../../..",
+            "/..",
+            "1",
+            "/..",
+            "..",
+            "..",
+            "/a/b/c/../../..",
+            "/..",
+            "/",
+            "",
+            ".",
+            "",
+            ".",
+            "/a/b/c/../../../../x",
+            "/abs",
+            "/a/b/c/../../../..",
+            "/../x",
+        ],
+        [
+            "./..",
+            "..",
+            "0",
+            "/tmp/paths-scratch/cwd dir",
+            "..",
+            "..",
+            ".",
+            "/tmp/paths-scratch/cwd dir",
+            "/tmp/paths-scratch",
+            "",
+            ".",
+            "",
+            ".",
+            "./../x",
+            "/abs",
+            "./..",
+            "/tmp/paths-scratch/cwd dir/x",
+        ],
+        [
+            "~/x",
+            "~/x",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/~/x",
+            "x",
+            "x",
+            "~",
+            "/tmp/paths-scratch/cwd dir/é/~/x",
+            "/tmp/paths-scratch/cwd dir/é/~",
+            "x",
+            "x",
+            "",
+            "",
+            "~/x/x",
+            "/abs",
+            "~/x",
+            "/tmp/paths-scratch/cwd dir/é/~/x/x",
+        ],
+        [
+            "a:b",
+            "a:b",
+            "0",
+            "/tmp/paths-scratch/cwd dir/é/a:b",
+            "a:b",
+            "a:b",
+            ".",
+            "/tmp/paths-scratch/cwd dir/é/a:b",
+            "/tmp/paths-scratch/cwd dir/é",
+            "a:b",
+            "a:b",
+            "",
+            "",
+            "a:b/x",
+            "/abs",
+            "a:b",
+            "/tmp/paths-scratch/cwd dir/é/a:b/x",
+        ],
     ];
 
     #[test]
@@ -2035,7 +3017,11 @@ pub(crate) mod tests {
                 file_path(p, ""),
                 absolute_file_path_in(p, "x", CWD),
             ];
-            assert_eq!(got.map(|s| s.to_string()), row.map(|s| s.to_string()), "for {p:?}");
+            assert_eq!(
+                got.map(|s| s.to_string()),
+                row.map(|s| s.to_string()),
+                "for {p:?}"
+            );
             assert_eq!(is_relative_path(p), !is_absolute_path(p));
         }
     }
@@ -2064,20 +3050,34 @@ pub(crate) mod tests {
         assert_eq!(absolute_path_in(":", CWD), ":/");
         assert_eq!(absolute_file_path_in(":", "x", CWD), ":/x");
         // A working directory that is not UTF-8 is decoded like QFile::decodeName.
-        assert_eq!(FileInfo::new("a").absolute_file_path_in(b"/w\xe2\x82"), "/w\u{FFFD}\u{FFFD}/a");
+        assert_eq!(
+            FileInfo::new("a").absolute_file_path_in(b"/w\xe2\x82"),
+            "/w\u{FFFD}\u{FFFD}/a"
+        );
     }
 
     #[test]
     fn home_and_temp_follow_the_environment() {
         let env = |pairs: &'static [(&'static str, &'static str)]| {
-            move |name: &str| pairs.iter().find(|(k, _)| *k == name).map(|(_, v)| v.to_string())
+            move |name: &str| {
+                pairs
+                    .iter()
+                    .find(|(k, _)| *k == name)
+                    .map(|(_, v)| v.to_string())
+            }
         };
         assert_eq!(home_path_with(&env(&[("HOME", "/home/u/")])), "/home/u");
-        assert_eq!(home_path_with(&env(&[("HOME", "/home//u/./x/..")])), "/home/u");
+        assert_eq!(
+            home_path_with(&env(&[("HOME", "/home//u/./x/..")])),
+            "/home/u"
+        );
         assert_eq!(home_path_with(&env(&[("HOME", "")])), "/");
         assert_eq!(home_path_with(&env(&[])), "/");
         assert_eq!(home_path_with(&env(&[("HOME", "rel/dir/")])), "rel/dir");
-        assert_eq!(file_path(&home_path_with(&env(&[("HOME", "/")])), ".config"), "/.config");
+        assert_eq!(
+            file_path(&home_path_with(&env(&[("HOME", "/")])), ".config"),
+            "/.config"
+        );
         assert_eq!(temp_path_with(&env(&[]), b"/w"), "/tmp");
         assert_eq!(temp_path_with(&env(&[("TMPDIR", "")]), b"/w"), "/tmp");
         assert_eq!(temp_path_with(&env(&[("TMPDIR", "/t/")]), b"/w"), "/t");
@@ -2100,7 +3100,10 @@ pub(crate) mod tests {
             (b"\xef\xbf\xbe/x", "\u{FFFE}/x"),
             (b"\xef\xbb\xbfA/x", "A/x"),
             (b"\xf0(\x8c(/x", "\u{FFFD}(\u{FFFD}(/x"),
-            (b"\xfc\x80\x80\x80\x80\x80/x", "\u{FFFD}\u{FFFD}\u{FFFD}\u{FFFD}\u{FFFD}\u{FFFD}/x"),
+            (
+                b"\xfc\x80\x80\x80\x80\x80/x",
+                "\u{FFFD}\u{FFFD}\u{FFFD}\u{FFFD}\u{FFFD}\u{FFFD}/x",
+            ),
             (b"x\xe2\x82", "x\u{FFFD}\u{FFFD}"),
         ];
         for (bytes, want) in cases {
@@ -2110,35 +3113,75 @@ pub(crate) mod tests {
         assert_eq!(decode_listing_name(b"N\xe2\x82").as_deref(), Some("N"));
         assert_eq!(decode_listing_name(b"N\xc3").as_deref(), Some("N"));
         assert_eq!(decode_listing_name(b"N\xf0\x9f\x98").as_deref(), Some("N"));
-        assert_eq!(decode_listing_name(b"\xef\xbb\xbfbom.png").as_deref(), Some("bom.png"));
-        assert_eq!(decode_listing_name(b"N\xef\xbb\xbfA").as_deref(), Some("N\u{FEFF}A"));
+        assert_eq!(
+            decode_listing_name(b"\xef\xbb\xbfbom.png").as_deref(),
+            Some("bom.png")
+        );
+        assert_eq!(
+            decode_listing_name(b"N\xef\xbb\xbfA").as_deref(),
+            Some("N\u{FEFF}A")
+        );
         assert_eq!(decode_listing_name(b"bad\xff.png"), None);
         assert_eq!(decode_listing_name(b"N\xc3("), None);
         assert_eq!(decode_listing_name(b"N\xc0"), None);
-        assert_eq!(decode_listing_name(b"ok\xef\xbf\xbe.png").as_deref(), Some("ok\u{FFFE}.png"));
+        assert_eq!(
+            decode_listing_name(b"ok\xef\xbf\xbe.png").as_deref(),
+            Some("ok\u{FFFE}.png")
+        );
     }
 
     #[test]
     fn folds_and_compares_case_like_qstring() {
         let folds = [
-            (0x41, 0x61), (0x61, 0x61), (0xB5, 0x3BC), (0x130, 0x130), (0x131, 0x131), (0x17F, 0x73),
-            (0x1E9E, 0xDF), (0x3A3, 0x3C3), (0x3C2, 0x3C3), (0x212A, 0x6B), (0x212B, 0xE5), (0x13A0, 0x13A0),
-            (0xAB70, 0x13A0), (0xA7D4, 0xA7D5), (0xFB05, 0xFB06), (0xFF21, 0xFF41), (0x10400, 0x10428),
-            (0x1E921, 0x1E943), (0x10FFFF, 0x10FFFF),
+            (0x41, 0x61),
+            (0x61, 0x61),
+            (0xB5, 0x3BC),
+            (0x130, 0x130),
+            (0x131, 0x131),
+            (0x17F, 0x73),
+            (0x1E9E, 0xDF),
+            (0x3A3, 0x3C3),
+            (0x3C2, 0x3C3),
+            (0x212A, 0x6B),
+            (0x212B, 0xE5),
+            (0x13A0, 0x13A0),
+            (0xAB70, 0x13A0),
+            (0xA7D4, 0xA7D5),
+            (0xFB05, 0xFB06),
+            (0xFF21, 0xFF41),
+            (0x10400, 0x10428),
+            (0x1E921, 0x1E943),
+            (0x10FFFF, 0x10FFFF),
         ];
         for (c, f) in folds {
             assert_eq!(fold_case(c), f, "{c:X}");
         }
         let sign = |a: &str, b: &str| {
-            let (a, b): (Vec<u16>, Vec<u16>) = (a.encode_utf16().collect(), b.encode_utf16().collect());
-            (compare_utf16_ignore_case(&a, &b).signum(), compare_utf16(&a, &b).signum())
+            let (a, b): (Vec<u16>, Vec<u16>) =
+                (a.encode_utf16().collect(), b.encode_utf16().collect());
+            (
+                compare_utf16_ignore_case(&a, &b).signum(),
+                compare_utf16(&a, &b).signum(),
+            )
         };
         // (QString::compare case-insensitive, case-sensitive), recorded from Qt.
         let cases = [
-            ("a", "B", -1, 1), ("B", "a", 1, -1), ("photo.png", "PHOTO.png", 0, 1), ("Photo.png", "photo.png", 0, -1),
-            ("ß", "ẞ", 0, -1), ("ss", "ß", -1, -1), ("ſ", "s", 0, 1), ("\u{212A}", "k", 0, 1), ("！", "😀", 1, 1),
-            ("𐐀", "𐐨", 0, -1), ("ς", "σ", 0, -1), ("İ", "i", 1, 1), ("abc", "ab", 1, 1), ("Z", "a", 1, -1),
-            ("_", "a", -1, -1), ("_", "A", -1, 1),
+            ("a", "B", -1, 1),
+            ("B", "a", 1, -1),
+            ("photo.png", "PHOTO.png", 0, 1),
+            ("Photo.png", "photo.png", 0, -1),
+            ("ß", "ẞ", 0, -1),
+            ("ss", "ß", -1, -1),
+            ("ſ", "s", 0, 1),
+            ("\u{212A}", "k", 0, 1),
+            ("！", "😀", 1, 1),
+            ("𐐀", "𐐨", 0, -1),
+            ("ς", "σ", 0, -1),
+            ("İ", "i", 1, 1),
+            ("abc", "ab", 1, 1),
+            ("Z", "a", 1, -1),
+            ("_", "a", -1, -1),
+            ("_", "A", -1, 1),
         ];
         for (a, b, ci, cs) in cases {
             assert_eq!(sign(a, b), (ci, cs), "{a} vs {b}");
@@ -2149,21 +3192,55 @@ pub(crate) mod tests {
     fn wildcards_match_like_qregularexpression() {
         // (pattern, name, case-insensitive match, case-sensitive match), recorded from Qt.
         let cases = [
-            ("*.json", "x.json", true, true), ("*.json", "x.JSON", true, false), ("*.json", "x.jſon", true, false),
-            ("*.json", "x.jsonx", false, false), ("??????????.jpg", "0123456789.jpg", true, true),
-            ("??????????.jpg", "012345678.jpg", false, false), ("??????????.jpg", "😀123456789.jpg", true, true),
-            ("[!a-c]*", "A", false, true), ("[!a-c]*", "d", true, true), ("[!a-c]*", "é", true, true),
-            ("[a-c]*", "B", true, false), ("[a-c]*", "\u{212A}", false, false), ("*k*", "\u{212A}", true, false),
-            ("*k*", "K", true, false), ("[k]", "\u{212A}", true, false), ("[é]", "É", true, false), ("[]a]", "]", true, true),
-            ("[]a]", "a", true, true), ("[!]a]", "]", false, false), ("[!]a]", "b", true, true), ("[", "a", false, false),
-            ("[a-", "a", false, false), ("[z-a]", "z", false, false), ("a[/]b", "a/b", false, false), ("~", "~", true, true),
-            ("~", "x", false, false), ("**", "", true, true), ("**", "x", true, true), ("*", "", true, true),
-            ("?", "😀", true, true), ("[[.a]", "[", true, true), ("[[.a]", "a", true, true), ("[^ab]", "c", true, true),
-            ("[^ab]", "a", false, false), ("event*", "Event2", true, false), ("", "", true, true), ("", "x", false, false),
+            ("*.json", "x.json", true, true),
+            ("*.json", "x.JSON", true, false),
+            ("*.json", "x.jſon", true, false),
+            ("*.json", "x.jsonx", false, false),
+            ("??????????.jpg", "0123456789.jpg", true, true),
+            ("??????????.jpg", "012345678.jpg", false, false),
+            ("??????????.jpg", "😀123456789.jpg", true, true),
+            ("[!a-c]*", "A", false, true),
+            ("[!a-c]*", "d", true, true),
+            ("[!a-c]*", "é", true, true),
+            ("[a-c]*", "B", true, false),
+            ("[a-c]*", "\u{212A}", false, false),
+            ("*k*", "\u{212A}", true, false),
+            ("*k*", "K", true, false),
+            ("[k]", "\u{212A}", true, false),
+            ("[é]", "É", true, false),
+            ("[]a]", "]", true, true),
+            ("[]a]", "a", true, true),
+            ("[!]a]", "]", false, false),
+            ("[!]a]", "b", true, true),
+            ("[", "a", false, false),
+            ("[a-", "a", false, false),
+            ("[z-a]", "z", false, false),
+            ("a[/]b", "a/b", false, false),
+            ("~", "~", true, true),
+            ("~", "x", false, false),
+            ("**", "", true, true),
+            ("**", "x", true, true),
+            ("*", "", true, true),
+            ("?", "😀", true, true),
+            ("[[.a]", "[", true, true),
+            ("[[.a]", "a", true, true),
+            ("[^ab]", "c", true, true),
+            ("[^ab]", "a", false, false),
+            ("event*", "Event2", true, false),
+            ("", "", true, true),
+            ("", "x", false, false),
         ];
         for (pattern, name, ci, cs) in cases {
-            assert_eq!(wildcard_match(pattern, name, false), ci, "{pattern:?} ~ {name:?}");
-            assert_eq!(wildcard_match(pattern, name, true), cs, "{pattern:?} = {name:?}");
+            assert_eq!(
+                wildcard_match(pattern, name, false),
+                ci,
+                "{pattern:?} ~ {name:?}"
+            );
+            assert_eq!(
+                wildcard_match(pattern, name, true),
+                cs,
+                "{pattern:?} = {name:?}"
+            );
         }
     }
 
@@ -2184,38 +3261,49 @@ pub(crate) mod tests {
             v.into_iter().map(|p| p.1).collect()
         };
         assert_eq!(sorted(keys(10, 12345, 5)), [2, 4, 5, 7, 8, 0, 1, 3, 6, 9]);
-        assert_eq!(sorted(keys(17, 12345, 5)), [2, 14, 4, 5, 8, 7, 16, 0, 1, 10, 11, 13, 12, 3, 15, 6, 9]);
+        assert_eq!(
+            sorted(keys(17, 12345, 5)),
+            [2, 14, 4, 5, 8, 7, 16, 0, 1, 10, 11, 13, 12, 3, 15, 6, 9]
+        );
         assert_eq!(
             sorted(keys(40, 12345, 5)),
-            [8, 17, 26, 14, 21, 7, 5, 4, 31, 2, 35, 23, 33, 22, 36, 37, 18, 16, 38, 0, 1, 13, 11, 10, 30, 15, 12, 3, 34,
-             32, 39, 29, 28, 27, 25, 24, 20, 19, 9, 6]
+            [
+                8, 17, 26, 14, 21, 7, 5, 4, 31, 2, 35, 23, 33, 22, 36, 37, 18, 16, 38, 0, 1, 13,
+                11, 10, 30, 15, 12, 3, 34, 32, 39, 29, 28, 27, 25, 24, 20, 19, 9, 6
+            ]
         );
         assert_eq!(
             sorted(keys(100, 12345, 5)),
-            [26, 52, 54, 58, 45, 44, 43, 64, 35, 65, 31, 75, 21, 80, 81, 17, 8, 14, 86, 2, 4, 5, 7, 16, 97,
-             36, 37, 38, 41, 0, 48, 49, 1, 66, 85, 18, 22, 23, 77, 76, 92, 70, 33, 63, 99, 61, 98, 78, 68,
-             90, 94, 53, 50, 47, 10, 11, 40, 13, 72, 3, 73, 74, 82, 83, 15, 87, 88, 89, 12, 96, 51, 55, 69,
-             30, 56, 57, 46, 59, 42, 62, 34, 6, 9, 95, 93, 91, 60, 39, 71, 84, 32, 67, 19, 20, 79, 24, 25,
-             27, 28, 29]
+            [
+                26, 52, 54, 58, 45, 44, 43, 64, 35, 65, 31, 75, 21, 80, 81, 17, 8, 14, 86, 2, 4, 5,
+                7, 16, 97, 36, 37, 38, 41, 0, 48, 49, 1, 66, 85, 18, 22, 23, 77, 76, 92, 70, 33,
+                63, 99, 61, 98, 78, 68, 90, 94, 53, 50, 47, 10, 11, 40, 13, 72, 3, 73, 74, 82, 83,
+                15, 87, 88, 89, 12, 96, 51, 55, 69, 30, 56, 57, 46, 59, 42, 62, 34, 6, 9, 95, 93,
+                91, 60, 39, 71, 84, 32, 67, 19, 20, 79, 24, 25, 27, 28, 29
+            ]
         );
         let v300: Vec<(u32, usize)> = (0..300).map(|i| ((i * 7919 % 13) as u32, i)).collect();
         assert_eq!(
             sorted(v300),
-            [299, 52, 65, 39, 78, 91, 104, 117, 130, 143, 26, 0, 156, 169, 182, 195, 260, 208, 221, 273, 13,
-             286, 234, 247, 72, 98, 85, 280, 124, 293, 59, 150, 46, 267, 111, 254, 137, 241, 228, 163, 176,
-             189, 215, 202, 20, 7, 33, 261, 118, 274, 40, 66, 209, 105, 1, 14, 222, 79, 235, 92, 248, 183,
-             131, 287, 157, 144, 53, 196, 170, 27, 138, 86, 151, 242, 164, 229, 34, 99, 21, 177, 216, 112,
-             125, 203, 190, 60, 73, 268, 47, 281, 294, 255, 8, 158, 262, 106, 15, 210, 184, 67, 275, 145,
-             119, 41, 197, 93, 2, 249, 236, 28, 171, 80, 288, 54, 132, 223, 113, 178, 126, 22, 282, 139, 165,
-             100, 9, 87, 243, 35, 152, 230, 295, 256, 191, 74, 217, 269, 204, 48, 61, 159, 172, 289, 3, 185,
-             198, 276, 16, 211, 263, 224, 250, 237, 133, 94, 29, 81, 55, 42, 107, 146, 120, 68, 75, 179, 127,
-             62, 192, 205, 114, 270, 257, 218, 101, 244, 231, 36, 88, 10, 166, 153, 296, 49, 23, 140, 283,
-             212, 238, 95, 43, 82, 225, 147, 160, 251, 108, 134, 264, 17, 69, 290, 199, 121, 56, 186, 4, 30,
-             173, 277, 193, 141, 102, 63, 245, 180, 232, 24, 11, 297, 154, 89, 219, 50, 37, 76, 167, 284,
-             128, 206, 258, 271, 115, 265, 252, 226, 70, 291, 278, 83, 5, 57, 239, 148, 161, 44, 174, 135,
-             187, 18, 122, 200, 31, 213, 109, 96, 220, 12, 181, 285, 129, 246, 233, 51, 64, 194, 272, 168,
-             142, 25, 90, 116, 207, 38, 155, 259, 298, 103, 77, 292, 162, 240, 149, 136, 253, 45, 175, 58,
-             279, 188, 19, 123, 84, 227, 201, 6, 266, 97, 71, 32, 110, 214]
+            [
+                299, 52, 65, 39, 78, 91, 104, 117, 130, 143, 26, 0, 156, 169, 182, 195, 260, 208,
+                221, 273, 13, 286, 234, 247, 72, 98, 85, 280, 124, 293, 59, 150, 46, 267, 111, 254,
+                137, 241, 228, 163, 176, 189, 215, 202, 20, 7, 33, 261, 118, 274, 40, 66, 209, 105,
+                1, 14, 222, 79, 235, 92, 248, 183, 131, 287, 157, 144, 53, 196, 170, 27, 138, 86,
+                151, 242, 164, 229, 34, 99, 21, 177, 216, 112, 125, 203, 190, 60, 73, 268, 47, 281,
+                294, 255, 8, 158, 262, 106, 15, 210, 184, 67, 275, 145, 119, 41, 197, 93, 2, 249,
+                236, 28, 171, 80, 288, 54, 132, 223, 113, 178, 126, 22, 282, 139, 165, 100, 9, 87,
+                243, 35, 152, 230, 295, 256, 191, 74, 217, 269, 204, 48, 61, 159, 172, 289, 3, 185,
+                198, 276, 16, 211, 263, 224, 250, 237, 133, 94, 29, 81, 55, 42, 107, 146, 120, 68,
+                75, 179, 127, 62, 192, 205, 114, 270, 257, 218, 101, 244, 231, 36, 88, 10, 166,
+                153, 296, 49, 23, 140, 283, 212, 238, 95, 43, 82, 225, 147, 160, 251, 108, 134,
+                264, 17, 69, 290, 199, 121, 56, 186, 4, 30, 173, 277, 193, 141, 102, 63, 245, 180,
+                232, 24, 11, 297, 154, 89, 219, 50, 37, 76, 167, 284, 128, 206, 258, 271, 115, 265,
+                252, 226, 70, 291, 278, 83, 5, 57, 239, 148, 161, 44, 174, 135, 187, 18, 122, 200,
+                31, 213, 109, 96, 220, 12, 181, 285, 129, 246, 233, 51, 64, 194, 272, 168, 142, 25,
+                90, 116, 207, 38, 155, 259, 298, 103, 77, 292, 162, 240, 149, 136, 253, 45, 175,
+                58, 279, 188, 19, 123, 84, 227, 201, 6, 266, 97, 71, 32, 110, 214
+            ]
         );
         let heap = |mut v: Vec<(u32, usize)>| -> Vec<usize> {
             heap_sort(&mut v, &|a: &(u32, usize), b: &(u32, usize)| a.0 < b.0);
@@ -2223,20 +3311,34 @@ pub(crate) mod tests {
         };
         assert_eq!(heap(keys(3, 777, 4)), [0, 2, 1]);
         assert_eq!(heap(keys(7, 777, 4)), [0, 3, 2, 1, 4, 5, 6]);
-        assert_eq!(heap(keys(16, 777, 4)), [3, 7, 0, 12, 10, 2, 9, 13, 14, 15, 8, 1, 4, 5, 11, 6]);
+        assert_eq!(
+            heap(keys(16, 777, 4)),
+            [3, 7, 0, 12, 10, 2, 9, 13, 14, 15, 8, 1, 4, 5, 11, 6]
+        );
         assert_eq!(
             heap(keys(33, 777, 4)),
-            [7, 18, 10, 3, 0, 12, 30, 19, 13, 20, 9, 21, 14, 2, 27, 28, 32, 8, 1, 4, 11, 5, 26, 15, 6, 29, 31, 16, 17, 22,
-             23, 24, 25]
+            [
+                7, 18, 10, 3, 0, 12, 30, 19, 13, 20, 9, 21, 14, 2, 27, 28, 32, 8, 1, 4, 11, 5, 26,
+                15, 6, 29, 31, 16, 17, 22, 23, 24, 25
+            ]
         );
     }
 
     #[test]
     fn sha256_like_qcryptographichash() {
-        assert_eq!(sha256_hex(b""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
-        assert_eq!(sha256_hex(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        assert_eq!(
+            sha256_hex(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
         let pattern: Vec<u8> = (0..1000).map(|i| (i % 256) as u8).collect();
-        assert_eq!(sha256_hex(&pattern), "a8af099bf2e878609558dbf69d8f88f4a31040a8cf84b549a0cfa912f12ffc3f");
+        assert_eq!(
+            sha256_hex(&pattern),
+            "a8af099bf2e878609558dbf69d8f88f4a31040a8cf84b549a0cfa912f12ffc3f"
+        );
         // OmarchyPaths::wallpaperThumbnailPath's identity: path, size and mtime joined by NULs.
         assert_eq!(
             sha256_hex(b"/tmp/x.png\x001234\x001700000000000"),
@@ -2257,16 +3359,36 @@ pub(crate) mod tests {
     fn listing_tree() -> TempDir {
         let dir = TempDir::new("qdir-list");
         let files: &[(&str, usize, i64)] = &[
-            ("A.PNG", 3, 5), ("b.Jpg", 0, 2), ("c.png", 7, 9), ("C.png", 1, 9), ("img10.png", 4, 1), ("img2.png", 4, 3),
-            ("img1.png", 2, 4), ("space name.png", 5, 6), ("é.png", 6, 7), ("É.png", 8, 8), (".hidden.png", 1, 1),
-            ("ſ.json", 2, 2), ("s.json", 3, 3), ("noext", 0, 4), ("a.tar.gz", 9, 5), ("0123456789.jpg", 1, 6),
-            ("012345678.jpg", 2, 7), ("z.webp", 3, 8),
+            ("A.PNG", 3, 5),
+            ("b.Jpg", 0, 2),
+            ("c.png", 7, 9),
+            ("C.png", 1, 9),
+            ("img10.png", 4, 1),
+            ("img2.png", 4, 3),
+            ("img1.png", 2, 4),
+            ("space name.png", 5, 6),
+            ("é.png", 6, 7),
+            ("É.png", 8, 8),
+            (".hidden.png", 1, 1),
+            ("ſ.json", 2, 2),
+            ("s.json", 3, 3),
+            ("noext", 0, 4),
+            ("a.tar.gz", 9, 5),
+            ("0123456789.jpg", 1, 6),
+            ("012345678.jpg", 2, 7),
+            ("z.webp", 3, 8),
         ];
         for &(name, size, t) in files {
             let path = dir.join(name);
             std::fs::write(&path, vec![b'x'; size]).unwrap();
-            let when = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_600_000_000 + t as u64);
-            std::fs::File::options().write(true).open(&path).unwrap().set_modified(when).unwrap();
+            let when =
+                std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_600_000_000 + t as u64);
+            std::fs::File::options()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_modified(when)
+                .unwrap();
         }
         for d in ["dir", "Dir2", ".hiddendir", "zdir.png"] {
             std::fs::create_dir(dir.join(d)).unwrap();
@@ -2286,41 +3408,122 @@ pub(crate) mod tests {
         let s = |bits: i32| SortFlags(bits);
         // (name filters, filters, sort, the names Qt lists, comma-separated)
         let cases: &[(&[&str], Filters, SortFlags, &str)] = &[
-            (&images, Filters::FILES, SortFlags::NAME,
-             "012345678.jpg,0123456789.jpg,A.PNG,C.png,b.Jpg,c.png,img1.png,img10.png,img2.png,link_to_file.png,space name.png,z.webp,É.png,é.png"),
-            (&[], Filters::DIRS | Filters::NO_DOT_AND_DOT_DOT, SortFlags::NAME, "Dir2,dir,link_to_devnull,link_to_dir,zdir.png"),
-            (&["*.json"], Filters::FILES, SortFlags::NAME, "s.json,ſ.json"),
-            (&[], Filters::FILES | Filters::DIRS | Filters::NO_DOT_AND_DOT_DOT, SortFlags::NAME,
-             "012345678.jpg,0123456789.jpg,A.PNG,C.png,Dir2,a.tar.gz,b.Jpg,c.png,dir,img1.png,img10.png,img2.png,link_to_devnull,link_to_dir,link_to_file.png,noext,s.json,space name.png,z.webp,zdir.png,É.png,é.png,ſ.json"),
-            (&[], Filters::FILES | Filters::SYSTEM | Filters::NO_DOT_AND_DOT_DOT, SortFlags::NAME,
-             "012345678.jpg,0123456789.jpg,A.PNG,C.png,a.tar.gz,b.Jpg,broken.png,c.png,img1.png,img10.png,img2.png,link_to_devnull,link_to_file.png,noext,s.json,space name.png,z.webp,É.png,é.png,ſ.json"),
-            (&["??????????.jpg"], Filters::FILES, SortFlags::NO_SORT, "0123456789.jpg"),
-            (&[], Filters::ALL_ENTRIES | Filters::HIDDEN, SortFlags::NAME,
-             ".,..,.hidden.png,.hiddendir,012345678.jpg,0123456789.jpg,A.PNG,C.png,Dir2,a.tar.gz,b.Jpg,c.png,dir,img1.png,img10.png,img2.png,link_to_devnull,link_to_dir,link_to_file.png,noext,s.json,space name.png,z.webp,zdir.png,É.png,é.png,ſ.json"),
-            (&["*.png"], Filters::FILES | Filters::CASE_SENSITIVE, SortFlags::NAME,
-             "C.png,c.png,img1.png,img10.png,img2.png,link_to_file.png,space name.png,É.png,é.png"),
-            (&["*.*"], Filters::FILES, SortFlags::TIME,
-             "C.png,c.png,link_to_file.png,z.webp,É.png,012345678.jpg,é.png,0123456789.jpg,space name.png,A.PNG,a.tar.gz,img1.png,img2.png,s.json,b.Jpg,ſ.json,img10.png"),
-            (&["*.*"], Filters::FILES, SortFlags::SIZE | SortFlags::REVERSED,
-             "b.Jpg,C.png,0123456789.jpg,ſ.json,img1.png,012345678.jpg,z.webp,s.json,A.PNG,img2.png,img10.png,space name.png,é.png,link_to_file.png,c.png,É.png,a.tar.gz"),
-            (&["*.*"], Filters::FILES, SortFlags::TIME | SortFlags::REVERSED,
-             "img10.png,ſ.json,b.Jpg,s.json,img2.png,img1.png,a.tar.gz,A.PNG,space name.png,0123456789.jpg,é.png,012345678.jpg,É.png,z.webp,link_to_file.png,c.png,C.png"),
-            (&[], f(0x6007), s(0x04),
-             "Dir2,dir,link_to_dir,zdir.png,012345678.jpg,0123456789.jpg,A.PNG,C.png,a.tar.gz,b.Jpg,c.png,img1.png,img10.png,img2.png,link_to_devnull,link_to_file.png,noext,s.json,space name.png,z.webp,É.png,é.png,ſ.json"),
-            (&[], f(0x6007), s(0x20),
-             "012345678.jpg,0123456789.jpg,A.PNG,C.png,a.tar.gz,b.Jpg,c.png,img1.png,img10.png,img2.png,link_to_devnull,link_to_file.png,noext,s.json,space name.png,z.webp,É.png,é.png,ſ.json,Dir2,dir,link_to_dir,zdir.png"),
-            (&[], f(0x6003), s(0x80),
-             "Dir2,dir,link_to_devnull,link_to_dir,noext,b.Jpg,A.PNG,a.tar.gz,012345678.jpg,0123456789.jpg,s.json,ſ.json,C.png,c.png,img1.png,img10.png,img2.png,link_to_file.png,space name.png,zdir.png,É.png,é.png,z.webp"),
-            (&[], Filters::FILES | Filters::DIRS | Filters::NO_SYMLINKS | Filters::NO_DOT_AND_DOT_DOT, SortFlags::NAME,
-             "012345678.jpg,0123456789.jpg,A.PNG,C.png,Dir2,a.tar.gz,b.Jpg,c.png,dir,img1.png,img10.png,img2.png,noext,s.json,space name.png,z.webp,zdir.png,É.png,é.png,ſ.json"),
-            (&["*.json"], Filters::ALL_DIRS | Filters::DIRS | Filters::NO_DOT_AND_DOT_DOT, SortFlags::NAME, "Dir2,dir,link_to_dir,zdir.png"),
-            (&["[!a-c]*"], Filters::FILES, SortFlags::NAME,
-             "012345678.jpg,0123456789.jpg,img1.png,img10.png,img2.png,link_to_devnull,link_to_file.png,noext,s.json,space name.png,z.webp,É.png,é.png,ſ.json"),
-            (&["*.PNG"], Filters::FILES, SortFlags::NAME, "A.PNG,C.png,c.png,img1.png,img10.png,img2.png,link_to_file.png,space name.png,É.png,é.png"),
+            (
+                &images,
+                Filters::FILES,
+                SortFlags::NAME,
+                "012345678.jpg,0123456789.jpg,A.PNG,C.png,b.Jpg,c.png,img1.png,img10.png,img2.png,link_to_file.png,space name.png,z.webp,É.png,é.png",
+            ),
+            (
+                &[],
+                Filters::DIRS | Filters::NO_DOT_AND_DOT_DOT,
+                SortFlags::NAME,
+                "Dir2,dir,link_to_devnull,link_to_dir,zdir.png",
+            ),
+            (
+                &["*.json"],
+                Filters::FILES,
+                SortFlags::NAME,
+                "s.json,ſ.json",
+            ),
+            (
+                &[],
+                Filters::FILES | Filters::DIRS | Filters::NO_DOT_AND_DOT_DOT,
+                SortFlags::NAME,
+                "012345678.jpg,0123456789.jpg,A.PNG,C.png,Dir2,a.tar.gz,b.Jpg,c.png,dir,img1.png,img10.png,img2.png,link_to_devnull,link_to_dir,link_to_file.png,noext,s.json,space name.png,z.webp,zdir.png,É.png,é.png,ſ.json",
+            ),
+            (
+                &[],
+                Filters::FILES | Filters::SYSTEM | Filters::NO_DOT_AND_DOT_DOT,
+                SortFlags::NAME,
+                "012345678.jpg,0123456789.jpg,A.PNG,C.png,a.tar.gz,b.Jpg,broken.png,c.png,img1.png,img10.png,img2.png,link_to_devnull,link_to_file.png,noext,s.json,space name.png,z.webp,É.png,é.png,ſ.json",
+            ),
+            (
+                &["??????????.jpg"],
+                Filters::FILES,
+                SortFlags::NO_SORT,
+                "0123456789.jpg",
+            ),
+            (
+                &[],
+                Filters::ALL_ENTRIES | Filters::HIDDEN,
+                SortFlags::NAME,
+                ".,..,.hidden.png,.hiddendir,012345678.jpg,0123456789.jpg,A.PNG,C.png,Dir2,a.tar.gz,b.Jpg,c.png,dir,img1.png,img10.png,img2.png,link_to_devnull,link_to_dir,link_to_file.png,noext,s.json,space name.png,z.webp,zdir.png,É.png,é.png,ſ.json",
+            ),
+            (
+                &["*.png"],
+                Filters::FILES | Filters::CASE_SENSITIVE,
+                SortFlags::NAME,
+                "C.png,c.png,img1.png,img10.png,img2.png,link_to_file.png,space name.png,É.png,é.png",
+            ),
+            (
+                &["*.*"],
+                Filters::FILES,
+                SortFlags::TIME,
+                "C.png,c.png,link_to_file.png,z.webp,É.png,012345678.jpg,é.png,0123456789.jpg,space name.png,A.PNG,a.tar.gz,img1.png,img2.png,s.json,b.Jpg,ſ.json,img10.png",
+            ),
+            (
+                &["*.*"],
+                Filters::FILES,
+                SortFlags::SIZE | SortFlags::REVERSED,
+                "b.Jpg,C.png,0123456789.jpg,ſ.json,img1.png,012345678.jpg,z.webp,s.json,A.PNG,img2.png,img10.png,space name.png,é.png,link_to_file.png,c.png,É.png,a.tar.gz",
+            ),
+            (
+                &["*.*"],
+                Filters::FILES,
+                SortFlags::TIME | SortFlags::REVERSED,
+                "img10.png,ſ.json,b.Jpg,s.json,img2.png,img1.png,a.tar.gz,A.PNG,space name.png,0123456789.jpg,é.png,012345678.jpg,É.png,z.webp,link_to_file.png,c.png,C.png",
+            ),
+            (
+                &[],
+                f(0x6007),
+                s(0x04),
+                "Dir2,dir,link_to_dir,zdir.png,012345678.jpg,0123456789.jpg,A.PNG,C.png,a.tar.gz,b.Jpg,c.png,img1.png,img10.png,img2.png,link_to_devnull,link_to_file.png,noext,s.json,space name.png,z.webp,É.png,é.png,ſ.json",
+            ),
+            (
+                &[],
+                f(0x6007),
+                s(0x20),
+                "012345678.jpg,0123456789.jpg,A.PNG,C.png,a.tar.gz,b.Jpg,c.png,img1.png,img10.png,img2.png,link_to_devnull,link_to_file.png,noext,s.json,space name.png,z.webp,É.png,é.png,ſ.json,Dir2,dir,link_to_dir,zdir.png",
+            ),
+            (
+                &[],
+                f(0x6003),
+                s(0x80),
+                "Dir2,dir,link_to_devnull,link_to_dir,noext,b.Jpg,A.PNG,a.tar.gz,012345678.jpg,0123456789.jpg,s.json,ſ.json,C.png,c.png,img1.png,img10.png,img2.png,link_to_file.png,space name.png,zdir.png,É.png,é.png,z.webp",
+            ),
+            (
+                &[],
+                Filters::FILES | Filters::DIRS | Filters::NO_SYMLINKS | Filters::NO_DOT_AND_DOT_DOT,
+                SortFlags::NAME,
+                "012345678.jpg,0123456789.jpg,A.PNG,C.png,Dir2,a.tar.gz,b.Jpg,c.png,dir,img1.png,img10.png,img2.png,noext,s.json,space name.png,z.webp,zdir.png,É.png,é.png,ſ.json",
+            ),
+            (
+                &["*.json"],
+                Filters::ALL_DIRS | Filters::DIRS | Filters::NO_DOT_AND_DOT_DOT,
+                SortFlags::NAME,
+                "Dir2,dir,link_to_dir,zdir.png",
+            ),
+            (
+                &["[!a-c]*"],
+                Filters::FILES,
+                SortFlags::NAME,
+                "012345678.jpg,0123456789.jpg,img1.png,img10.png,img2.png,link_to_devnull,link_to_file.png,noext,s.json,space name.png,z.webp,É.png,é.png,ſ.json",
+            ),
+            (
+                &["*.PNG"],
+                Filters::FILES,
+                SortFlags::NAME,
+                "A.PNG,C.png,c.png,img1.png,img10.png,img2.png,link_to_file.png,space name.png,É.png,é.png",
+            ),
         ];
         for (name_filters, filters, sort, want) in cases {
             let want: Vec<&str> = want.split(',').collect();
-            assert_eq!(entry_list(&tree.0, name_filters, *filters, *sort), want, "{name_filters:?} {filters:?} {sort:?}");
+            assert_eq!(
+                entry_list(&tree.0, name_filters, *filters, *sort),
+                want,
+                "{name_filters:?} {filters:?} {sort:?}"
+            );
             let infos = entry_info_list(&tree.0, name_filters, *filters, *sort);
             let names: Vec<String> = infos.iter().map(|i| i.file_name()).collect();
             assert_eq!(names, want);
@@ -2330,22 +3533,70 @@ pub(crate) mod tests {
         }
         // The same listing through other spellings of the directory.
         let plain = entry_list(&tree.0, &images, Filters::FILES, SortFlags::NAME);
-        assert_eq!(entry_list(&format!("{}/", tree.0), &images, Filters::FILES, SortFlags::NAME), plain);
-        assert_eq!(entry_info_list(&format!("{}/", tree.0), &[], Filters::DIRS, SortFlags::NAME)[0].file_path(), format!("{}/.", tree.0));
-        assert!(entry_list(&tree.join("nowhere"), &[], Filters::NO_FILTER, SortFlags::NO_SORT).is_empty());
-        assert!(entry_list(&tree.join("c.png"), &[], Filters::NO_FILTER, SortFlags::NO_SORT).is_empty());
-        assert_eq!(entry_list(&tree.join("link_to_dir"), &[], Filters::NO_FILTER, SortFlags::NO_SORT), [".", ".."]);
+        assert_eq!(
+            entry_list(
+                &format!("{}/", tree.0),
+                &images,
+                Filters::FILES,
+                SortFlags::NAME
+            ),
+            plain
+        );
+        assert_eq!(
+            entry_info_list(&format!("{}/", tree.0), &[], Filters::DIRS, SortFlags::NAME)[0]
+                .file_path(),
+            format!("{}/.", tree.0)
+        );
+        assert!(
+            entry_list(
+                &tree.join("nowhere"),
+                &[],
+                Filters::NO_FILTER,
+                SortFlags::NO_SORT
+            )
+            .is_empty()
+        );
+        assert!(
+            entry_list(
+                &tree.join("c.png"),
+                &[],
+                Filters::NO_FILTER,
+                SortFlags::NO_SORT
+            )
+            .is_empty()
+        );
+        assert_eq!(
+            entry_list(
+                &tree.join("link_to_dir"),
+                &[],
+                Filters::NO_FILTER,
+                SortFlags::NO_SORT
+            ),
+            [".", ".."]
+        );
         // An unsorted entryList ignores the permission and NoDot filters.
         std::fs::write(tree.join("dir/locked.png"), b"").unwrap();
-        std::fs::set_permissions(tree.join("dir/locked.png"), std::fs::Permissions::from_mode(0o000)).unwrap();
+        std::fs::set_permissions(
+            tree.join("dir/locked.png"),
+            std::fs::Permissions::from_mode(0o000),
+        )
+        .unwrap();
         let readable = Filters::FILES | Filters::READABLE | Filters::NO_DOT_AND_DOT_DOT;
         if !FileInfo::new(tree.join("dir/locked.png")).is_readable() {
             assert!(entry_list(&tree.join("dir"), &[], readable, SortFlags::NAME).is_empty());
-            assert!(entry_info_list(&tree.join("dir"), &[], readable, SortFlags::UNSORTED).is_empty());
+            assert!(
+                entry_info_list(&tree.join("dir"), &[], readable, SortFlags::UNSORTED).is_empty()
+            );
         }
-        assert_eq!(entry_list(&tree.join("dir"), &[], readable, SortFlags::UNSORTED), ["locked.png"]);
+        assert_eq!(
+            entry_list(&tree.join("dir"), &[], readable, SortFlags::UNSORTED),
+            ["locked.png"]
+        );
         let no_dot = Filters::ALL_ENTRIES | Filters::NO_DOT;
-        assert_eq!(entry_list(&tree.join("dir"), &[], no_dot, SortFlags::NAME), ["..", "locked.png"]);
+        assert_eq!(
+            entry_list(&tree.join("dir"), &[], no_dot, SortFlags::NAME),
+            ["..", "locked.png"]
+        );
         let mut unsorted = entry_list(&tree.join("dir"), &[], no_dot, SortFlags::UNSORTED);
         unsorted.sort();
         assert_eq!(unsorted, [".", "..", "locked.png"]);
@@ -2355,11 +3606,21 @@ pub(crate) mod tests {
     fn listing_decodes_names_like_qdirlisting() {
         use std::os::unix::ffi::OsStrExt;
         let tree = TempDir::new("qdir-names");
-        for raw in [&b"N\xe2\x82"[..], b"bad\xff.png", b"\xef\xbb\xbfbom.png", b"\xef\xbb\xbf", b"ok\xef\xbf\xbe.png", b"\xe2\x82"] {
+        for raw in [
+            &b"N\xe2\x82"[..],
+            b"bad\xff.png",
+            b"\xef\xbb\xbfbom.png",
+            b"\xef\xbb\xbf",
+            b"ok\xef\xbf\xbe.png",
+            b"\xe2\x82",
+        ] {
             let path = std::path::Path::new(&tree.0).join(std::ffi::OsStr::from_bytes(raw));
             std::fs::write(path, b"x").unwrap();
         }
-        assert_eq!(entry_list(&tree.0, &[], Filters::FILES, SortFlags::NAME), ["N", "bom.png", "ok\u{FFFE}.png"]);
+        assert_eq!(
+            entry_list(&tree.0, &[], Filters::FILES, SortFlags::NAME),
+            ["N", "bom.png", "ok\u{FFFE}.png"]
+        );
     }
 
     #[test]
@@ -2369,7 +3630,10 @@ pub(crate) mod tests {
         let link = info("link_to_file.png");
         assert!(link.exists() && link.is_file() && link.is_symlink() && !link.is_dir());
         assert_eq!(link.sym_link_target(), tree.join("c.png"));
-        assert_eq!(link.canonical_file_path(), FileInfo::new(tree.join("c.png")).canonical_file_path());
+        assert_eq!(
+            link.canonical_file_path(),
+            FileInfo::new(tree.join("c.png")).canonical_file_path()
+        );
         assert_eq!(link.size(), 7);
         assert_eq!(link.last_modified_msecs(), 1_600_000_009_000);
         let broken = info("broken.png");
@@ -2383,15 +3647,35 @@ pub(crate) mod tests {
         assert!(dir_link.is_dir() && dir_link.is_symlink());
         assert_eq!(dir_link.sym_link_target(), tree.join("dir"));
         assert_eq!(info("c.png").sym_link_target(), "");
-        assert!(info(".hidden.png").is_hidden() && info(".hiddendir/").is_hidden() && !info("c.png").is_hidden());
+        assert!(
+            info(".hidden.png").is_hidden()
+                && info(".hiddendir/").is_hidden()
+                && !info("c.png").is_hidden()
+        );
         assert!(info("dir/").is_dir() && !info("c.png/").exists() && !info("c.png/").is_file());
         assert_eq!(info("c.png/").canonical_file_path(), "");
         assert!(FileInfo::new("/").is_dir() && !FileInfo::new("/").is_hidden());
-        assert!(!FileInfo::new("").exists() && !FileInfo::new("").is_dir() && FileInfo::new("").canonical_file_path().is_empty());
+        assert!(
+            !FileInfo::new("").exists()
+                && !FileInfo::new("").is_dir()
+                && FileInfo::new("").canonical_file_path().is_empty()
+        );
         assert!(!FileInfo::new(":/x").exists() && !FileInfo::new(":").is_dir());
-        assert!(file_exists(&tree.join("dir")) && !file_exists("") && !file_exists(&tree.join("broken.png")));
-        assert!(dir_exists(&tree.join("link_to_dir")) && !dir_exists(&tree.join("c.png")) && dir_exists(&tree.0));
-        assert!(dir_contains(&tree.0, "c.png") && !dir_contains(&tree.0, "") && !dir_contains(&tree.0, "nope"));
+        assert!(
+            file_exists(&tree.join("dir"))
+                && !file_exists("")
+                && !file_exists(&tree.join("broken.png"))
+        );
+        assert!(
+            dir_exists(&tree.join("link_to_dir"))
+                && !dir_exists(&tree.join("c.png"))
+                && dir_exists(&tree.0)
+        );
+        assert!(
+            dir_contains(&tree.0, "c.png")
+                && !dir_contains(&tree.0, "")
+                && !dir_contains(&tree.0, "nope")
+        );
         // A loop is an error other than "doesn't exist": Qt then hands back the path as given.
         std::os::unix::fs::symlink("loop2", tree.join("loop1")).unwrap();
         std::os::unix::fs::symlink("loop1", tree.join("loop2")).unwrap();

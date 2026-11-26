@@ -25,7 +25,11 @@ The legacy omarecord command remains available as a compatibility alias.\n";
 
 /// What `usage` prints: the help alone, or an error line before it.
 pub fn usage_text(error: &str) -> String {
-    if error.is_empty() { USAGE.to_owned() } else { format!("omareel: {error}\n{USAGE}") }
+    if error.is_empty() {
+        USAGE.to_owned()
+    } else {
+        format!("omareel: {error}\n{USAGE}")
+    }
 }
 
 /// Exit status for a usage message: 0 for help, 2 for a usage error.
@@ -40,7 +44,10 @@ mod tests {
     #[test]
     fn error_comes_first_and_sets_the_status() {
         assert!(usage_text("").starts_with("usage: omareel [command]\n\ncommands:\n  record "));
-        assert_eq!(usage_text("probe requires a bundle").lines().next(), Some("omareel: probe requires a bundle"));
+        assert_eq!(
+            usage_text("probe requires a bundle").lines().next(),
+            Some("omareel: probe requires a bundle")
+        );
         assert_eq!((usage_status(""), usage_status("x")), (0, 2));
     }
 }

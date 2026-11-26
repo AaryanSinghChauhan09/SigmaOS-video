@@ -347,7 +347,11 @@ fn int_map(values: &[(&str, i32)]) -> QMap<QMapPair_QString_QVariant> {
 impl cxx_qt::Initialize for qobject::Theme {
     fn initialize(mut self: Pin<&mut Self>) {
         let configured = qobject::configured_font_family();
-        let family = if !configured.is_empty() { configured } else { qobject::bundled_ui_family() };
+        let family = if !configured.is_empty() {
+            configured
+        } else {
+            qobject::bundled_ui_family()
+        };
         if !family.is_empty() {
             self.as_mut().rust_mut().font_family = family;
         }

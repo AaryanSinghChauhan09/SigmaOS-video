@@ -17,9 +17,19 @@ fn main() {
     let count: usize = arguments[2].parse().expect("a count");
     let seconds: u64 = arguments[3].parse().expect("seconds");
     let directory = arguments[4].clone();
-    let fps: i32 = arguments.get(5).map_or(60, |fps| fps.parse().expect("an fps"));
-    let region: Vec<i32> = arguments.iter().skip(6).map(|value| value.parse().expect("a number")).collect();
-    let crop = if region.len() == 4 { Rect::new(region[0], region[1], region[2], region[3]) } else { Rect::default() };
+    let fps: i32 = arguments
+        .get(5)
+        .map_or(60, |fps| fps.parse().expect("an fps"));
+    let region: Vec<i32> = arguments
+        .iter()
+        .skip(6)
+        .map(|value| value.parse().expect("a number"))
+        .collect();
+    let crop = if region.len() == 4 {
+        Rect::new(region[0], region[1], region[2], region[3])
+    } else {
+        Rect::default()
+    };
     let threads: Vec<_> = (0..count)
         .map(|index| {
             let (monitor, directory) = (monitor.clone(), directory.clone());
@@ -53,6 +63,9 @@ fn main() {
         })
         .collect();
     for thread in threads {
-        println!("{}", thread.join().unwrap_or_else(|_| "capture panicked".into()));
+        println!(
+            "{}",
+            thread.join().unwrap_or_else(|_| "capture panicked".into())
+        );
     }
 }

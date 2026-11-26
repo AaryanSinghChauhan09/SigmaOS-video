@@ -46,7 +46,11 @@ fn monitor_cells(monitor: &Monitor) -> Vec<String> {
 }
 
 fn strings(value: &Value) -> Vec<String> {
-    value.to_array().iter().map(|item| item.to_string_or("")).collect()
+    value
+        .to_array()
+        .iter()
+        .map(|item| item.to_string_or(""))
+        .collect()
 }
 
 fn cases() -> Value {
@@ -81,19 +85,30 @@ impl<'a> World<'a> {
         if scenario_object.contains("captureBackend") {
             crate::hermetic::write_file(
                 &format!("{config}/omareel/settings.json"),
-                format!("{{\"captureBackend\": \"{}\"}}\n", scenario.get("captureBackend").to_string_or("")),
+                format!(
+                    "{{\"captureBackend\": \"{}\"}}\n",
+                    scenario.get("captureBackend").to_string_or("")
+                ),
             );
         }
         environment.set("XDG_CONFIG_HOME", &config);
         replay.activate(h);
-        World { replay, _environment: environment }
+        World {
+            replay,
+            _environment: environment,
+        }
     }
 }
 
 /// `monitors()` of a corpus file replayed as `hyprctl -j monitors`.
 fn monitors_from(h: &Hermetic, file: &str) -> Vec<Monitor> {
     let mut replay = Replay::new(&format!("{}/replay-monitors", h.scratch()));
-    replay.answer("hyprctl", &["-j", "monitors"], &Answer::stdout(read_corpus(file)), 0);
+    replay.answer(
+        "hyprctl",
+        &["-j", "monitors"],
+        &Answer::stdout(read_corpus(file)),
+        0,
+    );
     replay.activate(h);
     region_picker::monitors().unwrap_or_default()
 }
@@ -105,8 +120,13 @@ fn parse_capture_options_and_clicks_and_rects() {
     let directory = corpus_path("gpu-screen-recorder/list-capture-options");
     let mut out = Text::new();
     for name in sorted_entries(&directory, false) {
-        let text = omareel_core::compat::qstring::from_utf8(&std::fs::read(directory.join(&name)).expect("corpus"));
-        out.row([name, quote_list(&region_picker::parse_capture_options(&text))]);
+        let text = omareel_core::compat::qstring::from_utf8(
+            &std::fs::read(directory.join(&name)).expect("corpus"),
+        );
+        out.row([
+            name,
+            quote_list(&region_picker::parse_capture_options(&text)),
+        ]);
     }
     let options = out.into_string();
 
@@ -133,7 +153,11 @@ fn parse_capture_options_and_clicks_and_rects() {
     ];
     for width in values {
         for height in values {
-            out.row([num(width), num(height), boolean(region_picker::is_click_selection(width, height)).into()]);
+            out.row([
+                num(width),
+                num(height),
+                boolean(region_picker::is_click_selection(width, height)).into(),
+            ]);
         }
     }
     let clicks = out.into_string();
@@ -144,7 +168,14 @@ fn parse_capture_options_and_clicks_and_rects() {
             Some(rect) => (true, rect),
             None => (false, (-7.0, -7.0, -7.0, -7.0)),
         };
-        out.row([quote(&text), boolean(ok).into(), num(x), num(y), num(w), num(h)]);
+        out.row([
+            quote(&text),
+            boolean(ok).into(),
+            num(x),
+            num(y),
+            num(w),
+            num(h),
+        ]);
     }
     let rects = out.into_string();
 
@@ -160,7 +191,11 @@ fn parse_capture_options_and_clicks_and_rects() {
                 &read_expected("regionpicker/is-click-selection.txt"),
                 clicks.as_bytes(),
             ),
-            difference("regionpicker/parse-rect.txt", &read_expected("regionpicker/parse-rect.txt"), rects.as_bytes()),
+            difference(
+                "regionpicker/parse-rect.txt",
+                &read_expected("regionpicker/parse-rect.txt"),
+                rects.as_bytes(),
+            ),
         ]
         .into_iter()
         .flatten()
@@ -194,7 +229,12 @@ fn monitors_monitor_for_window_rectangles_and_snap() {
         }
     };
     for name in sorted_entries(&directory, false) {
-        dump(&mut out, &name, &Answer::stdout(std::fs::read(directory.join(&name)).expect("corpus")), true);
+        dump(
+            &mut out,
+            &name,
+            &Answer::stdout(std::fs::read(directory.join(&name)).expect("corpus")),
+            true,
+        );
     }
     let failing = Answer {
         out: std::fs::read(directory.join("crafted-two.json")).expect("corpus"),
@@ -202,8 +242,18 @@ fn monitors_monitor_for_window_rectangles_and_snap() {
         status: 1,
         ..Answer::default()
     };
-    dump(&mut out, "<crafted-two.json, exit status 1, stderr>", &failing, true);
-    dump(&mut out, "<exit status 3, no output>", &Answer::status(3), true);
+    dump(
+        &mut out,
+        "<crafted-two.json, exit status 1, stderr>",
+        &failing,
+        true,
+    );
+    dump(
+        &mut out,
+        "<exit status 3, no output>",
+        &Answer::status(3),
+        true,
+    );
     dump(&mut out, "<hyprctl not on PATH>", &Answer::default(), false);
     let monitors = out.into_string();
 
@@ -244,9 +294,16 @@ fn monitors_monitor_for_window_rectangles_and_snap() {
         let mut error = None;
         let rectangles = region_picker::window_rectangles(&mut error);
         let label = |value: &Value| value.as_str().map_or("<exit 1>".to_owned(), str::to_owned);
-        out.section(&format!("workspace={} clients={}", label(pair.get("workspace")), label(pair.get("clients"))));
+        out.section(&format!(
+            "workspace={} clients={}",
+            label(pair.get("workspace")),
+            label(pair.get("clients"))
+        ));
         out.row(["result".to_owned(), quote(&rectangles)]);
-        out.row(["error".to_owned(), quote(error.as_deref().unwrap_or("<untouched>"))]);
+        out.row([
+            "error".to_owned(),
+            quote(error.as_deref().unwrap_or("<untouched>")),
+        ]);
         replay.dump_calls(&h, &mut out);
     }
     let windows = out.into_string();
@@ -261,7 +318,16 @@ fn monitors_monitor_for_window_rectangles_and_snap() {
                 Some(rect) => (true, rect),
                 None => (false, (-7.0, -7.0, -7.0, -7.0)),
             };
-            out.row([quote(&rectangles), num(px), num(py), boolean(found).into(), num(x), num(y), num(w), num(hh)]);
+            out.row([
+                quote(&rectangles),
+                num(px),
+                num(py),
+                boolean(found).into(),
+                num(x),
+                num(y),
+                num(w),
+                num(hh),
+            ]);
         }
     }
     let snaps = out.into_string();
@@ -294,15 +360,23 @@ fn capturable_monitor_and_pick() {
             .unwrap_or_else(|| panic!("capturable scenario {label} names no monitor"));
         let world = World::new(&h, scenario);
         let mut note = None;
-        let result = region_picker::capturable_monitor(&values, requested, &mut note, &not_supported);
+        let result =
+            region_picker::capturable_monitor(&values, requested, &mut note, &not_supported);
         out.section(label);
         out.row([
             "result".to_owned(),
             quote(&values[requested].name),
             quote(&values[result].name),
-            if result == requested { "requested".into() } else { result.to_string() },
+            if result == requested {
+                "requested".into()
+            } else {
+                result.to_string()
+            },
         ]);
-        out.row(["note".to_owned(), quote(note.as_deref().unwrap_or("<untouched>"))]);
+        out.row([
+            "note".to_owned(),
+            quote(note.as_deref().unwrap_or("<untouched>")),
+        ]);
         world.replay.dump_calls(&h, &mut out);
     }
     let capturable = out.into_string();
@@ -312,11 +386,16 @@ fn capturable_monitor_and_pick() {
         let world = World::new(&h, scenario);
         let mode = mode_from(&scenario.get("mode").to_string_or(""));
         let picked = region_picker::pick(mode, &not_supported);
-        let region =
-            picked.region.clone().unwrap_or(CaptureRegion { monitor_name: "<untouched>".into(), ..CaptureRegion::default() });
+        let region = picked.region.clone().unwrap_or(CaptureRegion {
+            monitor_name: "<untouched>".into(),
+            ..CaptureRegion::default()
+        });
         out.section(label);
         out.row(["pick", mode_text(mode), boolean(picked.region.is_some())]);
-        out.row(["error".to_owned(), quote(&h.sanitize(picked.message.as_deref().unwrap_or("<untouched>")))]);
+        out.row([
+            "error".to_owned(),
+            quote(&h.sanitize(picked.message.as_deref().unwrap_or("<untouched>"))),
+        ]);
         out.row([
             "region".to_owned(),
             quote(&region.monitor_name),
@@ -334,9 +413,12 @@ fn capturable_monitor_and_pick() {
     let pick = out.into_string();
 
     assert_no_differences(
-        [("regionpicker/capturable-monitor.txt", capturable), ("regionpicker/pick.txt", pick)]
-            .iter()
-            .filter_map(|(name, text)| difference(name, &read_expected(name), text.as_bytes()))
-            .collect(),
+        [
+            ("regionpicker/capturable-monitor.txt", capturable),
+            ("regionpicker/pick.txt", pick),
+        ]
+        .iter()
+        .filter_map(|(name, text)| difference(name, &read_expected(name), text.as_bytes()))
+        .collect(),
     );
 }

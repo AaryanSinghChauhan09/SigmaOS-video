@@ -15,12 +15,13 @@ pub mod session;
 pub mod writer;
 
 pub use probe::{
-    EncoderProbeResults, cached_preferred_encoder_available, encoder_probe_cache_path, encoder_probe_key,
-    encoder_probe_results,
+    EncoderProbeResults, cached_preferred_encoder_available, encoder_probe_cache_path,
+    encoder_probe_key, encoder_probe_results,
 };
 pub use session::{ScreenCapture, ScreenCaptureConfig, is_supported};
 pub use writer::{
-    EncoderSink, FdSink, FrameOutput, FrameQueue, RawSlotMemory, SlotMemory, WriterConfig, run_writer, writer_loop,
+    EncoderSink, FdSink, FrameOutput, FrameQueue, RawSlotMemory, SlotMemory, WriterConfig,
+    run_writer, writer_loop,
 };
 
 /// `QSize`, as far as the capture uses it.
@@ -37,7 +38,10 @@ impl Size {
 
     /// `QSize()`: -1 by -1, invalid.
     pub const fn invalid() -> Size {
-        Size { width: -1, height: -1 }
+        Size {
+            width: -1,
+            height: -1,
+        }
     }
 
     /// `QSize::isEmpty`: a side below 1.
@@ -65,14 +69,24 @@ pub struct Rect {
 impl Default for Rect {
     /// `QRect()`: null, at 0,0 with a size of 0 by 0.
     fn default() -> Rect {
-        Rect { x1: 0, y1: 0, x2: -1, y2: -1 }
+        Rect {
+            x1: 0,
+            y1: 0,
+            x2: -1,
+            y2: -1,
+        }
     }
 }
 
 impl Rect {
     /// `QRect(x, y, width, height)`.
     pub const fn new(x: i32, y: i32, width: i32, height: i32) -> Rect {
-        Rect { x1: x, y1: y, x2: x.wrapping_add(width).wrapping_sub(1), y2: y.wrapping_add(height).wrapping_sub(1) }
+        Rect {
+            x1: x,
+            y1: y,
+            x2: x.wrapping_add(width).wrapping_sub(1),
+            y2: y.wrapping_add(height).wrapping_sub(1),
+        }
     }
 
     /// `QRect(QPoint(), size)`.
@@ -127,7 +141,11 @@ impl Rect {
             return Rect::default();
         }
         let span = |a1: i32, a2: i32| {
-            if a2 < a1.wrapping_sub(1) { (a2.wrapping_add(1), a1.wrapping_sub(1)) } else { (a1, a2) }
+            if a2 < a1.wrapping_sub(1) {
+                (a2.wrapping_add(1), a1.wrapping_sub(1))
+            } else {
+                (a1, a2)
+            }
         };
         let (l1, r1) = span(self.x1, self.x2);
         let (l2, r2) = span(other.x1, other.x2);
@@ -139,7 +157,12 @@ impl Rect {
         if t1 > b2 || t2 > b1 {
             return Rect::default();
         }
-        Rect { x1: l1.max(l2), x2: r1.min(r2), y1: t1.max(t2), y2: b1.min(b2) }
+        Rect {
+            x1: l1.max(l2),
+            x2: r1.min(r2),
+            y1: t1.max(t2),
+            y2: b1.min(b2),
+        }
     }
 }
 
@@ -181,12 +204,18 @@ impl CaptureRingBookkeeping {
     }
 
     fn slot_index(&self, slot: i32) -> Option<usize> {
-        usize::try_from(slot).ok().filter(|&index| index < self.states.len())
+        usize::try_from(slot)
+            .ok()
+            .filter(|&index| index < self.states.len())
     }
 
     /// The first available slot, now capturing; -1 (and a drop) when there is none.
     pub fn acquire(&mut self) -> i32 {
-        if let Some(index) = self.states.iter().position(|&state| state == SlotState::Available) {
+        if let Some(index) = self
+            .states
+            .iter()
+            .position(|&state| state == SlotState::Available)
+        {
             self.states[index] = SlotState::Capturing;
             return index as i32;
         }
@@ -235,7 +264,8 @@ impl CaptureRingBookkeeping {
 
     /// A slot's state; `Available` for one outside the ring.
     pub fn state(&self, slot: i32) -> SlotState {
-        self.slot_index(slot).map_or(SlotState::Available, |index| self.states[index])
+        self.slot_index(slot)
+            .map_or(SlotState::Available, |index| self.states[index])
     }
 
     pub fn count(&self, state: SlotState) -> i32 {
@@ -262,13 +292,21 @@ pub struct CaptureRowCopy {
 /// valid, else its part inside the frame) out of a BGRA frame of `source_size` with
 /// `source_stride` bytes per row. One copy when the crop spans whole rows, else one per row;
 /// none when the frame is empty, the stride is too short or the crop misses the frame.
-pub fn capture_crop_rows(source_size: Size, source_stride: i32, requested_crop: Rect) -> Vec<CaptureRowCopy> {
+pub fn capture_crop_rows(
+    source_size: Size,
+    source_stride: i32,
+    requested_crop: Rect,
+) -> Vec<CaptureRowCopy> {
     let mut result = Vec::new();
     if source_size.is_empty() || source_stride < source_size.width.wrapping_mul(4) {
         return result;
     }
     let frame = Rect::from_size(source_size);
-    let crop = if requested_crop.is_valid() { requested_crop.intersected(&frame) } else { frame };
+    let crop = if requested_crop.is_valid() {
+        requested_crop.intersected(&frame)
+    } else {
+        frame
+    };
     if !crop.is_valid() {
         return result;
     }
@@ -346,7 +384,12 @@ pub fn capture_stream_header(size: Size, fps: i32) -> Vec<u8> {
     // Timestamps count microseconds; DefaultDuration gives the last frame one interval.
     let info = ebml_element(
         0x1549A966,
-        &[ebml_unsigned(0x2AD7B1, 1000), ebml_element(0x4D80, b"omareel"), ebml_element(0x5741, b"omareel")].concat(),
+        &[
+            ebml_unsigned(0x2AD7B1, 1000),
+            ebml_element(0x4D80, b"omareel"),
+            ebml_element(0x5741, b"omareel"),
+        ]
+        .concat(),
     );
     let video = ebml_element(
         0xE0,
@@ -385,12 +428,18 @@ pub fn capture_frame_header(timestamp_us: i64, frame_bytes: i64) -> Vec<u8> {
     let block_header = [0x81u8, 0x00, 0x00, 0x80];
     let mut block = Vec::new();
     append_ebml_id(&mut block, 0xA3);
-    append_ebml_size(&mut block, (block_header.len() as i64).wrapping_add(frame_bytes) as u64);
+    append_ebml_size(
+        &mut block,
+        (block_header.len() as i64).wrapping_add(frame_bytes) as u64,
+    );
     block.extend_from_slice(&block_header);
     let timestamp = ebml_unsigned(0xE7, timestamp_us.max(0) as u64);
     let mut cluster = Vec::new();
     append_ebml_id(&mut cluster, 0x1F43B675);
-    append_ebml_size(&mut cluster, (timestamp.len() as i64 + block.len() as i64).wrapping_add(frame_bytes) as u64);
+    append_ebml_size(
+        &mut cluster,
+        (timestamp.len() as i64 + block.len() as i64).wrapping_add(frame_bytes) as u64,
+    );
     [cluster, timestamp, block].concat()
 }
 
@@ -420,7 +469,11 @@ pub fn trim_capture_crop(
     crop: &mut CaptureCrop,
 ) -> Result<(), String> {
     let output = Rect::new(0, 0, width, height);
-    crop.crop = if requested.is_valid() { requested.intersected(&output) } else { output };
+    crop.crop = if requested.is_valid() {
+        requested.intersected(&output)
+    } else {
+        output
+    };
     // The encoders reject odd frame sizes; a crop that lost a pixel to the output edge (or a
     // whole output of odd size) is trimmed rather than failing at the first frame.
     let (crop_width, crop_height) = (crop.crop.width(), crop.crop.height());
@@ -462,21 +515,39 @@ pub fn encoder_arguments(
 ) -> EncoderArguments {
     let fps = fps.max(1);
     let preferred = probe_results.preferred;
-    let requested_conversion = omareel_core::compat::qstring::to_lower(native_conversion.unwrap_or(""));
-    let use_gpu_conversion = preferred && requested_conversion != "cpu" && probe_results.gpu_conversion;
+    let requested_conversion =
+        omareel_core::compat::qstring::to_lower(native_conversion.unwrap_or(""));
+    let use_gpu_conversion =
+        preferred && requested_conversion != "cpu" && probe_results.gpu_conversion;
     let conversion = if use_gpu_conversion { "gpu" } else { "cpu" };
-    let mut arguments: Vec<String> =
-        ["-y", "-loglevel", "error", "-f", "matroska", "-i", "pipe:0", "-an"].map(String::from).to_vec();
-    let push = |arguments: &mut Vec<String>, items: &[&str]| arguments.extend(items.iter().map(|s| (*s).to_owned()));
+    let mut arguments: Vec<String> = [
+        "-y",
+        "-loglevel",
+        "error",
+        "-f",
+        "matroska",
+        "-i",
+        "pipe:0",
+        "-an",
+    ]
+    .map(String::from)
+    .to_vec();
+    let push = |arguments: &mut Vec<String>, items: &[&str]| {
+        arguments.extend(items.iter().map(|s| (*s).to_owned()))
+    };
     if use_gpu_conversion {
-        push(&mut arguments, &["-vf", "hwupload_cuda,scale_cuda=format=nv12"]);
+        push(
+            &mut arguments,
+            &["-vf", "hwupload_cuda,scale_cuda=format=nv12"],
+        );
     }
     push(&mut arguments, &["-c:v"]);
     // Quality: the capture is an intermediate that gets re-encoded on export, so keep it near
     // visually lossless. A plain -cq without a rate mode made NVENC starve small regions, so pin
     // VBR with a generous ceiling scaled to the frame size, plus a 1-second GOP for clean seeking.
     let megapixels = f64::from(encoded_size.width) * f64::from(encoded_size.height) / 1e6;
-    let maxrate_kbps = (megapixels * 12000.0 * (f64::from(fps) / 60.0)).clamp(8000.0, 120000.0) as i32;
+    let maxrate_kbps =
+        (megapixels * 12000.0 * (f64::from(fps) / 60.0)).clamp(8000.0, 120000.0) as i32;
     // Debug aid: OMAREEL_NATIVE_ENCODER=lossless stores the raw capture losslessly so capture
     // problems can be told apart from encoder artefacts.
     let lossless = native_encoder == Some("lossless");
@@ -486,11 +557,26 @@ pub fn encoder_arguments(
     let small_frame = megapixels < 1.5;
     let gop = fps.to_string();
     if lossless {
-        push(&mut arguments, &["libx264rgb", "-preset", "ultrafast", "-qp", "0"]);
+        push(
+            &mut arguments,
+            &["libx264rgb", "-preset", "ultrafast", "-qp", "0"],
+        );
     } else if preferred && small_frame {
         push(
             &mut arguments,
-            &["h264_nvenc", "-preset", "p4", "-tune", "lossless", "-zerolatency", "1", "-g", &gop, "-bf", "0"],
+            &[
+                "h264_nvenc",
+                "-preset",
+                "p4",
+                "-tune",
+                "lossless",
+                "-zerolatency",
+                "1",
+                "-g",
+                &gop,
+                "-bf",
+                "0",
+            ],
         );
     } else if preferred {
         let maxrate = format!("{maxrate_kbps}k");
@@ -527,28 +613,72 @@ pub fn encoder_arguments(
         let crf = if small_frame { "10" } else { "16" };
         push(
             &mut arguments,
-            &["libx264", "-preset", "veryfast", "-tune", "zerolatency", "-crf", crf, "-g", &gop, "-bf", "0"],
+            &[
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-tune",
+                "zerolatency",
+                "-crf",
+                crf,
+                "-g",
+                &gop,
+                "-bf",
+                "0",
+            ],
         );
     }
     if !use_gpu_conversion && !lossless {
         // swscale converts RGB with the BT.601 matrix unless told otherwise, while players read
         // untagged HD video as BT.709, so reds and greens drifted. Convert with BT.709 and say so.
-        push(&mut arguments, &["-vf", "scale=out_color_matrix=bt709:out_range=tv", "-pix_fmt", "yuv420p"]);
-        push(&mut arguments, &["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]);
+        push(
+            &mut arguments,
+            &[
+                "-vf",
+                "scale=out_color_matrix=bt709:out_range=tv",
+                "-pix_fmt",
+                "yuv420p",
+            ],
+        );
+        push(
+            &mut arguments,
+            &[
+                "-colorspace",
+                "bt709",
+                "-color_primaries",
+                "bt709",
+                "-color_trc",
+                "bt709",
+            ],
+        );
         push(&mut arguments, &["-color_range", "tv"]);
     }
     // Frames keep the times they were captured at, on a 1/fps time base. Gaps stay gaps.
     let time_base = format!("1/{fps}");
-    push(&mut arguments, &["-fps_mode", "vfr", "-enc_time_base", &time_base]);
+    push(
+        &mut arguments,
+        &["-fps_mode", "vfr", "-enc_time_base", &time_base],
+    );
     // Fragmented, so a recording whose encoder dies (a crash, an OOM kill, a power cut) is still
     // playable up to its last fragment; a plain MP4 is unreadable without the index written at
     // the end. No +faststart: it rewrites the whole file after encoding, which can outlast the
     // wait in `stop_encoder` on a long recording, and the editor reads the file locally anyway.
     // A still screen makes fragments small enough to sit in ffmpeg's output buffer, so each
     // packet is flushed as it is written.
-    push(&mut arguments, &["-flush_packets", "1", "-movflags", "+frag_keyframe+empty_moov+default_base_moof"]);
+    push(
+        &mut arguments,
+        &[
+            "-flush_packets",
+            "1",
+            "-movflags",
+            "+frag_keyframe+empty_moov+default_base_moof",
+        ],
+    );
     push(&mut arguments, &[output_path]);
-    EncoderArguments { conversion: conversion.to_owned(), arguments }
+    EncoderArguments {
+        conversion: conversion.to_owned(),
+        arguments,
+    }
 }
 
 /// `qEnvironmentVariable(name)` as an `Option`.
@@ -566,13 +696,24 @@ pub fn encoder_arguments_from_environment(
 ) -> EncoderArguments {
     let conversion = environment("OMAREEL_NATIVE_CONVERSION");
     let encoder = environment("OMAREEL_NATIVE_ENCODER");
-    encoder_arguments(encoded_size, fps, probe_results, conversion.as_deref(), encoder.as_deref(), output_path)
+    encoder_arguments(
+        encoded_size,
+        fps,
+        probe_results,
+        conversion.as_deref(),
+        encoder.as_deref(),
+        output_path,
+    )
 }
 
 /// `ScreenCapture::videoDurationUs`: from the first frame to the end of the last one written
 /// (`last_frame_index` on the 1/fps grid, -1 for none).
 pub fn video_duration_us(last_frame_index: i64, fps: i32) -> i64 {
-    if last_frame_index < 0 { 0 } else { ((last_frame_index + 1) as f64 * 1e6 / f64::from(fps)).round() as i64 }
+    if last_frame_index < 0 {
+        0
+    } else {
+        ((last_frame_index + 1) as f64 * 1e6 / f64::from(fps)).round() as i64
+    }
 }
 
 #[cfg(test)]
@@ -582,7 +723,10 @@ mod tests {
     #[test]
     fn rects_follow_qrect() {
         let frame = Rect::new(0, 0, 4, 3);
-        assert_eq!(Rect::new(-1, -1, 3, 3).intersected(&frame), Rect::new(0, 0, 2, 2));
+        assert_eq!(
+            Rect::new(-1, -1, 3, 3).intersected(&frame),
+            Rect::new(0, 0, 2, 2)
+        );
         assert_eq!(Rect::new(4, 0, 4, 4).intersected(&frame), Rect::default());
         assert!(Rect::default().is_null() && !Rect::default().is_valid());
         assert!(!Rect::new(0, 0, -2, 2).is_valid());

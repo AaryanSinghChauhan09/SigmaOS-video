@@ -42,7 +42,11 @@ pub fn print_error(text: &str) {
 /// `QFile::open(WriteOnly | Append | Text)` does: created when missing, nothing when it cannot be).
 pub fn append_debug_log(line: &str) {
     use std::io::Write;
-    if let Ok(mut file) = std::fs::OpenOptions::new().append(true).create(true).open("/tmp/omareel.log") {
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open("/tmp/omareel.log")
+    {
         let _ = file.write_all(line.as_bytes());
     }
 }

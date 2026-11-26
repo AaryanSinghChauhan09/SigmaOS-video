@@ -74,7 +74,9 @@ fn process_context(env: &dyn Fn(&str) -> Option<String>) -> Context<'_> {
         env,
         organization: ORGANIZATION_NAME,
         application: APPLICATION_NAME,
-        cwd: std::env::current_dir().map(|d| d.as_os_str().as_bytes().to_vec()).unwrap_or_default(),
+        cwd: std::env::current_dir()
+            .map(|d| d.as_os_str().as_bytes().to_vec())
+            .unwrap_or_default(),
     }
 }
 
@@ -206,8 +208,12 @@ fn tail_is_incomplete(tail: &[u8], need: usize) -> bool {
 fn user_dir_from(text: &str, key: &str, home: &str) -> Option<String> {
     let mut result = None;
     for line in text_stream_lines(text) {
-        let Some(rest) = line.strip_prefix("XDG_") else { continue };
-        let Some(at) = rest.rfind("_DIR=") else { continue };
+        let Some(rest) = line.strip_prefix("XDG_") else {
+            continue;
+        };
+        let Some(at) = rest.rfind("_DIR=") else {
+            continue;
+        };
         if &rest[..at] != key {
             continue;
         }
@@ -293,12 +299,25 @@ mod tests {
     use crate::compat::qdir::tests::TempDir;
 
     fn ctx<'a>(env: &'a dyn Fn(&str) -> Option<String>) -> Context<'a> {
-        Context { env, organization: ORGANIZATION_NAME, application: APPLICATION_NAME, cwd: b"/work".to_vec() }
+        Context {
+            env,
+            organization: ORGANIZATION_NAME,
+            application: APPLICATION_NAME,
+            cwd: b"/work".to_vec(),
+        }
     }
 
     fn vars(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
-        let pairs: Vec<(String, String)> = pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
-        move |name: &str| pairs.iter().find(|(k, _)| k == name).map(|(_, v)| v.clone())
+        let pairs: Vec<(String, String)> = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        move |name: &str| {
+            pairs
+                .iter()
+                .find(|(k, _)| k == name)
+                .map(|(_, v)| v.clone())
+        }
     }
 
     fn at(location: Location, env: &dyn Fn(&str) -> Option<String>) -> String {
@@ -311,31 +330,73 @@ mod tests {
         let home = vars(&[("HOME", "/home/u")]);
         assert_eq!(at(Location::Config, &home), "/home/u/.config");
         assert_eq!(at(Location::GenericConfig, &home), "/home/u/.config");
-        assert_eq!(at(Location::AppConfig, &home), "/home/u/.config/omareel/omareel");
+        assert_eq!(
+            at(Location::AppConfig, &home),
+            "/home/u/.config/omareel/omareel"
+        );
         assert_eq!(at(Location::GenericCache, &home), "/home/u/.cache");
         assert_eq!(at(Location::Cache, &home), "/home/u/.cache/omareel/omareel");
         assert_eq!(at(Location::GenericData, &home), "/home/u/.local/share");
-        assert_eq!(at(Location::AppData, &home), "/home/u/.local/share/omareel/omareel");
-        assert_eq!(at(Location::AppLocalData, &home), "/home/u/.local/share/omareel/omareel");
-        assert_eq!(at(Location::State, &home), "/home/u/.local/state/omareel/omareel");
+        assert_eq!(
+            at(Location::AppData, &home),
+            "/home/u/.local/share/omareel/omareel"
+        );
+        assert_eq!(
+            at(Location::AppLocalData, &home),
+            "/home/u/.local/share/omareel/omareel"
+        );
+        assert_eq!(
+            at(Location::State, &home),
+            "/home/u/.local/state/omareel/omareel"
+        );
         assert_eq!(at(Location::GenericState, &home), "/home/u/.local/state");
         assert_eq!(at(Location::Fonts, &home), "/home/u/.local/share/fonts");
-        assert_eq!(at(Location::Applications, &home), "/home/u/.local/share/applications");
+        assert_eq!(
+            at(Location::Applications, &home),
+            "/home/u/.local/share/applications"
+        );
         assert_eq!(at(Location::Home, &home), "/home/u");
         assert_eq!(at(Location::Temp, &home), "/tmp");
 
         // Relative, empty and unset variables are ignored; absolute ones are used as they are.
         for value in ["rel", "", " /x"] {
-            assert_eq!(at(Location::Config, &vars(&[("HOME", "/h"), ("XDG_CONFIG_HOME", value)])), "/h/.config");
+            assert_eq!(
+                at(
+                    Location::Config,
+                    &vars(&[("HOME", "/h"), ("XDG_CONFIG_HOME", value)])
+                ),
+                "/h/.config"
+            );
         }
-        assert_eq!(at(Location::Config, &vars(&[("XDG_CONFIG_HOME", "//x//")])), "//x//");
-        assert_eq!(at(Location::Cache, &vars(&[("XDG_CACHE_HOME", "/x/")])), "/x//omareel/omareel");
-        assert_eq!(at(Location::GenericData, &vars(&[("XDG_DATA_HOME", "/x/../y")])), "/x/../y");
+        assert_eq!(
+            at(Location::Config, &vars(&[("XDG_CONFIG_HOME", "//x//")])),
+            "//x//"
+        );
+        assert_eq!(
+            at(Location::Cache, &vars(&[("XDG_CACHE_HOME", "/x/")])),
+            "/x//omareel/omareel"
+        );
+        assert_eq!(
+            at(
+                Location::GenericData,
+                &vars(&[("XDG_DATA_HOME", "/x/../y")])
+            ),
+            "/x/../y"
+        );
         // $HOME is cleaned, and "/" when missing.
         assert_eq!(at(Location::Config, &vars(&[])), "//.config");
-        assert_eq!(at(Location::Cache, &vars(&[("HOME", "")])), "//.cache/omareel/omareel");
-        assert_eq!(at(Location::Config, &vars(&[("HOME", "/a//b/./c/..")])), "/a/b/.config");
-        assert_eq!(at(Location::Config, &vars(&[("HOME", "rel")])), "rel/.config");
+        assert_eq!(
+            at(Location::Cache, &vars(&[("HOME", "")])),
+            "//.cache/omareel/omareel"
+        );
+        assert_eq!(
+            at(Location::Config, &vars(&[("HOME", "/a//b/./c/..")])),
+            "/a/b/.config"
+        );
+        assert_eq!(
+            at(Location::Config, &vars(&[("HOME", "rel")])),
+            "rel/.config"
+        );
         assert_eq!(at(Location::Temp, &vars(&[("TMPDIR", "rel")])), "/work/rel");
         assert_eq!(at(Location::Temp, &vars(&[("TMPDIR", "/t//")])), "/t/");
     }
@@ -354,7 +415,10 @@ mod tests {
             at(Location::Movies, &env)
         };
         // Recorded from Qt 6.11.2.
-        assert_eq!(movies(b"XDG_VIDEOS_DIR=\"$HOME/Videos2\"\n"), "/home/u/Videos2");
+        assert_eq!(
+            movies(b"XDG_VIDEOS_DIR=\"$HOME/Videos2\"\n"),
+            "/home/u/Videos2"
+        );
         assert_eq!(movies(b"XDG_VIDEOS_DIR=\"$HOME/V/\"\n"), "/home/u/V");
         assert_eq!(movies(b"XDG_VIDEOS_DIR=\"/media/v\"\n"), "/media/v");
         assert_eq!(movies(b"XDG_VIDEOS_DIR=$HOME/x\n"), "/home/u/x");
@@ -362,8 +426,14 @@ mod tests {
         assert_eq!(movies(b"XDG_VIDEOS_DIR=\"\"\n"), "\"\"");
         assert_eq!(movies(b"XDG_VIDEOS_DIR=\"\n"), "\"");
         assert_eq!(movies(b"XDG_VIDEOS_DIR=\"$HOMEX/a\"\n"), "/home/uX/a");
-        assert_eq!(movies(b"XDG_VIDEOS_DIR=\"/first\"\nXDG_VIDEOS_DIR=\"/second\"\n"), "/second");
-        assert_eq!(movies(b"XDG_VIDEOS_DIR=\"/crlf\"\r\nXDG_MUSIC_DIR=\"/m\"\r\n"), "/crlf");
+        assert_eq!(
+            movies(b"XDG_VIDEOS_DIR=\"/first\"\nXDG_VIDEOS_DIR=\"/second\"\n"),
+            "/second"
+        );
+        assert_eq!(
+            movies(b"XDG_VIDEOS_DIR=\"/crlf\"\r\nXDG_MUSIC_DIR=\"/m\"\r\n"),
+            "/crlf"
+        );
         assert_eq!(movies(b"XDG_VIDEOS_DIR=\"/a\rb\"\n"), "/a\rb");
         assert_eq!(movies(b"XDG_VIDEOS_DIR=\"/a\"\r\r\n"), "\"/a\"\r");
         assert_eq!(movies(b"\xef\xbb\xbfXDG_VIDEOS_DIR=\"/bom\"\n"), "/bom");
@@ -371,16 +441,35 @@ mod tests {
         assert_eq!(movies(b" XDG_VIDEOS_DIR=\"/s\"\n"), "/home/u/Videos");
         assert_eq!(movies(b"XDG_VIDEOS_DIR=\"/x_DIR=/y\"\n"), "/home/u/Videos");
         assert_eq!(movies(b"XDG_videos_DIR=\"/lower\"\n"), "/home/u/Videos");
-        assert_eq!(movies(b"XDG_VIDEOS_DIR=\"/inv\xff\xe2\x82id\"\n"), "/inv\u{FFFD}\u{FFFD}\u{FFFD}id");
+        assert_eq!(
+            movies(b"XDG_VIDEOS_DIR=\"/inv\xff\xe2\x82id\"\n"),
+            "/inv\u{FFFD}\u{FFFD}\u{FFFD}id"
+        );
         assert_eq!(movies(b"XDG_VIDEOS_DIR=\"/nonl\""), "/nonl");
         assert_eq!(movies(b"XDG_VIDEOS_DIR=\"/tcr\"\r"), "/tcr");
         assert_eq!(movies(b"XDG_VIDEOS_DIR=$HOME\n"), "/home/u");
         assert_eq!(movies(b"XDG_VIDEOS_DIR=\"/n\x00ul\"\n"), "/n\0ul");
-        assert_eq!(movies("XDG_VIDEOS_DIR=\"/a\u{2028}b\"\n".as_bytes()), "/a\u{2028}b");
+        assert_eq!(
+            movies("XDG_VIDEOS_DIR=\"/a\u{2028}b\"\n".as_bytes()),
+            "/a\u{2028}b"
+        );
 
         let dir = TempDir::new("stdpaths-all");
-        let keys = ["DESKTOP", "DOCUMENTS", "PICTURES", "MUSIC", "VIDEOS", "DOWNLOAD", "PUBLICSHARE", "TEMPLATES", "FONTS"];
-        let text: String = keys.iter().map(|k| format!("XDG_{k}_DIR=\"$HOME/{k}-x\"\n")).collect();
+        let keys = [
+            "DESKTOP",
+            "DOCUMENTS",
+            "PICTURES",
+            "MUSIC",
+            "VIDEOS",
+            "DOWNLOAD",
+            "PUBLICSHARE",
+            "TEMPLATES",
+            "FONTS",
+        ];
+        let text: String = keys
+            .iter()
+            .map(|k| format!("XDG_{k}_DIR=\"$HOME/{k}-x\"\n"))
+            .collect();
         std::fs::write(dir.join("user-dirs.dirs"), text).unwrap();
         let config = dir.0.clone();
         let env = move |name: &str| match name {
@@ -389,8 +478,15 @@ mod tests {
             _ => None,
         };
         let got: Vec<String> = [
-            Location::Desktop, Location::Documents, Location::Pictures, Location::Music, Location::Movies,
-            Location::Download, Location::PublicShare, Location::Templates, Location::Fonts,
+            Location::Desktop,
+            Location::Documents,
+            Location::Pictures,
+            Location::Music,
+            Location::Movies,
+            Location::Download,
+            Location::PublicShare,
+            Location::Templates,
+            Location::Fonts,
         ]
         .iter()
         .map(|&l| at(l, &env))
@@ -398,20 +494,36 @@ mod tests {
         assert_eq!(
             got,
             [
-                "/h/DESKTOP-x", "/h/DOCUMENTS-x", "/h/PICTURES-x", "/h/MUSIC-x", "/h/VIDEOS-x", "/h/DOWNLOAD-x",
-                "/h/PUBLICSHARE-x", "/h/TEMPLATES-x", "/h/.local/share/fonts",
+                "/h/DESKTOP-x",
+                "/h/DOCUMENTS-x",
+                "/h/PICTURES-x",
+                "/h/MUSIC-x",
+                "/h/VIDEOS-x",
+                "/h/DOWNLOAD-x",
+                "/h/PUBLICSHARE-x",
+                "/h/TEMPLATES-x",
+                "/h/.local/share/fonts",
             ]
         );
 
         // No file, or a directory in its place: the defaults.
-        let none = vars(&[("HOME", "/h"), ("XDG_CONFIG_HOME", "/nonexistent-omareel-config")]);
+        let none = vars(&[
+            ("HOME", "/h"),
+            ("XDG_CONFIG_HOME", "/nonexistent-omareel-config"),
+        ]);
         assert_eq!(at(Location::Movies, &none), "/h/Videos");
         assert_eq!(at(Location::Download, &none), "/h/Downloads");
         assert_eq!(at(Location::Desktop, &none), "/h/Desktop");
         let dir = TempDir::new("stdpaths-dir");
         std::fs::create_dir(dir.join("user-dirs.dirs")).unwrap();
         let config = dir.0.clone();
-        let env = move |name: &str| if name == "XDG_CONFIG_HOME" { Some(config.clone()) } else { None };
+        let env = move |name: &str| {
+            if name == "XDG_CONFIG_HOME" {
+                Some(config.clone())
+            } else {
+                None
+            }
+        };
         assert_eq!(at(Location::Movies, &env), "//Videos");
     }
 
@@ -438,7 +550,15 @@ mod tests {
         let find = |name: &str, path: Option<&str>| -> String {
             let path = path.map(|p| p.replace("$D", &dir.0));
             let env = move |n: &str| if n == "PATH" { path.clone() } else { None };
-            find_executable_in(name, &Context { env: &env, organization: "", application: "", cwd: dir.0.as_bytes().to_vec() })
+            find_executable_in(
+                name,
+                &Context {
+                    env: &env,
+                    organization: "",
+                    application: "",
+                    cwd: dir.0.as_bytes().to_vec(),
+                },
+            )
         };
         let d = |rel: &str| dir.join(rel);
         assert_eq!(find("tool", Some("$D/bin")), d("bin/tool"));
@@ -456,7 +576,10 @@ mod tests {
         assert_eq!(find("cwdtool", Some(".")), d("cwdtool"));
         assert_eq!(find("tool", Some("bin")), d("bin/tool"));
         // Absolute names are only checked, and come back cleaned.
-        assert_eq!(find(&format!("{}//bin/./tool", dir.0), Some("")), d("bin/tool"));
+        assert_eq!(
+            find(&format!("{}//bin/./tool", dir.0), Some("")),
+            d("bin/tool")
+        );
         assert_eq!(find(&d("bin/noexec"), None), "");
         assert_eq!(find("", Some("$D/bin")), "");
         assert_eq!(find("tool/", Some("$D/bin")), "");
@@ -471,7 +594,10 @@ mod tests {
     #[test]
     fn decodes_the_stream_like_qtextstream() {
         assert_eq!(decode_stream_utf8(b"\xef\xbb\xbfab"), "ab");
-        assert_eq!(decode_stream_utf8(b"\xef\xbb\xbf\xef\xbb\xbfab"), "\u{FEFF}ab");
+        assert_eq!(
+            decode_stream_utf8(b"\xef\xbb\xbf\xef\xbb\xbfab"),
+            "\u{FEFF}ab"
+        );
         assert_eq!(decode_stream_utf8(b"a\xe2\x82"), "a");
         assert_eq!(decode_stream_utf8(b"a\xe2\x82b"), "a\u{FFFD}\u{FFFD}b");
         assert_eq!(decode_stream_utf8(b"a\xc3"), "a");

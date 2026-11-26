@@ -4,7 +4,9 @@
 //! say that capture has started, or for the daemon to give up and leave its reason in
 //! `last-error.txt`.
 
-use super::state::{last_error_file_path, process_alive, read_last_error, read_state_file, state_file_path};
+use super::state::{
+    last_error_file_path, process_alive, read_last_error, read_state_file, state_file_path,
+};
 use super::{debug_start_stage, mode_name, monotonic_us};
 use crate::capture::RecordOptions;
 use crate::region_picker;
@@ -25,7 +27,10 @@ pub struct StartOutcome {
 
 /// The daemon's arguments for a picked region (`startDetached`'s list): the region with
 /// `QString::number(value, 'g', 16)` for its coordinates, then the options.
-pub fn daemon_arguments(region: &crate::capture::CaptureRegion, options: &RecordOptions) -> Vec<String> {
+pub fn daemon_arguments(
+    region: &crate::capture::CaptureRegion,
+    options: &RecordOptions,
+) -> Vec<String> {
     let number = |value: f64| qnumber::number_f64(value, 'g', 16);
     let mut arguments: Vec<String> = vec![
         "__record-daemon".into(),
@@ -57,7 +62,11 @@ pub fn daemon_arguments(region: &crate::capture::CaptureRegion, options: &Record
         push(&["--desktop-audio"]);
     }
     if options.microphone_audio {
-        push(&["--microphone-audio", "--microphone-device", &options.microphone_device]);
+        push(&[
+            "--microphone-audio",
+            "--microphone-device",
+            &options.microphone_device,
+        ]);
     }
     if options.webcam {
         let height = options.webcam_height.to_string();
@@ -103,16 +112,24 @@ pub fn start_detached(options: &RecordOptions) -> StartOutcome {
     let Some(region) = pick.region else {
         let error = pick.message.unwrap_or_default();
         let code = if error == "Selection cancelled" { 1 } else { 2 };
-        return StartOutcome { code, message: error };
+        return StartOutcome {
+            code,
+            message: error,
+        };
     };
     let selection_note = pick.message.unwrap_or_default();
     qdir::mkpath(&FileInfo::new(state_file_path()).absolute_path());
     qfile::remove(&last_error_file_path());
     let arguments = daemon_arguments(&region, options);
-    let channels =
-        DetachedChannels { standard_output_file: Some("/dev/null"), standard_error_file: Some("/dev/null") };
+    let channels = DetachedChannels {
+        standard_output_file: Some("/dev/null"),
+        standard_error_file: Some("/dev/null"),
+    };
     let Some(pid) = qprocess::start_detached(&application_file_path(), &arguments, channels) else {
-        return StartOutcome { code: 2, message: "Could not start recorder daemon".into() };
+        return StartOutcome {
+            code: 2,
+            message: "Could not start recorder daemon".into(),
+        };
     };
     let spawn_us = monotonic_us();
     debug_start_stage("daemon_spawn", spawn_us, &format!("pid={pid}"));
@@ -141,12 +158,21 @@ pub fn start_detached(options: &RecordOptions) -> StartOutcome {
                 reason = "Recorder daemon exited during startup".into();
             }
             qfile::remove(&last_error_file_path());
-            return StartOutcome { code: 2, message: reason };
+            return StartOutcome {
+                code: 2,
+                message: reason,
+            };
         }
         std::thread::sleep(Duration::from_millis(20));
     }
     if !state_appeared {
-        return StartOutcome { code: 2, message: "Recorder daemon did not become ready".into() };
+        return StartOutcome {
+            code: 2,
+            message: "Recorder daemon did not become ready".into(),
+        };
     }
-    StartOutcome { code: 2, message: "Recorder daemon did not start capture in time".into() }
+    StartOutcome {
+        code: 2,
+        message: "Recorder daemon did not start capture in time".into(),
+    }
 }

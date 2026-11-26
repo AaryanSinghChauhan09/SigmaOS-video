@@ -64,5 +64,9 @@ fn parse_txt() {
             cells[..8].join("\t") + "\n"
         })
         .collect();
-    assert_same("qnumber/parse.txt (without the base-0 cells)", expected.as_bytes(), out.into_string().as_bytes());
+    assert_same(
+        "qnumber/parse.txt (without the base-0 cells)",
+        expected.as_bytes(),
+        out.into_string().as_bytes(),
+    );
 }

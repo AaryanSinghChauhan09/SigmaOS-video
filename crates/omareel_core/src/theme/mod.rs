@@ -47,7 +47,9 @@ impl Theme {
     pub fn new(font_family: Option<String>) -> Theme {
         let mut theme = Theme {
             palette: Palette::from_files(&Values::new(), &Values::new()),
-            font_family: font_family.filter(|f| !f.is_empty()).unwrap_or_else(|| "sans-serif".into()),
+            font_family: font_family
+                .filter(|f| !f.is_empty())
+                .unwrap_or_else(|| "sans-serif".into()),
             mono_family: "monospace".into(),
             theme_name: String::new(),
             radius: 0,
@@ -85,13 +87,19 @@ impl Theme {
     }
 }
 
-type Queries = (std::thread::JoinHandle<Option<String>>, std::thread::JoinHandle<Option<i32>>);
+type Queries = (
+    std::thread::JoinHandle<Option<String>>,
+    std::thread::JoinHandle<Option<i32>>,
+);
 
 /// The answers a [`Theme`] asks other programs for, started by [`prefetch`].
 static PREFETCHED: std::sync::Mutex<Option<Queries>> = std::sync::Mutex::new(None);
 
 fn spawn_queries() -> Queries {
-    (std::thread::spawn(monospace_family), std::thread::spawn(rounding))
+    (
+        std::thread::spawn(monospace_family),
+        std::thread::spawn(rounding),
+    )
 }
 
 fn take_prefetched() -> Option<Queries> {
@@ -142,7 +150,11 @@ pub struct Radii {
 impl From<i32> for Radii {
     fn from(radius: i32) -> Radii {
         if radius <= 0 {
-            return Radii { card: 0, control: 0, small: 0 };
+            return Radii {
+                card: 0,
+                control: 0,
+                small: 0,
+            };
         }
         Radii {
             card: q_bound(6, radius, 12),
@@ -171,16 +183,25 @@ pub fn watched_paths() -> Vec<String> {
 /// composition draws keystroke pills with.
 pub fn render_colors() -> (crate::compat::qcolor::QColor, crate::compat::qcolor::QColor) {
     use crate::compat::qcolor::QColor;
-    let colors = toml::read(&crate::compat::qdir::file_path(&omarchy_paths::state_root(), "theme/colors.toml"));
-    let color = |key: &str, fallback: &str| QColor::parse(colors.get(key).map_or(fallback, String::as_str));
-    (color(".background", "#1a1b26"), color(".foreground", "#a9b1d6"))
+    let colors = toml::read(&crate::compat::qdir::file_path(
+        &omarchy_paths::state_root(),
+        "theme/colors.toml",
+    ));
+    let color =
+        |key: &str, fallback: &str| QColor::parse(colors.get(key).map_or(fallback, String::as_str));
+    (
+        color(".background", "#1a1b26"),
+        color(".foreground", "#a9b1d6"),
+    )
 }
 
 /// shell.toml's `[font] base-size` (`^\s*base-size\s*=\s*(\d+)` inside `[font]`), at least
 /// 1, or 12 when there is none.
 pub fn shell_font_base_size() -> i32 {
     let path = crate::compat::qdir::file_path(&omarchy_paths::state_root(), "theme/shell.toml");
-    let Ok(bytes) = crate::compat::qfile::read_all(path) else { return 12 };
+    let Ok(bytes) = crate::compat::qfile::read_all(path) else {
+        return 12;
+    };
     let mut in_font = false;
     for line in toml::decoded_lines(&bytes) {
         if let Some(name) = toml::section(&line) {
@@ -190,11 +211,18 @@ pub fn shell_font_base_size() -> i32 {
         if !in_font {
             continue;
         }
-        let space = |s: &str| s.trim_start_matches([' ', '\t', '\n', '\x0b', '\x0c', '\r']).to_owned();
+        let space = |s: &str| {
+            s.trim_start_matches([' ', '\t', '\n', '\x0b', '\x0c', '\r'])
+                .to_owned()
+        };
         let rest = space(&line);
-        let Some(rest) = rest.strip_prefix("base-size") else { continue };
+        let Some(rest) = rest.strip_prefix("base-size") else {
+            continue;
+        };
         let rest = space(rest);
-        let Some(rest) = rest.strip_prefix('=') else { continue };
+        let Some(rest) = rest.strip_prefix('=') else {
+            continue;
+        };
         let rest = space(rest);
         let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
         if !digits.is_empty() {

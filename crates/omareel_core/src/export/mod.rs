@@ -19,6 +19,7 @@ pub mod encoder_pipe;
 pub mod hardware;
 pub mod plan;
 
+use crate::camera_timeline::map_camera_time;
 use crate::clip_timeline::ClipTimeline;
 use crate::compat::qdir::{self, FileInfo};
 use crate::compat::qnumber::number_f64;
@@ -26,7 +27,6 @@ use crate::compat::qprocess::Process;
 use crate::compat::qround::q_round;
 use crate::compat::qtemporaryfile::TemporaryFile;
 use crate::compat::{cpp, qfile, qjson, qstandardpaths, qstring};
-use crate::camera_timeline::map_camera_time;
 use crate::input_log::InputLog;
 use crate::keystroke_track::KeystrokeTrack;
 use crate::media_probe::{self, VideoInfo};
@@ -102,7 +102,13 @@ struct DecodedPacket {
 
 impl DecodedPacket {
     fn failed(error: String) -> DecodedPacket {
-        DecodedPacket { image: None, camera_image: None, error, clip: -1, insert_image: None }
+        DecodedPacket {
+            image: None,
+            camera_image: None,
+            error,
+            clip: -1,
+            insert_image: None,
+        }
     }
 }
 
@@ -165,7 +171,10 @@ fn nanos(since: Instant) -> i64 {
 /// The decode size for a source of `size` scaled by `scale`: even, at least 2, at most the
 /// source.
 fn even_scaled(size: i32, scale: f64) -> i32 {
-    cpp::min(size, cpp::max(2, q_round(f64::from(size) * scale / 2.0).wrapping_mul(2)))
+    cpp::min(
+        size,
+        cpp::max(2, q_round(f64::from(size) * scale / 2.0).wrapping_mul(2)),
+    )
 }
 
 /// What the decode thread works from.
@@ -238,7 +247,10 @@ impl ExportJob {
     /// `project.json`), probes inserted clips and the webcam video, builds the motion and
     /// keystroke tracks, and works out the output and decode sizes. `cancelled` is the
     /// exporter's flag, which [`cancel`](Self::cancel) sets too.
-    pub fn prepare(options: &ExportOptions, cancelled: Arc<AtomicBool>) -> Result<ExportJob, String> {
+    pub fn prepare(
+        options: &ExportOptions,
+        cancelled: Arc<AtomicBool>,
+    ) -> Result<ExportJob, String> {
         let total_timer = Instant::now();
         let bundle = options.bundle_path.clone();
         let video_path = qdir::file_path(&bundle, "screen.mp4");
@@ -258,7 +270,10 @@ impl ExportJob {
             project = Project::defaults(&qdir::dir_name(&bundle), media.duration);
             project.camera.enabled = FileInfo::new(&camera_path).is_file();
             if let Ok(bytes) = qfile::read_all(qdir::file_path(&bundle, "capture.json")) {
-                let camera = qjson::object_from_json(&bytes).unwrap_or_default().value("camera").to_object();
+                let camera = qjson::object_from_json(&bytes)
+                    .unwrap_or_default()
+                    .value("camera")
+                    .to_object();
                 let rotation = camera.value("rotation").to_int(0);
                 if matches!(rotation, 0 | 90 | 180 | 270) {
                     project.camera.rotation = rotation;
@@ -271,11 +286,21 @@ impl ExportJob {
                 project.camera.radius = camera.value("radius").to_double(16.0);
             }
             let input = InputLog::load_bundle(&qdir::absolute_path(&bundle), media.duration)?;
-            let clicks: Vec<f64> = input.click_downs(true).iter().map(|event| event.time).collect();
+            let clicks: Vec<f64> = input
+                .click_downs(true)
+                .iter()
+                .map(|event| event.time)
+                .collect();
             project.zooms = zoom_timeline::generate(&clicks, media.duration);
         }
         if project.clips.is_empty() {
-            project.clips = vec![Clip { id: "c1".into(), in_: 0.0, out: media.duration, speed: 1.0, ..Clip::default() }];
+            project.clips = vec![Clip {
+                id: "c1".into(),
+                in_: 0.0,
+                out: media.duration,
+                speed: 1.0,
+                ..Clip::default()
+            }];
         }
         let timeline = ClipTimeline::new(project.clips.clone());
         let output_duration = timeline.total_duration();
@@ -301,17 +326,32 @@ impl ExportJob {
             capture_fps = capture.value("fps").to_double(60.0);
             capture_scale = capture.value("scale").to_double(1.0);
             let screen_first = capture.value("first_frame_us").to_variant_long_long();
-            let camera_first = capture.value("camera").to_object().value("first_frame_us").to_variant_long_long();
+            let camera_first = capture
+                .value("camera")
+                .to_object()
+                .value("first_frame_us")
+                .to_variant_long_long();
             if screen_first > 0 && camera_first > 0 {
                 camera_offset = camera_first.wrapping_sub(screen_first) as f64 / 1000000.0;
             }
         }
-        let camera_media =
-            if FileInfo::new(&camera_path).is_file() { plan::probe(&camera_path).0 } else { MediaInfo::default() };
+        let camera_media = if FileInfo::new(&camera_path).is_file() {
+            plan::probe(&camera_path).0
+        } else {
+            MediaInfo::default()
+        };
         let camera_full_frame = project.clips.iter().any(|clip| clip.layout == "camera");
         // Camera clips show the webcam even when its bubble is switched off.
-        let camera_enabled = camera_media.width > 0 && (project.camera.enabled || camera_full_frame);
-        let motion = MotionTrack::build(media.duration, media.width, media.height, input.events(), &project, capture_fps);
+        let camera_enabled =
+            camera_media.width > 0 && (project.camera.enabled || camera_full_frame);
+        let motion = MotionTrack::build(
+            media.duration,
+            media.width,
+            media.height,
+            input.events(),
+            &project,
+            capture_fps,
+        );
         let keystrokes = KeystrokeTrack::build(input.events(), &project.keystrokes);
 
         let output = options.output_path.as_bytes();
@@ -326,12 +366,20 @@ impl ExportJob {
             project.export_settings.fps
         };
         let aspect = plan::output_aspect(&project.aspect, media.width, media.height, &project.crop);
-        let mut width = if gif && options.gif_width > 0 { options.gif_width } else { options.width };
+        let mut width = if gif && options.gif_width > 0 {
+            options.gif_width
+        } else {
+            options.width
+        };
         let height;
         if width > 0 {
             height = q_round(f64::from(width) / aspect);
         } else {
-            height = if gif { project.export_settings.gif.height } else { project.export_settings.height };
+            height = if gif {
+                project.export_settings.gif.height
+            } else {
+                project.export_settings.height
+            };
             width = q_round(f64::from(height) * aspect);
         }
         let (width, height) = plan::padded_even_size(width, height);
@@ -342,9 +390,13 @@ impl ExportJob {
             maximum_zoom = cpp::max(maximum_zoom, zoom.level);
         }
         let needed_width = maximum_zoom * f64::from(width) / cpp::max(0.0001, project.crop.width);
-        let needed_height = maximum_zoom * f64::from(height) / cpp::max(0.0001, project.crop.height);
+        let needed_height =
+            maximum_zoom * f64::from(height) / cpp::max(0.0001, project.crop.height);
         let decode_scale = cpp::clamp(
-            cpp::max(needed_width / f64::from(media.width), needed_height / f64::from(media.height)),
+            cpp::max(
+                needed_width / f64::from(media.width),
+                needed_height / f64::from(media.height),
+            ),
             0.01,
             1.0,
         );
@@ -353,16 +405,25 @@ impl ExportJob {
         // A bubble needs a fraction of the output height; a full-frame camera has to cover the
         // output once rotated.
         let camera_quarter_turn = project.camera.rotation == 90 || project.camera.rotation == 270;
-        let camera_display_width =
-            f64::from(if camera_quarter_turn { camera_media.height } else { camera_media.width });
-        let camera_display_height =
-            f64::from(if camera_quarter_turn { camera_media.width } else { camera_media.height });
+        let camera_display_width = f64::from(if camera_quarter_turn {
+            camera_media.height
+        } else {
+            camera_media.width
+        });
+        let camera_display_height = f64::from(if camera_quarter_turn {
+            camera_media.width
+        } else {
+            camera_media.height
+        });
         let camera_decode_scale = if camera_enabled {
             cpp::clamp(
                 cpp::max(
                     f64::from(height) * project.camera.size * 1.5 / camera_display_height,
                     if camera_full_frame {
-                        cpp::max(f64::from(width) / camera_display_width, f64::from(height) / camera_display_height)
+                        cpp::max(
+                            f64::from(width) / camera_display_width,
+                            f64::from(height) / camera_display_height,
+                        )
                     } else {
                         0.0
                     },
@@ -373,8 +434,16 @@ impl ExportJob {
         } else {
             1.0
         };
-        let camera_decode_width = if camera_enabled { even_scaled(camera_media.width, camera_decode_scale) } else { 0 };
-        let camera_decode_height = if camera_enabled { even_scaled(camera_media.height, camera_decode_scale) } else { 0 };
+        let camera_decode_width = if camera_enabled {
+            even_scaled(camera_media.width, camera_decode_scale)
+        } else {
+            0
+        };
+        let camera_decode_height = if camera_enabled {
+            even_scaled(camera_media.height, camera_decode_scale)
+        } else {
+            0
+        };
 
         // Composition.qml reads the state as it loads.
         let mut state = CompositionState::initial(&project);
@@ -382,7 +451,11 @@ impl ExportJob {
         state.output_height = height;
         state.source_width = media.width;
         state.source_height = media.height;
-        state.capture_scale = if capture_scale > 0.0 { capture_scale } else { 1.0 };
+        state.capture_scale = if capture_scale > 0.0 {
+            capture_scale
+        } else {
+            1.0
+        };
         state.camera_available = camera_media.width > 0;
         state.camera_source_width = camera_media.width;
         state.camera_source_height = camera_media.height;
@@ -439,7 +512,10 @@ impl ExportJob {
             }),
             encode_thread: None,
             decode: Arc::new(DecodeShared {
-                queue: Mutex::new(DecodeQueue { packets: VecDeque::new(), done: false }),
+                queue: Mutex::new(DecodeQueue {
+                    packets: VecDeque::new(),
+                    done: false,
+                }),
                 ready: Condvar::new(),
                 space: Condvar::new(),
                 stop: AtomicBool::new(false),
@@ -519,12 +595,20 @@ impl ExportJob {
         if runtime.is_empty() || !FileInfo::new(&runtime).is_writable() {
             runtime = qdir::temp_path();
         }
-        let raw_file = self.raw_file.insert(TemporaryFile::new(&qdir::file_path(&runtime, "omareel-export-XXXXXX.rgba")));
-        let click_file = self.click_file.insert(TemporaryFile::new(&qdir::file_path(&runtime, "omareel-click-XXXXXX.wav")));
-        let encoded_file = self.encoded_file.insert(TemporaryFile::new(&qdir::file_path(
-            &FileInfo::new(&self.options.output_path).absolute_path(),
-            ".omareel-export-XXXXXX.mp4",
+        let raw_file = self.raw_file.insert(TemporaryFile::new(&qdir::file_path(
+            &runtime,
+            "omareel-export-XXXXXX.rgba",
         )));
+        let click_file = self.click_file.insert(TemporaryFile::new(&qdir::file_path(
+            &runtime,
+            "omareel-click-XXXXXX.wav",
+        )));
+        let encoded_file = self
+            .encoded_file
+            .insert(TemporaryFile::new(&qdir::file_path(
+                &FileInfo::new(&self.options.output_path).absolute_path(),
+                ".omareel-export-XXXXXX.mp4",
+            )));
         self.encoded_path = self.options.output_path.clone();
         if !gif {
             if !encoded_file.open() {
@@ -536,7 +620,8 @@ impl ExportJob {
         let project = &self.project;
         // Each encoder to try, with its whole command line.
         let mut encoders: Vec<(&'static str, Vec<String>)> = Vec::new();
-        let use_source_audio = !gif && self.media.audio && (project.audio.desktop || project.audio.mic);
+        let use_source_audio =
+            !gif && self.media.audio && (project.audio.desktop || project.audio.mic);
         let click_times = if !gif && project.cursor.click_sound == "soft" {
             plan::click_output_times(&self.input, &project.clips)
         } else {
@@ -618,7 +703,8 @@ impl ExportJob {
                 if !click_file.open() {
                     return Err(prepare_failed());
                 }
-                if click_file.write(CLICK_SOUND) != CLICK_SOUND.len() as i64 || !click_file.flush() {
+                if click_file.write(CLICK_SOUND) != CLICK_SOUND.len() as i64 || !click_file.flush()
+                {
                     return Err(prepare_failed());
                 }
                 click_file.close();
@@ -628,7 +714,13 @@ impl ExportJob {
             if any_audio || use_clicks {
                 encoder_args.extend([
                     "-filter_complex".into(),
-                    plan::audio_filter(&audio_segments, project.audio.volume, &click_times, click_input, self.output_duration),
+                    plan::audio_filter(
+                        &audio_segments,
+                        project.audio.volume,
+                        &click_times,
+                        click_input,
+                        self.output_duration,
+                    ),
                     "-map".into(),
                     "0:v:0".into(),
                     "-map".into(),
@@ -647,23 +739,32 @@ impl ExportJob {
                 &self.options.quality
             });
             let bitrate = cpp::int64_cast(
-                (f64::from(self.width) * f64::from(self.height) * f64::from(self.fps) * plan::bitrate_multiplier(&quality))
-                    .floor(),
+                (f64::from(self.width)
+                    * f64::from(self.height)
+                    * f64::from(self.fps)
+                    * plan::bitrate_multiplier(&quality))
+                .floor(),
             );
             // The first GPU encoder that encodes a frame of this size, then libx264 in case it
             // still will not start.
             let choice = std::env::var("OMAREEL_EXPORT_ENCODER").unwrap_or_default();
             let nvenc_disabled = std::env::var_os("OMAREEL_DISABLE_NVENC").is_some();
-            let candidates = plan::video_encoders(&choice, nvenc_disabled, hardware::vaapi_device());
+            let candidates =
+                plan::video_encoders(&choice, nvenc_disabled, hardware::vaapi_device());
             let hardware_encoder = candidates.iter().find(|encoder| {
-                **encoder != VideoEncoder::X264 && plan::encoder_works(encoder, self.width, self.height, bitrate)
+                **encoder != VideoEncoder::X264
+                    && plan::encoder_works(encoder, self.width, self.height, bitrate)
             });
             for encoder in hardware_encoder.into_iter().chain([&VideoEncoder::X264]) {
                 let mut args: Vec<String> = ["-y", "-v", "error"].map(String::from).into();
                 args.extend(encoder.device_arguments());
                 args.extend(encoder_args.iter().cloned());
                 args.extend(encoder.video_arguments(!software_rendering, bitrate));
-                args.extend(["-movflags".into(), "+faststart".into(), self.encoded_path.clone()]);
+                args.extend([
+                    "-movflags".into(),
+                    "+faststart".into(),
+                    self.encoded_path.clone(),
+                ]);
                 encoders.push((encoder.name(), args));
             }
         }
@@ -671,9 +772,15 @@ impl ExportJob {
         if !gif {
             let shared = Arc::clone(&self.encode);
             let cancelled = Arc::clone(&self.cancelled);
-            self.encode_thread = Some(std::thread::spawn(move || encode_thread(encoders, &shared, &cancelled)));
+            self.encode_thread = Some(std::thread::spawn(move || {
+                encode_thread(encoders, &shared, &cancelled)
+            }));
             let queue = lock(&self.encode.queue);
-            let queue = self.encode.ready.wait_while(queue, |q| !q.started).unwrap_or_else(PoisonError::into_inner);
+            let queue = self
+                .encode
+                .ready
+                .wait_while(queue, |q| !q.started)
+                .unwrap_or_else(PoisonError::into_inner);
             if !queue.start_ok {
                 let error = queue.error.clone();
                 drop(queue);
@@ -704,14 +811,19 @@ impl ExportJob {
             fps: self.fps,
             total_frames: self.total_frames,
             screen_yuv: if self.yuv_screen && !self.gif {
-                self.media.yuv_matrix.map(|matrix| YuvLayout { matrix, full_range: self.media.full_range })
+                self.media.yuv_matrix.map(|matrix| YuvLayout {
+                    matrix,
+                    full_range: self.media.full_range,
+                })
             } else {
                 None
             },
         };
         let shared = Arc::clone(&self.decode);
         let cancelled = Arc::clone(&self.cancelled);
-        self.decode_thread = Some(std::thread::spawn(move || decode_thread(&work, &shared, &cancelled)));
+        self.decode_thread = Some(std::thread::spawn(move || {
+            decode_thread(&work, &shared, &cancelled)
+        }));
         Ok(())
     }
 
@@ -729,15 +841,24 @@ impl ExportJob {
             let mut queue = self
                 .decode
                 .ready
-                .wait_while(queue, |q| q.packets.is_empty() && !q.done && !cancelled.load(Ordering::SeqCst))
+                .wait_while(queue, |q| {
+                    q.packets.is_empty() && !q.done && !cancelled.load(Ordering::SeqCst)
+                })
                 .unwrap_or_else(PoisonError::into_inner);
             queue.packets.pop_front().unwrap_or_default()
         };
         self.decode.space.notify_one();
         self.decode_ns = self.decode_ns.wrapping_add(nanos(stage_timer));
-        let clip = usize::try_from(packet.clip).ok().and_then(|index| self.project.clips.get(index)).cloned();
+        let clip = usize::try_from(packet.clip)
+            .ok()
+            .and_then(|index| self.project.clips.get(index))
+            .cloned();
         let insert = clip.as_ref().is_some_and(Clip::is_media);
-        let shown = if insert { &packet.insert_image } else { &packet.image };
+        let shown = if insert {
+            &packet.insert_image
+        } else {
+            &packet.image
+        };
         let Some(clip) = clip.filter(|_| shown.is_some()) else {
             return Err(if !packet.error.is_empty() {
                 packet.error
@@ -760,7 +881,11 @@ impl ExportJob {
         self.state.export_frame(&sources, &clip, output_time);
         Ok(FrameImages {
             screen: if insert { None } else { packet.image },
-            camera: if self.camera_enabled && !insert { packet.camera_image } else { None },
+            camera: if self.camera_enabled && !insert {
+                packet.camera_image
+            } else {
+                None
+            },
             insert: if insert { packet.insert_image } else { None },
         })
     }
@@ -793,17 +918,31 @@ impl ExportJob {
     /// the raw file's.
     pub fn encode(&mut self, bytes: FrameBytes) -> Result<(), String> {
         if self.gif {
-            let Some(raw_file) = self.raw_file.as_mut() else { return Err("Export failed".into()) };
+            let Some(raw_file) = self.raw_file.as_mut() else {
+                return Err("Export failed".into());
+            };
             let write_timer = Instant::now();
             let data = (*bytes).as_ref();
-            let result =
-                if raw_file.write(data) != data.len() as i64 { Err(raw_file.error_string()) } else { Ok(()) };
-            self.encode.write_ns.fetch_add(nanos(write_timer), Ordering::SeqCst);
+            let result = if raw_file.write(data) != data.len() as i64 {
+                Err(raw_file.error_string())
+            } else {
+                Ok(())
+            };
+            self.encode
+                .write_ns
+                .fetch_add(nanos(write_timer), Ordering::SeqCst);
             return result;
         }
         let mut queue = lock(&self.encode.queue);
-        if self.encode.abort.load(Ordering::SeqCst) || !queue.error.is_empty() || self.is_cancelled() {
-            return Err(if !queue.error.is_empty() { queue.error.clone() } else { "Export cancelled".into() });
+        if self.encode.abort.load(Ordering::SeqCst)
+            || !queue.error.is_empty()
+            || self.is_cancelled()
+        {
+            return Err(if !queue.error.is_empty() {
+                queue.error.clone()
+            } else {
+                "Export cancelled".into()
+            });
         }
         queue.frames.push_back(bytes);
         drop(queue);
@@ -852,7 +991,9 @@ impl ExportJob {
         let _ = self
             .encode
             .space
-            .wait_timeout_while(queue, Duration::from_millis(timeout_ms), |_| !done.load(Ordering::SeqCst))
+            .wait_timeout_while(queue, Duration::from_millis(timeout_ms), |_| {
+                !done.load(Ordering::SeqCst)
+            })
             .unwrap_or_else(PoisonError::into_inner);
     }
 
@@ -870,7 +1011,11 @@ impl ExportJob {
         if !self.gif {
             let error = lock(&self.encode.queue).error.clone();
             if !error.is_empty() || self.is_cancelled() {
-                return Err(if !error.is_empty() { error } else { "Export cancelled".into() });
+                return Err(if !error.is_empty() {
+                    error
+                } else {
+                    "Export cancelled".into()
+                });
             }
             if qdir::file_exists(&output) && !qfile::remove(&output) {
                 return Err(format!("Could not replace existing output {output}"));
@@ -882,7 +1027,9 @@ impl ExportJob {
             // the ordinary umask-style permissions a freshly written file would have.
             qfile::set_permissions(&output, 0o644);
         } else {
-            let Some(raw_file) = self.raw_file.as_mut() else { return Err("Export failed".into()) };
+            let Some(raw_file) = self.raw_file.as_mut() else {
+                return Err("Export failed".into());
+            };
             raw_file.flush();
             let raw_name = raw_file.file_name();
             let quality = plan::normalized_quality(if self.options.quality.is_empty() {
@@ -908,7 +1055,10 @@ impl ExportJob {
             }
             if !qstandardpaths::find_executable("gifsicle").is_empty() {
                 let mut optimize = Process::new();
-                optimize.start("gifsicle", &["--batch", "--optimize=3", "--lossy=30", output.as_str()]);
+                optimize.start(
+                    "gifsicle",
+                    &["--batch", "--optimize=3", "--lossy=30", output.as_str()],
+                );
                 optimize.wait_for_finished(120000);
             }
         }
@@ -932,9 +1082,17 @@ impl ExportJob {
             per_frame(readback_ns),
             per_frame(self.encode.write_ns.load(Ordering::SeqCst)),
             number_f64(seconds, 'f', 3),
-            number_f64(f64::from(self.total_frames) / cpp::max(0.001, seconds), 'f', 1),
+            number_f64(
+                f64::from(self.total_frames) / cpp::max(0.001, seconds),
+                'f',
+                1
+            ),
             lock(&self.decode.acceleration),
-            if self.gif { "gif".to_owned() } else { lock(&self.encode.queue).encoder.clone() },
+            if self.gif {
+                "gif".to_owned()
+            } else {
+                lock(&self.encode.queue).encoder.clone()
+            },
         )
     }
 }
@@ -959,7 +1117,9 @@ type Encoders = std::vec::IntoIter<(&'static str, Vec<String>)>;
 /// Starts the next of `encoders` and notes its name; false when there is none or it did not
 /// start.
 fn start_encoder(process: &mut Process, encoders: &mut Encoders, shared: &EncodeShared) -> bool {
-    let Some((name, args)) = encoders.next() else { return false };
+    let Some((name, args)) = encoders.next() else {
+        return false;
+    };
     lock(&shared.queue).encoder = name.to_owned();
     process.set_pipe_capacity(decoder::PIPE_CAPACITY);
     process.start("ffmpeg", &args);
@@ -969,7 +1129,11 @@ fn start_encoder(process: &mut Process, encoders: &mut Encoders, shared: &Encode
 /// The encode thread: starts the first of `encoders`, then writes each queued frame until told
 /// to close (then finishes the file) or to stop. ffmpeg is killed if it is still running at the
 /// end.
-fn encode_thread(encoders: Vec<(&'static str, Vec<String>)>, shared: &EncodeShared, cancelled_flag: &AtomicBool) {
+fn encode_thread(
+    encoders: Vec<(&'static str, Vec<String>)>,
+    shared: &EncodeShared,
+    cancelled_flag: &AtomicBool,
+) {
     let mut process = Process::new();
     let cancelled = || shared.abort.load(Ordering::SeqCst) || cancelled_flag.load(Ordering::SeqCst);
     let mut encoders = encoders.into_iter();
@@ -984,7 +1148,13 @@ fn encode_thread(encoders: Vec<(&'static str, Vec<String>)>, shared: &EncodeShar
     }
     shared.ready.notify_all();
     if started {
-        encode_frames(&mut process, &mut encoders, shared, cancelled_flag, &cancelled);
+        encode_frames(
+            &mut process,
+            &mut encoders,
+            shared,
+            cancelled_flag,
+            &cancelled,
+        );
     }
     if process.state() != crate::compat::qprocess::ProcessState::NotRunning {
         process.kill();
@@ -1021,12 +1191,15 @@ fn encode_frames(
             if queue.frames.is_empty() && queue.closing {
                 break;
             }
-            let Some(bytes) = queue.frames.pop_front() else { continue };
+            let Some(bytes) = queue.frames.pop_front() else {
+                continue;
+            };
             bytes
         };
         shared.space.notify_one();
         let write_timer = Instant::now();
-        let mut written = write_encoder_frame(process, (*bytes).as_ref(), cancelled, STALL_TIMEOUT_MS);
+        let mut written =
+            write_encoder_frame(process, (*bytes).as_ref(), cancelled, STALL_TIMEOUT_MS);
         // An encoder that exits before taking the first frame could not start here (a device
         // that will not open, a driver that refuses): the next one gets the frame instead. One
         // that is still running has stalled, and is not replaced.
@@ -1039,7 +1212,11 @@ fn encode_frames(
             let failed = lock(&shared.queue).encoder.clone();
             let details = qstring::from_utf8(&process.read_all_standard_error());
             let details = qstring::trimmed(&details);
-            let reason = if details.is_empty() { pipe_error.as_str() } else { details };
+            let reason = if details.is_empty() {
+                pipe_error.as_str()
+            } else {
+                details
+            };
             if !start_encoder(process, encoders, shared) {
                 break;
             }
@@ -1057,7 +1234,9 @@ fn encode_frames(
             shared.space.notify_all();
             return;
         }
-        shared.write_ns.fetch_add(nanos(write_timer), Ordering::SeqCst);
+        shared
+            .write_ns
+            .fetch_add(nanos(write_timer), Ordering::SeqCst);
     }
     if let Err(pipe_error) = finish_encoder_pipe(process, cancelled, FINISH_TIMEOUT_MS) {
         lock(&shared.queue).error = pipe_error;
@@ -1066,16 +1245,28 @@ fn encode_frames(
 
 /// Queues `error` for the frame loop, which stops at it.
 fn push_error(shared: &DecodeShared, error: String) {
-    lock(&shared.queue).packets.push_back(DecodedPacket::failed(error));
+    lock(&shared.queue)
+        .packets
+        .push_back(DecodedPacket::failed(error));
 }
 
 fn image(pixels: Vec<u8>, width: i32, height: i32, yuv: Option<YuvLayout>) -> Image {
-    Image { width, height, pixels: Arc::new(pixels), yuv }
+    Image {
+        width,
+        height,
+        pixels: Arc::new(pixels),
+        yuv,
+    }
 }
 
 /// Starts `decoder` on `clip`: the recording at the decode size, or an inserted video scaled to
 /// its own size.
-fn start_clip_decoder(decoder: &mut FfmpegDecoder, clip: &Clip, work: &DecodePlan, error: &mut String) -> bool {
+fn start_clip_decoder(
+    decoder: &mut FfmpegDecoder,
+    clip: &Clip,
+    work: &DecodePlan,
+    error: &mut String,
+) -> bool {
     decoder.set_yuv(!clip.is_media() && work.screen_yuv.is_some());
     if clip.is_media() {
         let info = work.inserts.get(&clip.media).copied().unwrap_or_default();
@@ -1153,7 +1344,12 @@ fn decode_thread(work: &DecodePlan, shared: &DecodeShared, cancelled: &AtomicBoo
     while frame < work.total_frames && !stopped() {
         let output_time = f64::from(frame) / f64::from(work.fps);
         let clip_index = work.timeline.clip_at(output_time, None);
-        let Some(clip) = usize::try_from(clip_index).ok().and_then(|index| work.clips.get(index)) else { break };
+        let Some(clip) = usize::try_from(clip_index)
+            .ok()
+            .and_then(|index| work.clips.get(index))
+        else {
+            break;
+        };
         let mut decode_error = String::new();
         if clip_index != active_clip {
             // The decoder started ahead for this clip, or a new one.
@@ -1181,14 +1377,28 @@ fn decode_thread(work: &DecodePlan, shared: &DecodeShared, cancelled: &AtomicBoo
         // kept until the loop reaches it: a clip shorter than the second would otherwise lose its
         // decoder to the clip after it and start another at its boundary. Every clip change
         // clears next_clip, so the clip after is prepared then.
-        let ahead_index = work.timeline.clip_at(f64::from(frame + work.fps) / f64::from(work.fps), None);
+        let ahead_index = work
+            .timeline
+            .clip_at(f64::from(frame + work.fps) / f64::from(work.fps), None);
         if ahead_index != active_clip && next_clip < 0 {
-            if let Some(ahead) = usize::try_from(ahead_index).ok().and_then(|index| work.clips.get(index)) {
+            if let Some(ahead) = usize::try_from(ahead_index)
+                .ok()
+                .and_then(|index| work.clips.get(index))
+            {
                 let mut ahead_error = String::new();
-                next_clip = if start_clip_decoder(&mut next_decoder, ahead, work, &mut ahead_error) { ahead_index } else { -1 };
+                next_clip = if start_clip_decoder(&mut next_decoder, ahead, work, &mut ahead_error)
+                {
+                    ahead_index
+                } else {
+                    -1
+                };
             }
         }
-        let shown = if clip.is_media() { &mut insert_decoded } else { &mut decoded };
+        let shown = if clip.is_media() {
+            &mut insert_decoded
+        } else {
+            &mut decoded
+        };
         if let Some(next) = decoder.read_frame(&mut decode_error) {
             let yuv = if decoder.yuv() { work.screen_yuv } else { None };
             *shown = Some(image(next, decoder.width(), decoder.height(), yuv));
@@ -1198,7 +1408,11 @@ fn decode_thread(work: &DecodePlan, shared: &DecodeShared, cancelled: &AtomicBoo
         } else if shown.is_none() {
             push_error(
                 shared,
-                if decode_error.is_empty() { "Decoder ended before the first frame".into() } else { decode_error },
+                if decode_error.is_empty() {
+                    "Decoder ended before the first frame".into()
+                } else {
+                    decode_error
+                },
             );
             break;
         }
@@ -1233,7 +1447,12 @@ fn decode_thread(work: &DecodePlan, shared: &DecodeShared, cancelled: &AtomicBoo
             }
             while !camera_eof && camera_frame < wanted {
                 if let Some(next) = camera_decoder.read_frame(&mut decode_error) {
-                    camera_decoded = Some(image(next, camera_decoder.width(), camera_decoder.height(), None));
+                    camera_decoded = Some(image(
+                        next,
+                        camera_decoder.width(),
+                        camera_decoder.height(),
+                        None,
+                    ));
                     camera_frame += 1;
                 } else {
                     camera_eof = true;

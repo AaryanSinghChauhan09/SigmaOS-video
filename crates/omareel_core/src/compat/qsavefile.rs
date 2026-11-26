@@ -41,7 +41,7 @@
 //! a temporary name.
 
 use super::qdir::{self, FileInfo};
-use super::qtemporaryfile::{self, errno, linkat_fd, rename_raw, TemplateName};
+use super::qtemporaryfile::{self, TemplateName, errno, linkat_fd, rename_raw};
 use std::ffi::CString;
 
 /// `QFILE_WRITEBUFFER_SIZE`.
@@ -76,13 +76,23 @@ impl Engine {
     /// `QTemporaryFileEngine::open` for `template` with the given creation mode.
     fn open(template: &str, mode: u32) -> Result<Engine, (i32, String)> {
         let (fd, named) = qtemporaryfile::create_with_errno(template, mode)?;
-        Ok(Engine { fd, named, direct: false, template: template.to_string(), error: (FileError::Unspecified, String::new()) })
+        Ok(Engine {
+            fd,
+            named,
+            direct: false,
+            template: template.to_string(),
+            error: (FileError::Unspecified, String::new()),
+        })
     }
 
     /// `QFSFileEngine(path).open(WriteOnly)`: the file itself, created or truncated.
     fn open_direct(path: &str) -> Result<Engine, String> {
-        let fd = qtemporaryfile::open_raw(path.as_bytes(), libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC, 0o666)
-            .map_err(qdir::error_string)?;
+        let fd = qtemporaryfile::open_raw(
+            path.as_bytes(),
+            libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC,
+            0o666,
+        )
+        .map_err(qdir::error_string)?;
         Ok(Engine {
             fd,
             named: Some(path.as_bytes().to_vec()),
@@ -114,7 +124,11 @@ impl Engine {
             written += r as usize;
         }
         if !data.is_empty() && written == 0 {
-            let kind = if err == libc::ENOSPC { FileError::Resource } else { FileError::Write };
+            let kind = if err == libc::ENOSPC {
+                FileError::Resource
+            } else {
+                FileError::Write
+            };
             self.error = (kind, qdir::error_string(err));
             return -1;
         }
@@ -336,7 +350,9 @@ impl SaveFile {
     /// `QFileDevice::setPermissions` on the open file (the temporary one, or the final one when
     /// writing directly), with the permissions as mode bits.
     pub fn set_permissions(&mut self, mode: u32) -> bool {
-        let Some(engine) = &self.engine else { return false };
+        let Some(engine) = &self.engine else {
+            return false;
+        };
         // SAFETY: `fd` is open.
         if unsafe { libc::fchmod(engine.fd, mode as libc::mode_t) } == 0 {
             self.unset_error();
@@ -371,7 +387,9 @@ impl SaveFile {
             return -1;
         }
         if data.len() > WRITE_BUFFER_CHUNK {
-            let Some(engine) = self.engine.as_mut() else { return -1 };
+            let Some(engine) = self.engine.as_mut() else {
+                return -1;
+            };
             let ret = engine.write(data);
             if ret < 0 {
                 let (mut kind, text) = engine.error.clone();
@@ -388,7 +406,9 @@ impl SaveFile {
 
     /// `QFileDevice::flush`.
     fn flush(&mut self) -> bool {
-        let Some(engine) = self.engine.as_mut() else { return false };
+        let Some(engine) = self.engine.as_mut() else {
+            return false;
+        };
         if !self.buffer.is_empty() {
             let size = self.buffer.len();
             let written = engine.write(&self.buffer);
@@ -426,7 +446,9 @@ impl SaveFile {
         let flushed = self.flush();
         self.open = false;
         self.buffer.clear();
-        let Some(mut engine) = self.engine.take() else { return false };
+        let Some(mut engine) = self.engine.take() else {
+            return false;
+        };
         engine.error = (FileError::Unspecified, String::new());
         if flushed {
             self.unset_error();
@@ -486,7 +508,11 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
 
     fn mode(path: &str) -> u32 {
-        std::fs::symlink_metadata(path).unwrap().permissions().mode() & 0o7777
+        std::fs::symlink_metadata(path)
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o7777
     }
 
     fn read(path: &str) -> String {
@@ -494,8 +520,10 @@ mod tests {
     }
 
     fn entries(dir: &str) -> Vec<String> {
-        let mut names: Vec<String> =
-            std::fs::read_dir(dir).unwrap().map(|e| e.unwrap().file_name().into_string().unwrap()).collect();
+        let mut names: Vec<String> = std::fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
         names.sort();
         names
     }
@@ -516,10 +544,20 @@ mod tests {
         assert_eq!(mode(&f), mode(&dir.join("reference")));
 
         // Existing files keep their permission bits, but not setuid.
-        for (before, after) in [(0o640, 0o640), (0o600, 0o600), (0o755, 0o755), (0o4755, 0o755), (0o604, 0o604)] {
+        for (before, after) in [
+            (0o640, 0o640),
+            (0o600, 0o600),
+            (0o755, 0o755),
+            (0o4755, 0o755),
+            (0o604, 0o604),
+        ] {
             write_mode(&f, "old", before);
             assert_eq!(save(&f, b"new"), Ok(()), "{before:o}");
-            assert_eq!((read(&f), mode(&f)), ("new".to_string(), after), "{before:o}");
+            assert_eq!(
+                (read(&f), mode(&f)),
+                ("new".to_string(), after),
+                "{before:o}"
+            );
         }
         assert_eq!(save(&f, b""), Ok(()));
         assert_eq!(read(&f), "");
@@ -528,7 +566,10 @@ mod tests {
         assert_eq!(read(&f), big);
         // A name with a run of X's is its own temporary-file template.
         assert_eq!(save(&dir.join("fooXXXXXXbar.json"), b"x"), Ok(()));
-        assert_eq!(entries(&dir.0), ["f.json", "fooXXXXXXbar.json", "reference"]);
+        assert_eq!(
+            entries(&dir.0),
+            ["f.json", "fooXXXXXXbar.json", "reference"]
+        );
     }
 
     #[test]
@@ -537,24 +578,45 @@ mod tests {
         let f = dir.join("ro");
         write_mode(&f, "old", 0o444);
         if !FileInfo::new(&f).is_writable() {
-            assert_eq!(save(&f, b"new"), Err(format!("Existing file {f} is not writable")));
+            assert_eq!(
+                save(&f, b"new"),
+                Err(format!("Existing file {f} is not writable"))
+            );
             assert_eq!(read(&f), "old");
         }
         std::fs::create_dir(dir.join("d")).unwrap();
-        assert_eq!(save(&dir.join("d"), b"x"), Err("Filename refers to a directory".into()));
+        assert_eq!(
+            save(&dir.join("d"), b"x"),
+            Err("Filename refers to a directory".into())
+        );
         std::os::unix::fs::symlink("d", dir.join("dlink")).unwrap();
-        assert_eq!(save(&dir.join("dlink"), b"x"), Err("Filename refers to a directory".into()));
-        assert_eq!(save(&dir.join("missing/f"), b"x"), Err("No such file or directory".into()));
+        assert_eq!(
+            save(&dir.join("dlink"), b"x"),
+            Err("Filename refers to a directory".into())
+        );
+        assert_eq!(
+            save(&dir.join("missing/f"), b"x"),
+            Err("No such file or directory".into())
+        );
         std::fs::write(dir.join("plain"), b"old").unwrap();
-        assert_eq!(save(&format!("{}/", dir.join("plain")), b"x"), Err("Not a directory".into()));
+        assert_eq!(
+            save(&format!("{}/", dir.join("plain")), b"x"),
+            Err("Not a directory".into())
+        );
         // The temporary file is made where the cleaned name points; the link goes to the name as
         // given, which fails when "missing" doesn't exist.
-        assert_eq!(save(&dir.join("missing/../late"), b"x"), Err("No such file or directory".into()));
+        assert_eq!(
+            save(&dir.join("missing/../late"), b"x"),
+            Err("No such file or directory".into())
+        );
         let locked = dir.join("locked");
         std::fs::create_dir(&locked).unwrap();
         std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o555)).unwrap();
         if !FileInfo::new(&locked).is_writable() {
-            assert_eq!(save(&format!("{locked}/f"), b"x"), Err("Permission denied".into()));
+            assert_eq!(
+                save(&format!("{locked}/f"), b"x"),
+                Err("Permission denied".into())
+            );
         }
         assert_eq!(entries(&dir.0), ["d", "dlink", "locked", "plain", "ro"]);
     }
@@ -567,7 +629,10 @@ mod tests {
         std::os::unix::fs::symlink("other/t", dir.join("rel")).unwrap();
         assert_eq!(save(&dir.join("rel"), b"via link"), Ok(()));
         assert!(FileInfo::new(dir.join("rel")).is_symlink());
-        assert_eq!((read(&dir.join("other/t")), mode(&dir.join("other/t"))), ("via link".into(), 0o640));
+        assert_eq!(
+            (read(&dir.join("other/t")), mode(&dir.join("other/t"))),
+            ("via link".into(), 0o640)
+        );
         // A chain, each link resolved from where it is.
         std::fs::create_dir(dir.join("sub")).unwrap();
         std::os::unix::fs::symlink("../other/t", dir.join("sub/l2")).unwrap();

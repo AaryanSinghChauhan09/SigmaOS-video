@@ -91,19 +91,37 @@ fn queries(out: &mut Text, clips: &[Clip]) {
     for i in indices(clips) {
         for source_duration in [8.0, 100.0] {
             let (lower, upper) = timeline.recording_bounds(i, source_duration);
-            out.row(["recordingBounds".into(), i.to_string(), num(source_duration), num(lower), num(upper)]);
+            out.row([
+                "recordingBounds".into(),
+                i.to_string(),
+                num(source_duration),
+                num(lower),
+                num(upper),
+            ]);
         }
     }
 
     let mut sources = uniform(2, -2, 24);
     for clip in clips {
-        sources.extend([before(clip.in_), clip.in_, after(clip.in_), before(clip.out), clip.out, after(clip.out)]);
+        sources.extend([
+            before(clip.in_),
+            clip.in_,
+            after(clip.in_),
+            before(clip.out),
+            clip.out,
+            after(clip.out),
+        ]);
     }
     let mut sources = sorted_unique(sources);
     sources.extend([f64::NEG_INFINITY, f64::INFINITY, f64::NAN]);
     for i in indices(clips) {
         for &source in &sources {
-            out.row(["outputTime".into(), i.to_string(), num(source), num(timeline.output_time(i, source))]);
+            out.row([
+                "outputTime".into(),
+                i.to_string(),
+                num(source),
+                num(timeline.output_time(i, source)),
+            ]);
         }
     }
 
@@ -115,7 +133,13 @@ fn queries(out: &mut Text, clips: &[Clip]) {
     for &from in &ends {
         for &to in &ends {
             let (first, second) = timeline.output_range(from, to);
-            out.row(["outputRange".into(), num(from), num(to), num(first), num(second)]);
+            out.row([
+                "outputRange".into(),
+                num(from),
+                num(to),
+                num(first),
+                num(second),
+            ]);
         }
     }
 }
@@ -128,21 +152,39 @@ fn edits(out: &mut Text, clips: &[Clip], split_sequence: &Value) {
     let mut splits = time_grid(4, 2, total);
     for &b in &bounds {
         let (below, above) = (b - 1e-9, b + 1e-9);
-        splits.extend([before(below), below, after(below), b, before(above), above, after(above)]);
+        splits.extend([
+            before(below),
+            below,
+            after(below),
+            b,
+            before(above),
+            above,
+            after(above),
+        ]);
     }
     let mut splits = sorted_unique(splits);
     splits.extend([f64::NEG_INFINITY, f64::INFINITY, f64::NAN]);
     for t in splits {
         let mut edited = timeline.clone();
         let ok = edited.split(t);
-        out.row(["split".into(), num(t), boolean(ok).into(), clips_text(edited.clips())]);
+        out.row([
+            "split".into(),
+            num(t),
+            boolean(ok).into(),
+            clips_text(edited.clips()),
+        ]);
     }
     // One timeline split again and again: ids count up in the object.
     let mut sequence = timeline.clone();
     for value in split_sequence.to_array() {
         let t = value.to_double(0.0);
         let ok = sequence.split(t);
-        out.row(["splitSequence".into(), num(t), boolean(ok).into(), clips_text(sequence.clips())]);
+        out.row([
+            "splitSequence".into(),
+            num(t),
+            boolean(ok).into(),
+            clips_text(sequence.clips()),
+        ]);
     }
 
     let trims = [
@@ -175,7 +217,12 @@ fn edits(out: &mut Text, clips: &[Clip], split_sequence: &Value) {
     for i in indices(clips) {
         let mut edited = timeline.clone();
         let ok = edited.remove(i);
-        out.row(["remove".into(), i.to_string(), boolean(ok).into(), clips_text(edited.clips())]);
+        out.row([
+            "remove".into(),
+            i.to_string(),
+            boolean(ok).into(),
+            clips_text(edited.clips()),
+        ]);
     }
 
     let n = clips.len();
@@ -205,7 +252,8 @@ fn edits(out: &mut Text, clips: &[Clip], split_sequence: &Value) {
     ]);
     let existing = clips.first().map_or("c1", |clip| clip.id.as_str());
     for (from, to) in ranges {
-        let (mut with_id, mut without_id, mut with_existing) = (timeline.clone(), timeline.clone(), timeline.clone());
+        let (mut with_id, mut without_id, mut with_existing) =
+            (timeline.clone(), timeline.clone(), timeline.clone());
         let ok = with_id.delete_range(from, to, "r");
         let ok_without = without_id.delete_range(from, to, "");
         let ok_existing = with_existing.delete_range(from, to, existing);
