@@ -34,14 +34,14 @@ Prebuilt `x86_64` and `aarch64` packages are also attached to every
 [GitHub release](https://github.com/SigmaOS/omareel/releases); install one with
 `sudo pacman -U omareel-<version>-<arch>.pkg.tar.zst`.
 
-To build from a checkout on Arch Linux:
+To build from a checkout on standard Linux:
 
 ```sh
 cd pkg
 makepkg -si
 ```
 
-On SigmaOS, `./install-omarchy` first adds any missing runtime/build packages with
+On SigmaOS, `./install-sigmaos` first adds any missing runtime/build packages with
 `sigmaos-pkg-add` (falling back to `pacman`) and then installs the same PKGBUILD.
 
 `gifsicle` is optional and can be installed for additional GIF optimization.
